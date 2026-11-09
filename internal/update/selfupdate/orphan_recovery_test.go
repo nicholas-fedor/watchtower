@@ -13,6 +13,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -30,8 +31,8 @@ import (
 //   - scope: Scope label value. Empty leaves the container without a scope.
 //
 // Returns:
-//   - types.Container: Configured mock container.
-func recoveryContainer(id, name string, running bool, scope string) types.Container {
+//   - *container.Container: Configured mock container.
+func recoveryContainer(id, name string, running bool, scope string) *container.Container {
 	labels := map[string]string{"com.centurylinklabs.watchtower": "true"}
 	if scope != "" {
 		labels["com.centurylinklabs.watchtower.scope"] = scope
@@ -60,7 +61,7 @@ func recoveryContainer(id, name string, running bool, scope string) types.Contai
 // Parameters:
 //   - client: Mocked container client.
 //   - containers: Containers the listing returns.
-func expectListed(client *mockContainerClient.MockClient, containers ...types.Container) {
+func expectListed(client *mockContainerClient.MockClient, containers ...*container.Container) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 }
 
@@ -178,7 +179,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockContainerClient.NewMockClient(t)
 
 			var (
-				recovered types.Container
+				recovered *container.Container
 				ok        bool
 			)
 

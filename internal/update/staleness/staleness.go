@@ -8,12 +8,12 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for checking images for updates.
@@ -32,14 +32,14 @@ var (
 //   - The container is a Watchtower instance other than the current one.
 //
 // Parameters:
-//   - container: The container to check.
+//   - c: The container to check.
 //   - stale: Whether the container's image is outdated.
 //   - config: Update parameters controlling update behavior.
 //
 // Returns:
 //   - bool: True if the container should be updated, false otherwise.
 func ShouldUpdate(
-	container types.Container,
+	c *container.Container,
 	stale bool,
 	config updateParams.Params,
 ) bool {
@@ -50,28 +50,28 @@ func ShouldUpdate(
 
 	// Skip old Watchtower containers — they are predecessors from a
 	// self-update and should only be removed, never updated.
-	if filters.IsOldWatchtower(container) {
+	if filters.IsOldWatchtower(c) {
 		return false
 	}
 
 	// Skip monitor-only containers
-	if container.IsMonitorOnly(config.Policy) {
+	if c.IsMonitorOnly(config.Policy) {
 		return false
 	}
 
 	// Skip Watchtower self-update in run-once mode
-	if config.RunOnce && container.IsWatchtower() {
+	if config.RunOnce && c.IsWatchtower() {
 		return false
 	}
 
 	// Skip Watchtower self-update if SkipSelfUpdate is true
-	if config.SkipSelfUpdate && container.IsWatchtower() {
+	if config.SkipSelfUpdate && c.IsWatchtower() {
 		return false
 	}
 
 	// Skip other Watchtower containers from self-updates
-	if container.IsWatchtower() && config.CurrentContainerID != "" &&
-		container.ID() != config.CurrentContainerID {
+	if c.IsWatchtower() && config.CurrentContainerID != "" &&
+		c.ID() != config.CurrentContainerID {
 		return false
 	}
 
@@ -84,16 +84,16 @@ func ShouldUpdate(
 //   - imageName: Image name to parse.
 //   - configImage: Config.Image value for log context.
 //   - fallbackImage: Fallback image name for log context.
-//   - cont: Container being processed (for log fields).
+//   - c: Container being processed (for log fields).
 //
 // Returns:
 //   - error: Non-nil if the image name cannot be parsed as a Docker reference.
 func parseReference(log *zerolog.Logger, imageName, configImage, fallbackImage string,
-	cont types.Container,
+	c *container.Container,
 ) error {
 	// Set up logging with container and image details.
 	clogVal := log.With().
-		Str("container", cont.Name()).
+		Str("container", c.Name()).
 		Str("image", imageName).
 		Logger()
 	clog := &clogVal
@@ -134,7 +134,7 @@ func parseReference(log *zerolog.Logger, imageName, configImage, fallbackImage s
 //
 // Parameters:
 //   - log: Process logger.
-//   - cont: The container to check for a pinned image.
+//   - c: The container to check for a pinned image.
 //   - progress: The progress tracker to update for scanned or skipped containers.
 //   - config: Update parameters for the Git monitoring check and the scanned record.
 //   - gitSession: The session's Git monitoring, which decides whether Git watches the container.
@@ -144,27 +144,27 @@ func parseReference(log *zerolog.Logger, imageName, configImage, fallbackImage s
 //   - error: Non-nil if no valid image reference can be resolved, nil on success.
 func IsPinned(
 	log *zerolog.Logger,
-	cont types.Container,
+	c *container.Container,
 	progress *state.Progress,
 	config updateParams.Params,
 	gitSession *rebuild.Session,
 ) (bool, error) {
 	// Set up logging with container and image details for debugging.
 	clogVal := log.With().
-		Str("container", cont.Name()).
-		Str("image", cont.ImageName()).
+		Str("container", c.Name()).
+		Str("image", c.ImageName()).
 		Logger()
 	clog := &clogVal
 
 	// Get initial image name and configuration.
-	imageName := cont.ImageName()
+	imageName := c.ImageName()
 
 	var configImage string
-	if info := cont.ContainerInfo(); info != nil && info.Config != nil {
+	if info := c.ContainerInfo(); info != nil && info.Config != nil {
 		configImage = info.Config.Image
 	}
 
-	fallbackImage := getFallbackImage(cont)
+	fallbackImage := getFallbackImage(c)
 
 	// Check if ImageName is invalid and fall back to Config.Image or a derived name.
 	if isInvalidImageName(imageName) {
@@ -194,7 +194,7 @@ func IsPinned(
 	// A repo@sha256 reference must stay pinned even when ParseDockerRef fails
 	// for unrelated reasons.
 	if containerImage.IsImagePinnedByDigest(imageName) {
-		if gitSession.Watching(log, cont, config) {
+		if gitSession.Watching(log, c, config) {
 			clog.Debug().Msg("Pinned digest uses Git path because watcher is on")
 
 			return false, nil
@@ -204,8 +204,8 @@ func IsPinned(
 			Bool("is_digested", true).
 			Msg("Pinned image detected, marking as scanned")
 		progress.AddScanned(log,
-			cont,
-			cont.ImageID(),
+			c,
+			c.ImageID(),
 			config,
 		)
 
@@ -213,7 +213,7 @@ func IsPinned(
 	}
 
 	// Non-pinned names must still be parseable. Retry with fallback when needed.
-	err := parseReference(log, imageName, configImage, fallbackImage, cont)
+	err := parseReference(log, imageName, configImage, fallbackImage, c)
 	if err != nil {
 		if imageName != fallbackImage {
 			clog.Debug().Msg("Retrying with fallback image")
@@ -222,7 +222,7 @@ func IsPinned(
 				fallbackImage,
 				configImage,
 				fallbackImage,
-				cont,
+				c,
 			)
 			if fallbackErr != nil {
 				return false, err
@@ -239,8 +239,8 @@ func IsPinned(
 
 // getFallbackImage derives a fallback image name from container info.
 // Uses the container name with ":latest" as the fallback image.
-func getFallbackImage(container types.Container) string {
-	return container.Name() + ":latest"
+func getFallbackImage(c *container.Container) string {
+	return c.Name() + ":latest"
 }
 
 // isInvalidImageName checks if an image name is invalid.

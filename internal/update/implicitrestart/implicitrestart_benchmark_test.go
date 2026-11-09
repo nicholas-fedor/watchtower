@@ -7,9 +7,9 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // benchmarkStackSize is the number of containers in each benchmark Compose stack.
@@ -18,8 +18,8 @@ const benchmarkStackSize = 7
 // benchmarkComposeHost returns a host running stacks Compose stacks, each with
 // a web service that depends on api, an api that depends on db and cache, and
 // a worker that depends on db, with two replicas of api and worker.
-func benchmarkComposeHost(stacks int) []types.Container {
-	containers := make([]types.Container, 0, stacks*benchmarkStackSize)
+func benchmarkComposeHost(stacks int) []*container.Container {
+	containers := make([]*container.Container, 0, stacks*benchmarkStackSize)
 
 	for s := range stacks {
 		project := fmt.Sprintf("stack%d", s)

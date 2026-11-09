@@ -642,7 +642,7 @@ func TestClient(t *testing.T) {
 
 				containers, err := c.ListContainers(t.Context(), filters.NoFilter)
 				require.NoError(t, err)
-				assert.True(t, slices.ContainsFunc(containers, func(container types.Container) bool {
+				assert.True(t, slices.ContainsFunc(containers, func(container *container.Container) bool {
 					return !container.ContainerInfo().State.Running
 				}), "a stopped container is listed")
 			})
@@ -669,7 +669,7 @@ func TestClient(t *testing.T) {
 
 				containers, err := c.ListContainers(t.Context(), filters.NoFilter)
 				require.NoError(t, err)
-				assert.True(t, slices.ContainsFunc(containers, func(container types.Container) bool {
+				assert.True(t, slices.ContainsFunc(containers, func(container *container.Container) bool {
 					return container.ContainerInfo().State.Restarting
 				}), "a restarting container is listed")
 			})
@@ -685,7 +685,7 @@ func TestClient(t *testing.T) {
 
 				containers, err := c.ListContainers(t.Context(), filters.NoFilter)
 				require.NoError(t, err)
-				assert.False(t, slices.ContainsFunc(containers, func(container types.Container) bool {
+				assert.False(t, slices.ContainsFunc(containers, func(container *container.Container) bool {
 					return container.ContainerInfo().State.Restarting
 				}), "no restarting container is listed")
 			})

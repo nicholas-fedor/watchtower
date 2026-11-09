@@ -33,7 +33,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
-	mockTypes "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -56,7 +55,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc", "nginx@sha256:digest123")
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{running}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID("sha256:abc"), "", nil)
 
@@ -69,7 +68,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc")
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{running}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
 		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
 
@@ -83,7 +82,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc")
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{running}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p updateConfig.Policy) bool {
 		return p.MonitorOnly && p.NoPull && p.EnableChangelog && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
 	})).Return(true, types.ImageID("sha256:new"), "sha256:newdigest", nil)
@@ -108,7 +107,7 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 	container1 := imageContainer("app1", "nginx:latest", "sha256:abc")
 	container2 := imageContainer("app2", "redis:latest", "sha256:def")
 
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{container1, container2}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{container1, container2}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container1, mock.Anything).
 		Return(true, types.ImageID("sha256:new1"), "sha256:digest1", nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container2, mock.Anything).
@@ -134,7 +133,7 @@ func TestCheckForUpdates_GitNoPullSkipsCheck(t *testing.T) {
 			labels.GitRepo: "https://git.example.com/org/app.git",
 		}),
 	)
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{watched}, nil)
 
 	gitClient := git.New(newTestLogger(t), git.Options{Timeout: time.Millisecond})
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{
@@ -164,7 +163,7 @@ func TestCheckForUpdates_GitCommitField(t *testing.T) {
 	)
 
 	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{watched}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{watched}, nil)
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{
 		Git: gitConfig.Defaults{
@@ -367,25 +366,6 @@ func TestApplyReportMetadata(t *testing.T) {
 		assert.Empty(t, result.LatestImageVersion)
 		assert.Empty(t, result.LatestImageRevision)
 	})
-
-	t.Run("a stubbed container exposes no metadata", func(t *testing.T) {
-		t.Parallel()
-
-		// The generated mock stands in for a container that is not the model type.
-		c := mockTypes.NewMockContainer(t)
-
-		result := ContainerCheck{}
-		applyReportMetadata(c, updateParams.Params{}, &result)
-
-		assert.Empty(t, result.GitRepo)
-		assert.Empty(t, result.GitRef)
-		assert.Empty(t, result.Changelog)
-		assert.Empty(t, result.OCISource)
-		assert.Empty(t, result.ImageURL)
-		assert.Empty(t, result.Documentation)
-		assert.Empty(t, result.CurrentImageVersion)
-		assert.Empty(t, result.CurrentImageRevision)
-	})
 }
 
 func TestIsGitWatched(t *testing.T) {
@@ -395,7 +375,7 @@ func TestIsGitWatched(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		container types.Container
+		container *container.Container
 		params    updateParams.Params
 		gitClient *git.Client
 		want      bool
@@ -405,14 +385,6 @@ func TestIsGitWatched(t *testing.T) {
 			container: gitContainer("https://github.com/org/app.git", nil),
 			params:    updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
 			gitClient: nil,
-			want:      false,
-		},
-		{
-			name: "stubbed container has no labels to watch",
-			// The generated mock stands in for a container that is not the model type.
-			container: mockTypes.NewMockContainer(t),
-			params:    updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
-			gitClient: gitClient,
 			want:      false,
 		},
 		{

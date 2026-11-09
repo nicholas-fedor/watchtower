@@ -14,8 +14,8 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/redact"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // tailBuffer is an [io.Writer] that keeps the last bytes written to it.
@@ -73,7 +73,7 @@ var (
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - container: Container to execute command in.
+//   - target: Container to execute command in.
 //   - command: Command to execute.
 //   - timeout: Minutes to wait before timeout (0 for no timeout).
 //   - uid: UID to run command as (-1 to use container default).
@@ -84,19 +84,19 @@ var (
 //   - error: Non-nil if execution fails, nil on success.
 func (c *client) ExecuteCommand(
 	ctx context.Context,
-	container types.Container,
+	target *container.Container,
 	command string,
 	timeout int,
 	uid int,
 	gid int,
 ) (bool, error) {
 	clogVal := c.logger().With().
-		Str("container_id", string(container.ID())).
+		Str("container_id", string(target.ID())).
 		Logger()
 	clog := &clogVal
 
 	// Generate JSON metadata for the container.
-	metadataJSON, err := generateContainerMetadata(container)
+	metadataJSON, err := generateContainerMetadata(target)
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -139,7 +139,7 @@ func (c *client) ExecuteCommand(
 	// Create the exec instance using the parent context.
 	exec, err := c.api.ExecCreate(
 		ctx,
-		string(container.ID()),
+		string(target.ID()),
 		execConfig,
 	)
 	if err != nil {
@@ -499,16 +499,16 @@ func escapeSequenceEnd(raw string, index int, introducer rune) int {
 // generateContainerMetadata creates a JSON-formatted string of container metadata.
 //
 // Parameters:
-//   - container: Container object to extract metadata from.
+//   - c: Container object to extract metadata from.
 //
 // Returns:
 //   - string: JSON string containing metadata (e.g., name, ID, image name, stop signal, labels).
 //   - error: Non-nil if JSON marshaling fails, nil otherwise.
-func generateContainerMetadata(container types.Container) (string, error) {
+func generateContainerMetadata(c *container.Container) (string, error) {
 	// Filter Watchtower-specific labels to reduce JSON size
 	labels := make(map[string]string)
 
-	containerInfo := container.ContainerInfo()
+	containerInfo := c.ContainerInfo()
 	if containerInfo != nil &&
 		containerInfo.Config != nil {
 		for key, value := range containerInfo.Config.Labels {
@@ -525,10 +525,10 @@ func generateContainerMetadata(container types.Container) (string, error) {
 		StopSignal string            `json:"stop_signal"`
 		Labels     map[string]string `json:"labels"`
 	}{
-		Name:       container.Name(),
-		ID:         string(container.ID()),
-		ImageName:  container.ImageName(),
-		StopSignal: container.StopSignal(),
+		Name:       c.Name(),
+		ID:         string(c.ID()),
+		ImageName:  c.ImageName(),
+		StopSignal: c.StopSignal(),
 		Labels:     labels,
 	}
 

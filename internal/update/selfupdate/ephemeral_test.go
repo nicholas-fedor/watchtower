@@ -14,6 +14,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -47,8 +48,8 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 //   - labels: Label map to apply to the container config.
 //
 // Returns:
-//   - types.Container: Configured mock container.
-func createDefaultMockContainer(id string, labels map[string]string) types.Container {
+//   - *container.Container: Configured mock container.
+func createDefaultMockContainer(id string, labels map[string]string) *container.Container {
 	return mockUpdate.CreateMockContainerWithConfig(
 		id,
 		"watchtower",
@@ -75,7 +76,7 @@ func createDefaultMockContainer(id string, labels map[string]string) types.Conta
 //
 // Returns:
 //   - *mockContainer.MockClient: Mocked container client.
-func expectOrchestrator(t *testing.T, source types.Container, chain string, cleanup bool, err error) *mockContainerClient.MockClient {
+func expectOrchestrator(t *testing.T, source *container.Container, chain string, cleanup bool, err error) *mockContainerClient.MockClient {
 	t.Helper()
 
 	client := mockContainerClient.NewMockClient(t)

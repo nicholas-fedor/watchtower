@@ -15,11 +15,11 @@ import (
 	"github.com/rs/zerolog"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Options configures a Git watcher client. Credentials stay here, not on [gitConfig.Defaults].
@@ -225,7 +225,7 @@ func (c *Client) Clone(ctx context.Context, repo string, rev CheckResult) (strin
 func CheckContainer(
 	ctx context.Context,
 	client *Client,
-	c types.Container,
+	c *container.Container,
 	defaults gitConfig.Defaults,
 ) (CheckResult, error) {
 	assoc, ok := provenance.ResolveAssociation(c, defaults)
@@ -310,7 +310,7 @@ type ApplyStampKey struct {
 //
 // Returns:
 //   - ApplyStampKey: Project name, directory, config files, service, and replica number.
-func ApplyStampKeyFrom(c types.Container) ApplyStampKey {
+func ApplyStampKeyFrom(c *container.Container) ApplyStampKey {
 	if c == nil {
 		return ApplyStampKey{}
 	}

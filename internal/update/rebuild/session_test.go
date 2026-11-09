@@ -17,6 +17,7 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -91,8 +92,8 @@ func expectGitBuild(client *mockContainerClient.MockClient) {
 //   - extra: Labels added to the Git association labels.
 //
 // Returns:
-//   - types.Container: The configured container.
-func gitAssociatedContainer(id, name, image string, extra map[string]string) types.Container {
+//   - *container.Container: The configured container.
+func gitAssociatedContainer(id, name, image string, extra map[string]string) *container.Container {
 	labels := map[string]string{
 		labels.GitRepo: "https://github.com/org/app.git",
 		labels.GitRef:  "main",
@@ -264,7 +265,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 			newTestLogger(t),
 			t.Context(),
 			mockContainerClient.NewMockClient(t),
-			[]types.Container{c},
+			[]*container.Container{c},
 			updateParams.Params{},
 			nil,
 			failed,
@@ -276,7 +277,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 			newTestLogger(t),
 			t.Context(),
 			mockContainerClient.NewMockClient(t),
-			[]types.Container{c},
+			[]*container.Container{c},
 			updateParams.Params{},
 			nil,
 			failed,
@@ -301,7 +302,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		// The mock has no expectations, so a build or image removal fails
 		// the test.
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{fresh, staleNoResult, staleFreshResult}, updateParams.Params{}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{fresh, staleNoResult, staleFreshResult}, updateParams.Params{}, nil, failed)
 
 		assert.Empty(t, failed)
 	})
@@ -325,7 +326,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{monitor, noPull}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{monitor, noPull}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
 		assert.Empty(t, sess.built)
@@ -342,7 +343,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Contains(t, failed, c.ID())
 		assert.False(t, c.IsStale())
@@ -362,7 +363,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		expectGitBuild(docker)
 
 		progress := &state.Progress{}
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, progress, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, progress, failed)
 
 		assert.Empty(t, failed)
 		assert.Contains(t, sess.built, c.ID())
@@ -390,7 +391,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []types.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.NotContains(t, failed, c.ID())
 		assert.False(t, c.IsStale())
@@ -420,7 +421,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		failed := map[types.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
-		sess.PrepareRebuilds(log, t.Context(), docker, []types.Container{c}, params, progress, failed)
+		sess.PrepareRebuilds(log, t.Context(), docker, []*container.Container{c}, params, progress, failed)
 		progress.UpdateFailed(log, failed)
 
 		report := progress.Report(log)
@@ -505,7 +506,7 @@ func TestSession_ExcludeNoRestart(t *testing.T) {
 		t.Parallel()
 
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		list := []types.Container{c}
+		list := []*container.Container{c}
 
 		var sess *Session
 		assert.Equal(t, list, sess.ExcludeNoRestart(list, updateParams.Params{NoRestart: true}))
@@ -522,7 +523,7 @@ func TestSession_ExcludeNoRestart(t *testing.T) {
 		kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
 		sess.built[built.ID()] = "sha256:git"
 
-		got := sess.ExcludeNoRestart([]types.Container{built, kept}, updateParams.Params{NoRestart: true})
+		got := sess.ExcludeNoRestart([]*container.Container{built, kept}, updateParams.Params{NoRestart: true})
 		require.Len(t, got, 1)
 		assert.Equal(t, kept.ID(), got[0].ID())
 	})
@@ -537,7 +538,7 @@ func TestSession_ExcludeApplied(t *testing.T) {
 		t.Parallel()
 
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		list := []types.Container{c}
+		list := []*container.Container{c}
 
 		var sess *Session
 		assert.Equal(t, list, sess.ExcludeApplied(list))
@@ -554,7 +555,7 @@ func TestSession_ExcludeApplied(t *testing.T) {
 		kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
 		sess.applied[applied.ID()] = struct{}{}
 
-		got := sess.ExcludeApplied([]types.Container{applied, kept})
+		got := sess.ExcludeApplied([]*container.Container{applied, kept})
 		require.Len(t, got, 1)
 		assert.Equal(t, kept.ID(), got[0].ID())
 	})

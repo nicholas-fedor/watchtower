@@ -7,29 +7,30 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	dockerContainer "github.com/moby/moby/api/types/container"
+	dockerImage "github.com/moby/moby/api/types/image"
+
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
-// stopTimeoutContainer is a container whose only behavior is its stop timeout.
-// Calling any other method panics.
-type stopTimeoutContainer struct {
-	// Container leaves every other method unimplemented.
-	types.Container
-
-	// own is the stop timeout set on the container, or nil when it sets none.
-	own *time.Duration
-}
-
-// StopTimeout returns the container's own stop timeout, and fallback when it
-// sets none.
-func (c stopTimeoutContainer) StopTimeout(fallback time.Duration) time.Duration {
-	if c.own != nil {
-		return *c.own
-	}
-
-	return fallback
+// stopTimeoutContainer returns a container with its own stop timeout, or with
+// none when own is nil.
+//
+// Parameters:
+//   - own: The container's stop timeout, or nil.
+//
+// Returns:
+//   - *container.Container: Container built from inspect data.
+func stopTimeoutContainer(own *time.Duration) *container.Container {
+	return modelfixture.Container(func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if own != nil {
+			seconds := int(own.Seconds())
+			c.Config.StopTimeout = &seconds
+		}
+	})
 }
 
 // TestParams_DetachedTimeout verifies that detached Docker calls are
@@ -83,7 +84,7 @@ func TestParams_DetachedStopTimeout(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := Params{Timeout: tt.timeout}.DetachedStopTimeout(stopTimeoutContainer{own: tt.own})
+			got := Params{Timeout: tt.timeout}.DetachedStopTimeout(stopTimeoutContainer(tt.own))
 			assert.Equal(t, tt.want, got)
 		})
 	}

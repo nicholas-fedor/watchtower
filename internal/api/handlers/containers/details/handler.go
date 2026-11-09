@@ -8,6 +8,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -143,7 +144,7 @@ func GetContainerDetails(
 	imageFilter string,
 	params updateParams.Params,
 ) ([]ContainerDetails, error) {
-	var list []types.Container
+	var list []*container.Container
 
 	var err error
 

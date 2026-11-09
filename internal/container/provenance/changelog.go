@@ -5,10 +5,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ChangelogVars substitutes placeholders in an explicit changelog template.
@@ -30,7 +30,7 @@ type ChangelogVars struct {
 //
 // Returns:
 //   - string: Changelog URL, or empty when none can be derived.
-func Changelog(c types.Container, repo string, vars ChangelogVars) string {
+func Changelog(c *container.Container, repo string, vars ChangelogVars) string {
 	if template := label(c, labels.ChangelogURL); template != "" {
 		return applyVars(template, vars)
 	}

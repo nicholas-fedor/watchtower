@@ -7,10 +7,10 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // DefaultDockerfile is used when no Dockerfile path is configured.
@@ -77,7 +77,7 @@ func (a Association) Validate() error {
 //     Dockerfile and Context are empty when unset. Callers default to Dockerfile
 //     and the repository root.
 //   - bool: True when a git-repo label or image mapping is present.
-func ResolveAssociation(c types.Container, defaults gitConfig.Defaults) (Association, bool) {
+func ResolveAssociation(c *container.Container, defaults gitConfig.Defaults) (Association, bool) {
 	if c == nil {
 		return Association{}, false
 	}
@@ -172,7 +172,7 @@ func sourced(primary, secondary, fallback string) (string, bool) {
 //
 // Returns:
 //   - bool: True when Git staleness checks and rebuilds apply.
-func ShouldMonitor(log *zerolog.Logger, c types.Container, defaults gitConfig.Defaults) bool {
+func ShouldMonitor(log *zerolog.Logger, c *container.Container, defaults gitConfig.Defaults) bool {
 	if c == nil || c.IsWatchtower() {
 		return false
 	}
@@ -205,7 +205,7 @@ func ShouldMonitor(log *zerolog.Logger, c types.Container, defaults gitConfig.De
 //
 // Returns:
 //   - bool: True when the source had an explicit on value for git-watch.
-func PersistWatch(c types.Container) bool {
+func PersistWatch(c *container.Container) bool {
 	if c == nil {
 		return false
 	}
@@ -231,7 +231,7 @@ func PersistWatch(c types.Container) bool {
 //
 // Returns:
 //   - string: Trimmed value, or empty when the label is missing.
-func label(c types.Container, key string) string {
+func label(c *container.Container, key string) string {
 	if c == nil {
 		return ""
 	}
@@ -251,7 +251,7 @@ func label(c types.Container, key string) string {
 //
 // Returns:
 //   - string: Ref label value, or empty.
-func refLabel(c types.Container) string {
+func refLabel(c *container.Container) string {
 	return cmp.Or(label(c, labels.GitRef), label(c, labels.GitBranch))
 }
 
@@ -279,7 +279,7 @@ func imageMapping(imageName string, images map[string]gitConfig.Image) gitConfig
 //
 // Returns:
 //   - bool: True when the watcher should run, ignoring association.
-func isWatch(c types.Container, defaults gitConfig.Defaults) bool {
+func isWatch(c *container.Container, defaults gitConfig.Defaults) bool {
 	val, ok := c.GetLabel(labels.GitWatch)
 	if !ok || strings.TrimSpace(val) == "" {
 		return defaults.Enable

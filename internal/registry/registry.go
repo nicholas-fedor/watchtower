@@ -10,9 +10,9 @@ import (
 
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/hosts"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for registry operations.
@@ -92,18 +92,18 @@ func defaultAuthHandler(log *zerolog.Logger, _ context.Context) (string, error) 
 // It returns true for registries supporting HEAD requests (e.g., Docker Hub, GHCR) or if parsing fails.
 //
 // Parameters:
-//   - container: Container with image info for registry check.
+//   - c: Container with image info for registry check.
 //
 // Returns:
 //   - bool: True if a warning is warranted, false otherwise.
-func WarnOnAPIConsumption(log *zerolog.Logger, container types.Container) bool {
+func WarnOnAPIConsumption(log *zerolog.Logger, c *container.Container) bool {
 	clogVal := log.With().
-		Str("container", container.Name()).
-		Str("image", container.ImageName()).
+		Str("container", c.Name()).
+		Str("image", c.ImageName()).
 		Logger()
 	clog := &clogVal
 
-	normalizedRef, err := reference.ParseNormalizedNamed(container.ImageName())
+	normalizedRef, err := reference.ParseNormalizedNamed(c.ImageName())
 	if err != nil {
 		clog.Debug().
 			Err(err).

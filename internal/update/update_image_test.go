@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
@@ -41,7 +42,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"tagged-container",
 							"/tagged-container",
@@ -69,7 +70,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"untagged-container",
 							"/untagged-container",
@@ -97,7 +98,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"pinned-container",
 							"/pinned-container",
@@ -126,7 +127,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"bare-digest-container",
 							"/bare-digest-container",
@@ -154,7 +155,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"pinned-tagged-container",
 							"/pinned-tagged-container",
@@ -183,7 +184,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"invalid-container",
 							"/invalid-container",
@@ -211,7 +212,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithImageInfoP(
 							"edge-container",
 							"/edge-container",
@@ -246,7 +247,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"InvalidContainer",
 							"/InvalidContainer",
@@ -278,7 +279,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithImageInfoP(
 							"invalid-ref-container",
 							"/invalid-ref-container",
@@ -324,7 +325,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"rate-limited-container",
 							"/rate-limited-container",
@@ -359,7 +360,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"rate-limited-container",
 							"/rate-limited-container",
@@ -409,7 +410,7 @@ func TestUpdateAction_ImageReferences(t *testing.T) {
 
 			client := &mockUpdate.MockClient{
 				TestData: &mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainer(
 							"rate-limited-container",
 							"/rate-limited-container",

@@ -11,6 +11,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
@@ -32,7 +33,7 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 	const newID = types.ContainerID("e000000000000000000000000000000000000000000000000000000000000000")
 
 	// appContainer returns a running container that uses the given image.
-	appContainer := func(id, name, image string) types.Container {
+	appContainer := func(id, name, image string) *container.Container {
 		return mockUpdate.CreateMockContainerWithConfig(
 			id,
 			name,
@@ -52,7 +53,7 @@ func TestRunUpdatesWithNotifications_UpdateErrorKeepsPartialResults(t *testing.T
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-		Return([]types.Container{first, second}, nil).Once()
+		Return([]*container.Container{first, second}, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		Return(true, types.ImageID("sha256:new"), "", nil).Times(2)
 	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{})

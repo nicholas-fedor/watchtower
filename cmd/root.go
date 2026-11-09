@@ -108,7 +108,7 @@ var (
 	// It is initialized in preRun by retrieving the container object using the currentWatchtowerContainerID,
 	// remains nil if retrieval fails or yields an unexpected type, and is used for operations like updating
 	// restart policy, validating restarts, and cleaning up excess instances.
-	currentWatchtowerContainer types.Container
+	currentWatchtowerContainer *container.Container
 
 	// sleepFunc is a function variable for time.Sleep, allowing it to be overridden in tests.
 	//

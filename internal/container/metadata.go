@@ -501,7 +501,7 @@ func (c *Container) NormalizedScope() string {
 // Returns:
 //   - string: The effective scope.
 //   - error: Non-nil if derivation fails.
-func GetEffectiveScope(container types.Container, currentScope string) (string, error) {
+func GetEffectiveScope(container *Container, currentScope string) (string, error) {
 	// Skip derivation if scope is already explicitly set.
 	if currentScope != "" {
 		return currentScope, nil
@@ -918,7 +918,7 @@ func IsWatchtowerParent(currentID types.ContainerID, chain string) bool {
 //
 // Returns:
 //   - bool: True when the container has been replaced, false otherwise or for nil.
-func IsSuperseded(container types.Container) bool {
+func IsSuperseded(container *Container) bool {
 	if container == nil {
 		return false
 	}
@@ -946,7 +946,7 @@ func IsSuperseded(container types.Container) bool {
 //
 // Returns:
 //   - bool: True when the candidate is an orphaned replacement.
-func IsOrphanedReplacement(candidate, current types.Container) bool {
+func IsOrphanedReplacement(candidate, current *Container) bool {
 	return candidate.IsWatchtower() &&
 		candidate.ID() != current.ID() &&
 		!IsOldContainer(candidate.Name()) &&

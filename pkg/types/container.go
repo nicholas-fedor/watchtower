@@ -2,63 +2,12 @@ package types
 
 import (
 	"strings"
-	"time"
-
-	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerImage "github.com/moby/moby/api/types/image"
-
-	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 )
 
 // WatchtowerOldPrefix is the prefix used when renaming Watchtower containers
 // during self-update. It is the single source of truth for both rename
 // generation and old-name detection to prevent cross-file protocol drift.
 const WatchtowerOldPrefix = "watchtower-old-"
-
-// Container defines a docker container's interface in Watchtower.
-type Container interface {
-	ContainerInfo() *dockerContainer.InspectResponse        // Container metadata.
-	ID() ContainerID                                        // Container ID.
-	IsRunning() bool                                        // Check if running.
-	Name() string                                           // Container name.
-	ImageID() ImageID                                       // Current image ID.
-	ImageName() string                                      // Image name with tag.
-	Enabled() (bool, bool)                                  // Enabled status and presence.
-	IsMonitorOnly(policy updateConfig.Policy) bool          // Monitor-only check.
-	Scope() (string, bool)                                  // Scope value and presence.
-	NormalizedScope() string                                // Scope, or "none" when unset or empty.
-	Links(useComposeDependsOn bool) []string                // Dependency links.
-	GetLabel(key string) (string, bool)                     // Arbitrary label value lookup.
-	ToRestart() bool                                        // Needs restart check.
-	IsWatchtower() bool                                     // Watchtower instance check.
-	StopSignal() string                                     // Custom stop signal.
-	StopTimeout(fallback time.Duration) time.Duration       // How long a stop waits before killing the container.
-	HasImageInfo() bool                                     // Image metadata presence.
-	ImageInfo() *dockerImage.InspectResponse                // Image metadata.
-	GetLifecyclePreCheckCommand() string                    // Pre-check command.
-	GetLifecyclePostCheckCommand() string                   // Post-check command.
-	GetLifecyclePreUpdateCommand() string                   // Pre-update command.
-	GetLifecyclePostUpdateCommand() string                  // Post-update command.
-	LifecycleUser(uid, gid int) (int, int)                  // UID and GID hooks run as, from labels or the defaults.
-	VerifyConfiguration() error                             // Config validation.
-	SetStale(status bool)                                   // Set stale status.
-	IsStale() bool                                          // Stale status check.
-	IsNoPull(policy updateConfig.Policy) bool               // No-pull check.
-	CooldownDelay(policy updateConfig.Policy) time.Duration // Effective cooldown delay.
-	SetLinkedToRestarting(status bool)                      // Set linked-to-restarting status.
-	IsLinkedToRestarting() bool                             // Linked-to-restarting check.
-	PreCheckTimeout() int                                   // Pre-check timeout.
-	PostCheckTimeout() int                                  // Post-check timeout.
-	PreUpdateTimeout() int                                  // Pre-update timeout.
-	PostUpdateTimeout() int                                 // Post-update timeout.
-	IsRestarting() bool                                     // Restarting status check.
-	IsCreated() bool                                        // Created-state check.
-	GetCreateConfig() *dockerContainer.Config               // Creation config.
-	GetCreateHostConfig() *dockerContainer.HostConfig       // Host creation config.
-	GetContainerChain() (string, bool)                      // Container chain label value and presence.
-	HasExposedPorts() bool                                  // Exposed ports presence check.
-	RestartsAutomatically() bool                            // Restart policy other than "no".
-}
 
 // ImageID is a hash string for a container image.
 type ImageID string

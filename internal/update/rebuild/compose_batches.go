@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
@@ -15,7 +16,7 @@ import (
 
 // composeMember is one stale container and the check result that selected its commit.
 type composeMember struct {
-	container types.Container
+	container *container.Container
 	result    git.CheckResult
 }
 
@@ -68,12 +69,12 @@ func composeBatchKeyFor(ref composeProject.ProjectRef) composeBatchKey {
 //   - useComposeDependsOn: Whether to include Compose depends_on relationships when sorting.
 //
 // Returns:
-//   - []types.Container: Containers in dependency order, or a copy of the original order if sorting fails.
+//   - []*container.Container: Containers in dependency order, or a copy of the original order if sorting fails.
 func orderedComposeContainers(
 	log *zerolog.Logger,
-	containers []types.Container,
+	containers []*container.Container,
 	useComposeDependsOn bool,
-) []types.Container {
+) []*container.Container {
 	ordered := slices.Clone(containers)
 	if len(ordered) == 0 || len(ordered) == 1 {
 		return ordered
@@ -133,7 +134,7 @@ func (b *composeBatches) add(ref composeProject.ProjectRef, member composeMember
 //   - []*composeBatch: Batches in dependency order.
 func (b *composeBatches) inDependencyOrder(
 	log *zerolog.Logger,
-	containers []types.Container,
+	containers []*container.Container,
 	useComposeDependsOn bool,
 ) []*composeBatch {
 	const minBatchesToOrder = 2

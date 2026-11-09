@@ -16,7 +16,6 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // copyFileAwareClient implements container.Client and container.CopyFileStore
@@ -29,10 +28,10 @@ type copyFileAwareClient struct {
 // staleMockContainer returns a stale container for the copy-file recreate tests.
 //
 // Returns:
-//   - types.Container: The stale container.
-func staleMockContainer() types.Container {
+//   - *container.Container: The stale container.
+func staleMockContainer() *container.Container {
 	source := mockUpdate.CreateMockContainer("container-id", "/app", "app:latest", time.Now())
-	source.(*container.Container).SetStale(true)
+	source.SetStale(true)
 
 	return source
 }

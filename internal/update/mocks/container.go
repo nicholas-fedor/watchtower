@@ -10,12 +10,11 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // CreateMockContainer creates a container substitute valid for testing.
 // It initializes a basic container with the specified ID, name, image, and creation time.
-func CreateMockContainer(id, name, image string, created time.Time) types.Container {
+func CreateMockContainer(id, name, image string, created time.Time) *container.Container {
 	content := dockerContainer.InspectResponse{
 		ID:      id,
 		Image:   image,
@@ -60,7 +59,7 @@ func CreateMockContainerWithImageInfoP(
 	image string,
 	created time.Time,
 	imageInfo *dockerImage.InspectResponse,
-) types.Container {
+) *container.Container {
 	content := dockerContainer.InspectResponse{
 		ID:      id,
 		Image:   image,
@@ -92,7 +91,7 @@ func CreateMockContainerWithConfig(
 	restarting bool,
 	created time.Time,
 	config *dockerContainer.Config,
-) types.Container {
+) *container.Container {
 	content := dockerContainer.InspectResponse{
 		ID:    id,
 		Image: image,
@@ -125,7 +124,7 @@ func CreateMockContainerWithLinks(
 	created time.Time,
 	links []string,
 	imageInfo *dockerImage.InspectResponse,
-) types.Container {
+) *container.Container {
 	content := dockerContainer.InspectResponse{
 		ID:      id,
 		Image:   image,

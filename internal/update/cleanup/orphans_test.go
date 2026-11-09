@@ -17,11 +17,11 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestRemoveOrphanedOrchestrators verifies that orphaned orchestrators are
@@ -48,7 +48,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
-				Return([]types.Container{}, nil)
+				Return([]*container.Container{}, nil)
 
 			count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
 
@@ -74,7 +74,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
-				Return([]types.Container{regularContainer}, nil)
+				Return([]*container.Container{regularContainer}, nil)
 
 			count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
 
@@ -101,7 +101,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
-				Return([]types.Container{orchestrator}, nil)
+				Return([]*container.Container{orchestrator}, nil)
 			mockAPIClient.EXPECT().
 				StopAndRemoveContainer(
 					ctx,
@@ -147,7 +147,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
-				Return([]types.Container{orch1, regular, orch2}, nil)
+				Return([]*container.Container{orch1, regular, orch2}, nil)
 			mockAPIClient.EXPECT().
 				StopAndRemoveContainer(
 					ctx,
@@ -214,7 +214,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
-				Return([]types.Container{orch1, orch2}, nil)
+				Return([]*container.Container{orch1, orch2}, nil)
 			mockAPIClient.EXPECT().
 				StopAndRemoveContainer(
 					ctx,
@@ -251,7 +251,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockContainerClient.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListContainers(ctx).
-				Return([]types.Container{noLabelContainer}, nil)
+				Return([]*container.Container{noLabelContainer}, nil)
 
 			count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
 
@@ -335,7 +335,7 @@ func TestRemoveOrphanedOrchestrators_SkipsInFlight(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything).
-				Return([]types.Container{orchestrator, app}, nil).Once()
+				Return([]*container.Container{orchestrator, app}, nil).Once()
 
 			wantCount := 0
 
@@ -370,7 +370,7 @@ func TestRemoveOrphanedOrchestrators_AlreadyGone(t *testing.T) {
 	)
 
 	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{orchestrator}, nil).Once()
+	client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{orchestrator}, nil).Once()
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, orchestrator, time.Duration(0)).
 		Return(fmt.Errorf("no such container: %w", cerrdefs.ErrNotFound)).Once()
 

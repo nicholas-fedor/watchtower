@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
@@ -71,7 +72,7 @@ func (p Params) DetachedTimeout() time.Duration {
 //
 // Returns:
 //   - time.Duration: The bound for the detached calls.
-func (p Params) DetachedStopTimeout(c types.Container) time.Duration {
+func (p Params) DetachedStopTimeout(c *container.Container) time.Duration {
 	return detachedBound(max(p.Timeout, c.StopTimeout(p.Timeout)))
 }
 

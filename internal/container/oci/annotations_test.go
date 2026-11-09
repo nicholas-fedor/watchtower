@@ -10,7 +10,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
 )
 
 func TestRead(t *testing.T) {
@@ -26,17 +25,6 @@ func TestRead(t *testing.T) {
 		t.Parallel()
 
 		assert.Equal(t, Annotations{}, Read(modelfixture.ContainerWithoutImageInfo()))
-	})
-
-	// The model returns image info whenever it reports having some, so only a
-	// mock can report image info and then return none.
-	t.Run("nil image inspect", func(t *testing.T) {
-		t.Parallel()
-
-		c := typemocks.NewMockContainer(t)
-		c.EXPECT().HasImageInfo().Return(true)
-		c.EXPECT().ImageInfo().Return(nil)
-		assert.Equal(t, Annotations{}, Read(c))
 	})
 
 	t.Run("nil image config", func(t *testing.T) {

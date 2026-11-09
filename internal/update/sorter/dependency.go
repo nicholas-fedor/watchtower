@@ -25,7 +25,7 @@ type dependencySorter struct{}
 //
 // Returns:
 //   - error: Non-nil if circular reference detected, nil on success.
-func SortByDependencies(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) error {
+func SortByDependencies(log *zerolog.Logger, containers []*container.Container, useComposeDependsOn bool) error {
 	sorter := dependencySorter{}
 
 	return sorter.Sort(log, containers, useComposeDependsOn)
@@ -55,7 +55,7 @@ func SortByDependencies(log *zerolog.Logger, containers []types.Container, useCo
 // Returns:
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes the container name and cycle path for debugging.
-func (ds dependencySorter) Sort(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) error {
+func (ds dependencySorter) Sort(log *zerolog.Logger, containers []*container.Container, useComposeDependsOn bool) error {
 	if containers == nil {
 		return nil
 	}
@@ -66,8 +66,8 @@ func (ds dependencySorter) Sort(log *zerolog.Logger, containers []types.Containe
 
 	// Separate Watchtower containers from non-Watchtower containers
 	var (
-		nonWatchtowerContainers []types.Container
-		watchtowerContainers    []types.Container
+		nonWatchtowerContainers []*container.Container
+		watchtowerContainers    []*container.Container
 	)
 
 	for _, c := range containers {
@@ -140,10 +140,10 @@ func (ds dependencySorter) Sort(log *zerolog.Logger, containers []types.Containe
 //   - containers: List to sort. Should not be nil.
 //
 // Returns:
-//   - []types.Container: Sorted list in dependency order (dependencies first).
+//   - []*container.Container: Sorted list in dependency order (dependencies first).
 //   - error: Non-nil if circular reference detected, nil on success.
 //     Error includes container name and cycle path for debugging.
-func sortByDependencies(log *zerolog.Logger, containers []types.Container, useComposeDependsOn bool) ([]types.Container, error) {
+func sortByDependencies(log *zerolog.Logger, containers []*container.Container, useComposeDependsOn bool) ([]*container.Container, error) {
 	// Phase 1: Build the dependency graph data structures
 	containerMap, indegree, adjacency, normalizedMap, err := buildDependencyGraph(log, containers, useComposeDependsOn)
 	if err != nil {
@@ -166,15 +166,15 @@ func sortByDependencies(log *zerolog.Logger, containers []types.Container, useCo
 //   - normalizedMap: Identifier of each container.
 //
 // Returns:
-//   - []types.Container: Sorted list in dependency order (dependencies first).
+//   - []*container.Container: Sorted list in dependency order (dependencies first).
 //   - error: A circularReferenceError when not every container can be ordered.
 func kahnSort(log *zerolog.Logger,
-	containers []types.Container,
-	containerMap map[string]types.Container,
+	containers []*container.Container,
+	containerMap map[string]*container.Container,
 	indegree map[string]int,
 	adjacency map[string][]string,
-	normalizedMap map[types.Container]string,
-) ([]types.Container, error) {
+	normalizedMap map[*container.Container]string,
+) ([]*container.Container, error) {
 	// Phase 2: Initialize processing queue with containers that have no dependencies
 	queue := initializeQueue(indegree)
 
@@ -183,7 +183,7 @@ func kahnSort(log *zerolog.Logger,
 	//   - Remove a container from queue and add it to sorted result
 	//   - For each container that depends on it, decrement their indegree
 	//   - If a dependent's indegree becomes 0, add it to queue
-	sorted := make([]types.Container, 0, len(containers))
+	sorted := make([]*container.Container, 0, len(containers))
 	for len(queue) > 0 {
 		// Dequeue the next container with no dependencies
 		current := queue[0]
@@ -247,15 +247,15 @@ func kahnSort(log *zerolog.Logger,
 //   - useComposeDependsOn: Whether Links() should include Compose depends_on labels.
 //
 // Returns:
-//   - map[string]types.Container: Container lookup map (canonical keys only)
+//   - map[string]*container.Container: Container lookup map (canonical keys only)
 //   - map[string]int: Indegree count for each container
 //   - map[string][]string: Adjacency list (canonical dependency -> dependents)
-//   - map[types.Container]string: Reverse map from container to normalized identifier
+//   - map[*container.Container]string: Reverse map from container to normalized identifier
 //   - error: identifierCollisionError if duplicate identifiers detected, nil otherwise
 func buildDependencyGraph(log *zerolog.Logger,
-	containers []types.Container,
+	containers []*container.Container,
 	useComposeDependsOn bool,
-) (map[string]types.Container, map[string]int, map[string][]string, map[types.Container]string, error) {
+) (map[string]*container.Container, map[string]int, map[string][]string, map[*container.Container]string, error) {
 	graph, err := newDependencyGraph(
 		log,
 		containers,
@@ -282,18 +282,18 @@ func buildDependencyGraph(log *zerolog.Logger,
 //   - containers: Containers to index.
 //
 // Returns:
-//   - map[string]types.Container: Container for each normalized identifier.
+//   - map[string]*container.Container: Container for each normalized identifier.
 //   - error: identifierCollisionError if containers share an identifier.
-func identifierIndex(log *zerolog.Logger, containers []types.Container) (map[string]types.Container, error) {
+func identifierIndex(log *zerolog.Logger, containers []*container.Container) (map[string]*container.Container, error) {
 	// Use temporary map to collect all containers per normalized identifier
-	tempMap := make(map[string][]types.Container, len(containers))
+	tempMap := make(map[string][]*container.Container, len(containers))
 
 	for _, c := range containers {
 		normalizedIdentifier := container.NormalizeContainerName(container.ResolveContainerIdentifier(c))
 		tempMap[normalizedIdentifier] = append(tempMap[normalizedIdentifier], c)
 	}
 
-	index := make(map[string]types.Container, len(tempMap))
+	index := make(map[string]*container.Container, len(tempMap))
 
 	// Check for identifier collisions
 	for identifier, dupContainers := range tempMap {
@@ -332,7 +332,7 @@ func identifierIndex(log *zerolog.Logger, containers []types.Container) (map[str
 //   - error: Non-nil when dependency identifiers collide.
 func ContainerDependencies(
 	log *zerolog.Logger,
-	containers []types.Container,
+	containers []*container.Container,
 	useComposeDependsOn bool,
 ) (map[types.ContainerID][]types.ContainerID, error) {
 	if len(containers) == 0 {
@@ -398,7 +398,7 @@ func ContainerDependencies(
 //   - map[string]bool: Precomputed set of matchable identifiers (canonical keys and unique bare names).
 //   - map[string]string: Maps every matchable identifier to its canonical graph key.
 func buildLinkMatchIndexes(log *zerolog.Logger,
-	containerMap map[string]types.Container,
+	containerMap map[string]*container.Container,
 ) (map[string]bool, map[string]string) {
 	// Capacity covers canonical key, optional bare-name alias, and Docker ID per container.
 	const aliasCapacityFactor = 3
@@ -417,12 +417,10 @@ func buildLinkMatchIndexes(log *zerolog.Logger,
 	bareOwners := make(map[string]map[string]struct{})
 
 	for identifier, c := range containerMap {
-		if concrete, ok := c.(*container.Container); ok {
-			containerID := string(concrete.ID())
-			if containerID != "" && containerID != identifier {
-				if _, exists := aliasToCanonical[containerID]; !exists {
-					aliasToCanonical[containerID] = identifier
-				}
+		containerID := string(c.ID())
+		if containerID != "" && containerID != identifier {
+			if _, exists := aliasToCanonical[containerID]; !exists {
+				aliasToCanonical[containerID] = identifier
 			}
 		}
 
@@ -766,11 +764,11 @@ func initializeQueue(indegree map[string]int) []string {
 // Returns:
 //   - error: circularReferenceError if cycle detected, nil otherwise
 func detectAndReportCycle(log *zerolog.Logger,
-	sorted []types.Container,
-	containers []types.Container,
-	containerMap map[string]types.Container,
+	sorted []*container.Container,
+	containers []*container.Container,
+	containerMap map[string]*container.Container,
 	adjacency map[string][]string,
-	normalizedMap map[types.Container]string,
+	normalizedMap map[*container.Container]string,
 ) error {
 	if len(sorted) != len(containers) {
 		// Identify which containers were not processed (part of cycles)

@@ -16,12 +16,12 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/manifest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ContentDigestHeader is the HTTP header key used to retrieve the digest from a registry's response.
@@ -96,23 +96,23 @@ var (
 var localOnlyImageCache sync.Map
 
 // localOnlyCacheKey builds a cache key for a container's image identity.
-func localOnlyCacheKey(container types.Container) string {
-	if !container.HasImageInfo() {
-		return container.ImageName() + "|"
+func localOnlyCacheKey(c *container.Container) string {
+	if !c.HasImageInfo() {
+		return c.ImageName() + "|"
 	}
 
-	return container.ImageName() + "|" + container.ImageInfo().ID
+	return c.ImageName() + "|" + c.ImageInfo().ID
 }
 
 // rememberLocalOnlyImage records that the container's image was confirmed local-only.
-func rememberLocalOnlyImage(container types.Container) {
-	localOnlyImageCache.Store(localOnlyCacheKey(container), true)
+func rememberLocalOnlyImage(c *container.Container) {
+	localOnlyImageCache.Store(localOnlyCacheKey(c), true)
 }
 
 // isCachedLocalOnlyImage reports whether the container's image was previously
 // confirmed local-only for this process.
-func isCachedLocalOnlyImage(container types.Container) bool {
-	_, ok := localOnlyImageCache.Load(localOnlyCacheKey(container))
+func isCachedLocalOnlyImage(c *container.Container) bool {
+	_, ok := localOnlyImageCache.Load(localOnlyCacheKey(c))
 
 	return ok
 }
@@ -182,7 +182,7 @@ func NormalizeDigest(log *zerolog.Logger, digest string) string {
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
-//   - container: Container whose digest is being compared.
+//   - c: Container whose digest is being compared.
 //   - registryAuth: Base64-encoded auth string.
 //   - settings: Registry request settings.
 //   - limiter: Rate limiter shared by registry requests. Must not be nil.
@@ -194,7 +194,7 @@ func NormalizeDigest(log *zerolog.Logger, digest string) string {
 func CompareDigest(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	settings registryConfig.Registry,
 	limiter *ratelimit.Limiter,
@@ -202,7 +202,7 @@ func CompareDigest(
 ) (bool, error) {
 	match, _, err := CompareDigestWithRemote(log,
 		ctx,
-		container,
+		c,
 		registryAuth,
 		settings,
 		limiter,
@@ -224,12 +224,12 @@ func CompareDigest(
 // A manifest 404 never makes an image local-only.
 //
 // Parameters:
-//   - container: Container whose image name is inspected.
+//   - c: Container whose image name is inspected.
 //   - err: Error returned from digest fetch.
 //
 // Returns:
 //   - bool: True if the image should be treated as local-only, false otherwise.
-func isRefusedLocalImage(container types.Container, err error) bool {
+func isRefusedLocalImage(c *container.Container, err error) bool {
 	// Docker Hub refuses a single-component name it does not have with a 401
 	// whose challenge reports insufficient_scope, with or without credentials.
 	// Its official namespace has no private repositories. The refusal therefore
@@ -239,19 +239,19 @@ func isRefusedLocalImage(container types.Container, err error) bool {
 		return false
 	}
 
-	if !container.HasImageInfo() {
+	if !c.HasImageInfo() {
 		return false
 	}
 
 	// A registry or namespace is always followed by a slash. Neither a tag nor
 	// a digest contains one.
-	if strings.Contains(container.ImageName(), "/") {
+	if strings.Contains(c.ImageName(), "/") {
 		return false
 	}
 
 	// Registry-qualified digests mean the image was pulled from a remote source,
 	// so a refusal is a failed probe rather than proof the image is local-only.
-	for _, digestRef := range container.ImageInfo().RepoDigests {
+	for _, digestRef := range c.ImageInfo().RepoDigests {
 		repoPart, _, _ := strings.Cut(digestRef, "@")
 		if repoPartHasRegistryHost(repoPart) {
 			return false
@@ -289,7 +289,7 @@ func repoPartHasRegistryHost(repoPart string) bool {
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
-//   - container: Container whose digest is being compared.
+//   - c: Container whose digest is being compared.
 //   - registryAuth: Base64-encoded auth string.
 //   - settings: Registry request settings.
 //   - limiter: Rate limiter shared by registry requests. Must not be nil.
@@ -301,19 +301,19 @@ func repoPartHasRegistryHost(repoPart string) bool {
 //   - error: Non-nil if operation fails, nil on success.
 func CompareDigestWithRemote(log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	settings registryConfig.Registry,
 	limiter *ratelimit.Limiter,
 	endpoints ...string,
 ) (bool, string, error) {
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": c.Name(),
+		"image":     c.ImageName(),
 	}
 
 	// Ensure the container has image metadata to proceed with digest comparison.
-	if !container.HasImageInfo() {
+	if !c.HasImageInfo() {
 		log.Debug().
 			Fields(fields).
 			Msg("Container image info missing")
@@ -331,7 +331,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 	// 1. The container was already populated with image info during initialization
 	// 2. For locally built images, RepoDigests are either empty or registry-less
 	// 3. This avoids an extra Docker daemon call
-	if len(container.ImageInfo().RepoDigests) == 0 {
+	if len(c.ImageInfo().RepoDigests) == 0 {
 		log.Debug().
 			Fields(fields).
 			Msg("Image with no registry reference detected (empty RepoDigests) - skipping digest comparison")
@@ -342,7 +342,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 	// Skip registry probes for images previously confirmed local-only (same name+ID).
 	// This prevents repeated Docker Hub refusals that can rate-limit concurrent
 	// checks for other containers in the same update session.
-	if isCachedLocalOnlyImage(container) {
+	if isCachedLocalOnlyImage(c) {
 		log.Debug().
 			Fields(fields).
 			Msg("Cached local-only image - skipping digest comparison")
@@ -353,7 +353,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 	// Fetch the latest digest from the registry using a HEAD request for efficiency.
 	remoteDigest, err := fetchDigest(log,
 		ctx,
-		container,
+		c,
 		registryAuth,
 		settings,
 		limiter,
@@ -371,7 +371,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 
 		remoteDigest, err = fetchDigestWithGet(log,
 			ctx,
-			container,
+			c,
 			registryAuth,
 			settings,
 			limiter,
@@ -382,8 +382,8 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 	if err != nil {
 		// A refused local-only image is up to date. Return no error so callers
 		// skip the pull without logging a warning.
-		if isRefusedLocalImage(container, err) {
-			rememberLocalOnlyImage(container)
+		if isRefusedLocalImage(c, err) {
+			rememberLocalOnlyImage(c)
 			log.Debug().
 				Fields(fields).
 				Msg("Registry refused the repository - treating as local image")
@@ -396,7 +396,7 @@ func CompareDigestWithRemote(log *zerolog.Logger,
 
 	// Compare the fetched remote digest with the container's local digests.
 	matches := digestsMatch(log,
-		container.ImageInfo().RepoDigests,
+		c.ImageInfo().RepoDigests,
 		remoteDigest,
 	)
 	log.Debug().
@@ -435,7 +435,7 @@ func formatDigest(digest string) string {
 //
 // Parameters:
 //   - ctx: The context controlling the request's lifecycle, enabling cancellation or timeouts.
-//   - container: The container whose image digest is being fetched, providing the image name and reference.
+//   - c: The container whose image digest is being fetched, providing the image name and reference.
 //   - authToken: A base64-encoded authentication string for registry access.
 //   - settings: Registry request settings.
 //   - limiter: Rate limiter shared by registry requests.
@@ -447,13 +447,13 @@ func formatDigest(digest string) string {
 func fetchDigestWithGet(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	authToken string,
 	settings registryConfig.Registry,
 	limiter *ratelimit.Limiter,
 	endpoints ...string,
 ) (string, error) {
-	return fetchDigest(log, ctx, container, authToken, settings, limiter, http.MethodGet, "", endpoints...)
+	return fetchDigest(log, ctx, c, authToken, settings, limiter, http.MethodGet, "", endpoints...)
 }
 
 // FetchDigestForTag retrieves the manifest digest of a specific tag.
@@ -469,7 +469,7 @@ func fetchDigestWithGet(
 // Parameters:
 //   - log: Logger.
 //   - ctx: The context controlling the request's lifecycle.
-//   - container: Container whose image supplies the repository and registry host.
+//   - c: Container whose image supplies the repository and registry host.
 //   - authToken: A base64-encoded authentication string for registry access.
 //   - tag: Exact tag to fetch the digest for.
 //   - settings: Registry request settings.
@@ -484,14 +484,14 @@ func fetchDigestWithGet(
 func FetchDigestForTag(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	authToken string,
 	tag string,
 	settings registryConfig.Registry,
 	limiter *ratelimit.Limiter,
 	endpoints ...string,
 ) (string, error) {
-	remote, err := fetchDigest(log, ctx, container, authToken, settings, limiter, http.MethodHead, tag, endpoints...)
+	remote, err := fetchDigest(log, ctx, c, authToken, settings, limiter, http.MethodHead, tag, endpoints...)
 
 	switch {
 	case errors.Is(err, errManifestNotFound):
@@ -520,7 +520,7 @@ func FetchDigestForTag(
 // URL's scheme takes precedence over the registry settings.
 //
 // Parameters:
-//   - container: Container whose manifest URL is being built.
+//   - c: Container whose manifest URL is being built.
 //   - settings: Registry request settings.
 //   - hostOverride: Optional host or endpoint URL to use instead of the canonical host.
 //     An empty string uses the canonical host.
@@ -531,11 +531,11 @@ func FetchDigestForTag(
 //   - *url.URL: The parsed URL object.
 //   - error: Non-nil if construction or validation fails.
 func buildManifestURL(log *zerolog.Logger,
-	container types.Container,
+	c *container.Container,
 	settings registryConfig.Registry,
 	hostOverride string,
 ) (string, string, *url.URL, error) {
-	return buildManifestURLForImage(log, container.ImageName(), container.Name(), settings, hostOverride)
+	return buildManifestURLForImage(log, c.ImageName(), c.Name(), settings, hostOverride)
 }
 
 // buildManifestURLForTag constructs a manifest URL for a specific tag of an
@@ -548,7 +548,7 @@ func buildManifestURL(log *zerolog.Logger,
 //
 // Parameters:
 //   - log: Logger.
-//   - container: Container whose image supplies the repository and registry host.
+//   - c: Container whose image supplies the repository and registry host.
 //   - settings: Registry request settings.
 //   - hostOverride: Optional host or endpoint URL to use instead of the canonical host.
 //   - tag: Exact tag to target. An empty tag yields the container's own reference.
@@ -559,23 +559,23 @@ func buildManifestURL(log *zerolog.Logger,
 //   - *url.URL: The parsed URL object.
 //   - error: Non-nil if construction or validation fails.
 func buildManifestURLForTag(log *zerolog.Logger,
-	container types.Container,
+	c *container.Container,
 	settings registryConfig.Registry,
 	hostOverride string,
 	tag string,
 ) (string, string, *url.URL, error) {
-	imageName, err := imageNameForTag(container.ImageName(), tag)
+	imageName, err := imageNameForTag(c.ImageName(), tag)
 	if err != nil {
 		log.Debug().
 			Err(err).
-			Str("image", container.ImageName()).
+			Str("image", c.ImageName()).
 			Str("tag", tag).
 			Msg("Failed to resolve image name for tag")
 
 		return "", "", nil, fmt.Errorf("%w: %w", errFailedBuildManifestURL, err)
 	}
 
-	return buildManifestURLForImage(log, imageName, container.Name(), settings, hostOverride)
+	return buildManifestURLForImage(log, imageName, c.Name(), settings, hostOverride)
 }
 
 // imageNameForTag returns the image reference with its tag replaced by tag.
@@ -691,7 +691,7 @@ func buildManifestURLForImage(log *zerolog.Logger,
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
-//   - container: Container whose digest is being retrieved.
+//   - c: Container whose digest is being retrieved.
 //   - registryAuth: Base64-encoded auth string.
 //   - settings: Registry request settings.
 //   - limiter: Rate limiter shared by registry requests.
@@ -705,7 +705,7 @@ func buildManifestURLForImage(log *zerolog.Logger,
 //   - error: Non-nil if operation fails, nil on success.
 func fetchDigest(log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	settings registryConfig.Registry,
 	limiter *ratelimit.Limiter,
@@ -714,12 +714,12 @@ func fetchDigest(log *zerolog.Logger,
 	endpoints ...string,
 ) (string, error) {
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": c.Name(),
+		"image":     c.ImageName(),
 	}
 
 	// Skip digest fetching for locally built images (empty RepoDigests).
-	if container.HasImageInfo() && len(container.ImageInfo().RepoDigests) == 0 {
+	if c.HasImageInfo() && len(c.ImageInfo().RepoDigests) == 0 {
 		log.Debug().
 			Fields(fields).
 			Msg("Skipping digest fetch for locally built image")
@@ -733,7 +733,7 @@ func fetchDigest(log *zerolog.Logger,
 	// Create an authentication client for registry requests.
 	client := auth.NewAuthClient(log, settings)
 
-	manifestURL, originalHost, _, err := buildManifestURL(log, container, settings, "")
+	manifestURL, originalHost, _, err := buildManifestURL(log, c, settings, "")
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -787,7 +787,7 @@ func fetchDigest(log *zerolog.Logger,
 		result, err := limiter.DoValue(ctx, log, limitKey, func() (auth.TokenResult, error) {
 			return auth.GetToken(log,
 				ctx,
-				container,
+				c,
 				registryAuth,
 				client,
 				settings,
@@ -848,7 +848,7 @@ func fetchDigest(log *zerolog.Logger,
 		)
 
 		manifestURL, _, parsedURL, err = buildManifestURLForTag(log,
-			container,
+			c,
 			settings,
 			hostForManifest,
 			tag,

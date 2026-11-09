@@ -78,7 +78,7 @@ const (
 func Run(
 	log *zerolog.Logger,
 	ctx context.Context,
-	containers []types.Container,
+	containers []*container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
@@ -153,7 +153,7 @@ func Run(
 func performRollingRestart(
 	log *zerolog.Logger,
 	ctx context.Context,
-	containers []types.Container,
+	containers []*container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
@@ -302,7 +302,7 @@ func performRollingRestart(
 func stopContainersInReversedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
-	containers []types.Container,
+	containers []*container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 ) (map[types.ContainerID]error, []cleanup.RemovedImageInfo) {
@@ -432,7 +432,7 @@ func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcom
 func stopStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	container *container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 ) (bool, error) {
@@ -553,7 +553,7 @@ func stopStaleContainer(
 func snapshotCopyFilesForRecreate(
 	ctx context.Context,
 	client containerClient.Client,
-	source types.Container,
+	source *container.Container,
 ) error {
 	store, ok := client.(containerClient.CopyFileStore)
 	if !ok {
@@ -602,7 +602,7 @@ func discardCopyFilesForRecreate(client containerClient.Client, containerID type
 func restartContainersInSortedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
-	containers []types.Container,
+	containers []*container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 	stoppedImages []cleanup.RemovedImageInfo,
@@ -734,7 +734,7 @@ func restartContainersInSortedOrder(
 func restartStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	client containerClient.Client,
 	config updateParams.Params,
 ) (types.ContainerID, bool, error) {
@@ -841,25 +841,22 @@ func restartStaleContainer(
 
 	// For Watchtower self-updates, accumulate container ID chain in labels.
 	if sourceContainer.IsWatchtower() {
-		c, ok := sourceContainer.(*container.Container)
-		if ok {
-			containerInfo := c.ContainerInfo()
-			if containerInfo != nil && containerInfo.Config != nil {
-				existingChain, _ := c.GetContainerChain()
+		containerInfo := sourceContainer.ContainerInfo()
+		if containerInfo != nil && containerInfo.Config != nil {
+			existingChain, _ := sourceContainer.GetContainerChain()
 
-				var newChain string
-				if existingChain != "" {
-					newChain = existingChain + "," + string(c.ID())
-				} else {
-					newChain = string(c.ID())
-				}
-
-				c.SetLabel(labels.ContainerChain, newChain)
-				log.Debug().
-					Fields(fields).
-					Str("container_chain", newChain).
-					Msg("Updated container chain label for Watchtower self-update")
+			var newChain string
+			if existingChain != "" {
+				newChain = existingChain + "," + string(sourceContainer.ID())
+			} else {
+				newChain = string(sourceContainer.ID())
 			}
+
+			sourceContainer.SetLabel(labels.ContainerChain, newChain)
+			log.Debug().
+				Fields(fields).
+				Str("container_chain", newChain).
+				Msg("Updated container chain label for Watchtower self-update")
 		}
 	}
 

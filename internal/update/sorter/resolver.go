@@ -5,7 +5,6 @@ import (
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // linkResolver resolves dependency links to the containers they name.
@@ -21,16 +20,16 @@ type linkResolver struct {
 	// members of that service, in every project.
 	services map[string][]string
 	// watchtowers maps the exact names of monitored Watchtower containers to them.
-	watchtowers map[string]types.Container
+	watchtowers map[string]*container.Container
 	// unmonitored maps the exact names of unmonitored containers to them.
-	unmonitored map[string]types.Container
+	unmonitored map[string]*container.Container
 	// unmonitoredNames maps each Compose project, or empty for containers
 	// without one, to the identifiers, names, and service names of its
 	// unmonitored containers.
 	unmonitoredNames map[string]*matchSet
 	// watchtowerAliases maps the identifier without its replica number of each
 	// Watchtower container that is the only one with that identifier to it.
-	watchtowerAliases map[string]types.Container
+	watchtowerAliases map[string]*container.Container
 }
 
 // resolve returns the containers a link of c names.
@@ -51,9 +50,9 @@ type linkResolver struct {
 //
 // Returns:
 //   - []string: Identifiers of the members the link names.
-//   - types.Container: The Watchtower container the link names, or nil.
+//   - *container.Container: The Watchtower container the link names, or nil.
 //   - bool: Whether the link names any container, monitored or not.
-func (r *linkResolver) resolve(c types.Container, link string) ([]string, types.Container, bool) {
+func (r *linkResolver) resolve(c *container.Container, link string) ([]string, *container.Container, bool) {
 	exact := r.matchIDSet.names[link]
 	if !exact {
 		if watchtower, ok := r.watchtowers[link]; ok {
@@ -101,7 +100,7 @@ func (r *linkResolver) resolve(c types.Container, link string) ([]string, types.
 // Returns:
 //   - []string: Identifiers of the members the link names.
 //   - bool: Whether the link names any container, monitored or not.
-func (r *linkResolver) byProject(c types.Container, link string, keys []string) ([]string, bool) {
+func (r *linkResolver) byProject(c *container.Container, link string, keys []string) ([]string, bool) {
 	if project := projectOf(c); project != "" {
 		local := make([]string, 0, len(keys))
 
@@ -143,15 +142,10 @@ func (r *linkResolver) byProject(c types.Container, link string, keys []string) 
 //
 // Returns:
 //   - []UnresolvedLink: The entries that name no container.
-func (r *linkResolver) unresolvedDependsOn(c types.Container, self string) []UnresolvedLink {
-	concrete, ok := c.(*container.Container)
-	if !ok {
-		return nil
-	}
-
+func (r *linkResolver) unresolvedDependsOn(c *container.Container, self string) []UnresolvedLink {
 	var unresolved []UnresolvedLink
 
-	for _, link := range container.GetLinksFromWatchtowerLabel(concrete) {
+	for _, link := range container.GetLinksFromWatchtowerLabel(c) {
 		if link == c.Name() || (self != "" && link == self) {
 			continue
 		}
@@ -171,7 +165,7 @@ func (r *linkResolver) unresolvedDependsOn(c types.Container, self string) []Unr
 //
 // Returns:
 //   - string: The value of the Compose project label.
-func projectOf(c types.Container) string {
+func projectOf(c *container.Container) string {
 	info := c.ContainerInfo()
 	if info == nil || info.Config == nil {
 		return ""
@@ -188,7 +182,7 @@ func projectOf(c types.Container) string {
 //
 // Returns:
 //   - string: The value of the Compose service label, normalized as a link.
-func serviceOf(c types.Container) string {
+func serviceOf(c *container.Container) string {
 	info := c.ContainerInfo()
 	if info == nil || info.Config == nil {
 		return ""
@@ -205,7 +199,7 @@ func serviceOf(c types.Container) string {
 //
 // Returns:
 //   - map[string]string: Project for each identifier.
-func memberProjects(members map[string]types.Container) map[string]string {
+func memberProjects(members map[string]*container.Container) map[string]string {
 	projects := make(map[string]string, len(members))
 
 	for identifier, c := range members {
@@ -225,7 +219,7 @@ func memberProjects(members map[string]types.Container) map[string]string {
 //
 // Returns:
 //   - map[string][]string: Identifiers for each service name.
-func memberServices(members map[string]types.Container) map[string][]string {
+func memberServices(members map[string]*container.Container) map[string][]string {
 	services := make(map[string][]string)
 
 	for identifier, c := range members {
@@ -250,7 +244,7 @@ func memberServices(members map[string]types.Container) map[string][]string {
 //
 // Returns:
 //   - map[string]*matchSet: Identifiers and names for each project, indexed for matching.
-func projectNames(containers []types.Container) map[string]*matchSet {
+func projectNames(containers []*container.Container) map[string]*matchSet {
 	projects := make(map[string]map[string]bool)
 
 	for _, c := range containers {
@@ -289,9 +283,9 @@ const namesPerContainer = 3
 //   - containers: Containers to index.
 //
 // Returns:
-//   - map[string]types.Container: Container for each exact name.
-func exactNames(containers []types.Container) map[string]types.Container {
-	names := make(map[string]types.Container, len(containers)*namesPerContainer)
+//   - map[string]*container.Container: Container for each exact name.
+func exactNames(containers []*container.Container) map[string]*container.Container {
+	names := make(map[string]*container.Container, len(containers)*namesPerContainer)
 
 	for _, c := range containers {
 		for _, name := range []string{
@@ -319,9 +313,9 @@ func exactNames(containers []types.Container) map[string]types.Container {
 //   - names: The exact names of the Watchtower containers.
 //
 // Returns:
-//   - map[string]types.Container: Container for each alias.
-func watchtowerAliases(watchtowers []types.Container, names map[string]types.Container) map[string]types.Container {
-	aliases := make(map[string]types.Container, len(watchtowers))
+//   - map[string]*container.Container: Container for each alias.
+func watchtowerAliases(watchtowers []*container.Container, names map[string]*container.Container) map[string]*container.Container {
+	aliases := make(map[string]*container.Container, len(watchtowers))
 	replicas := make(map[string]int, len(watchtowers))
 
 	for _, c := range watchtowers {

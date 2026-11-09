@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/meta"
 	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
@@ -32,7 +33,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -115,8 +115,8 @@ var tokenServiceCount atomic.Uint64
 //   - repoDigests: The image's repo digests.
 //
 // Returns:
-//   - types.Container: The container.
-func newRegistryContainer(image string, repoDigests ...string) types.Container {
+//   - *container.Container: The container.
+func newRegistryContainer(image string, repoDigests ...string) *container.Container {
 	return modelfixture.Container(
 		containerfixture.WithImageName(image),
 		containerfixture.WithRepoDigests(repoDigests),
@@ -304,8 +304,8 @@ func sha256Hex(body string) string {
 //   - updates: Changes applied after the defaults, such as another image name.
 //
 // Returns:
-//   - types.Container: The container.
-func newLocalOnlyContainer(imageID string, updates ...containerfixture.Update) types.Container {
+//   - *container.Container: The container.
+func newLocalOnlyContainer(imageID string, updates ...containerfixture.Update) *container.Container {
 	return modelfixture.Container(append([]containerfixture.Update{
 		containerfixture.WithName("atlas-badgerdb-1"),
 		containerfixture.WithImageName("atlas-badgerdb"),
@@ -625,7 +625,7 @@ func TestCompareDigest(t *testing.T) {
 	tests := []struct {
 		name string
 		// container is the container to compare.
-		container types.Container
+		container *container.Container
 		// handlers returns the registry's handlers in request order.
 		handlers func(t *testing.T) []http.HandlerFunc
 		expected bool
@@ -899,10 +899,10 @@ func TestCompareDigest_StubRegistry(t *testing.T) {
 			server := httpstub.New(t)
 			server.AppendHandlers(tt.handlers(t, server.Addr())...)
 
-			container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := CompareDigest(newTestLogger(t), context.Background(),
-				container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+				c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 			if tt.errContains != "" {
 				require.ErrorContains(t, err, tt.errContains)
 			} else {
@@ -940,13 +940,13 @@ func TestCompareDigest_HashesManifestWithoutDigestHeader(t *testing.T) {
 		),
 	)
 
-	container := newRegistryContainer(
+	c := newRegistryContainer(
 		server.Addr()+"/test/image:latest",
 		server.Addr()+"/test/image@sha256:"+sha256Hex(testManifestListBody),
 	)
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
-		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 	require.NoError(t, err)
 	assert.True(t, match)
 	assert.Equal(t, "sha256:"+sha256Hex(testManifestListBody), remoteDigest)
@@ -1036,10 +1036,10 @@ func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
 			))
 			registry.AppendHandlers(bearerChallengeHandlers(t, registry.Addr(), "repository:test/image:pull")...)
 
-			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-				container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+				c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 			require.NoError(t, err)
 			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
 		})
@@ -1114,10 +1114,10 @@ func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 				),
 			)
 
-			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
 			require.NoError(t, err)
 			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
 			assert.Len(t, registry.ReceivedRequests(), tt.registryRequests,
@@ -1178,10 +1178,10 @@ func TestFetchDigestWithGet_RedirectHostFailure(t *testing.T) {
 				manifestHandler(t, http.MethodGet, manifestPath, http.StatusUnauthorized, nil),
 			)...)
 
-			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				assert.Empty(t, got)
@@ -1216,10 +1216,10 @@ func TestCompareDigest_RedirectedChallenge(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
+	c := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 	got, err := CompareDigest(newTestLogger(t), context.Background(),
-		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 	require.NoError(t, err)
 	assert.True(t, got)
 }
@@ -1237,11 +1237,11 @@ func TestCompareDigestWithRemote(t *testing.T) {
 		manifestHandler(t, http.MethodHead, "/v2/myapp/manifests/latest", http.StatusOK, digestHeader("sha256:"+remoteHash)),
 	)
 
-	container := newRegistryContainer(server.Addr()+"/myapp:latest",
+	c := newRegistryContainer(server.Addr()+"/myapp:latest",
 		"registry.example.com/myapp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
+		c, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
 	require.NoError(t, err)
 	assert.False(t, match)
 	assert.Equal(t, "sha256:"+remoteHash, remoteDigest)
@@ -1404,10 +1404,10 @@ func TestCompareDigestWithRemote_MirrorHeadFailure(t *testing.T) {
 				registryAddr = registry.Addr()
 			}
 
-			container := newRegistryContainer(registryAddr+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(registryAddr+"/test/image:latest", testRepoDigest)
 
 			match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
 			require.NoError(t, err)
 			assert.True(t, match)
 			assert.Equal(t, testDigestHash, remoteDigest)
@@ -1429,10 +1429,10 @@ func TestCompareDigestWithRemote_SkipsInvalidEndpoint(t *testing.T) {
 		manifestHandler(t, http.MethodHead, "/v2/myapp/manifests/latest", http.StatusOK, digestHeader(remoteHash)),
 	)
 
-	container := newRegistryContainer(server.Addr()+"/myapp:latest", "registry.example.com/myapp@"+remoteHash)
+	c := newRegistryContainer(server.Addr()+"/myapp:latest", "registry.example.com/myapp@"+remoteHash)
 
 	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", registryConfig.Registry{}, ratelimit.New(), "bad host", server.URL())
+		c, "", registryConfig.Registry{}, ratelimit.New(), "bad host", server.URL())
 	require.NoError(t, err)
 	assert.True(t, match)
 	assert.Len(t, server.ReceivedRequests(), 2)
@@ -1455,11 +1455,11 @@ func TestCompareDigestWithRemote_Head429DoesNotFallBackToGET(t *testing.T) {
 		),
 	)
 
-	container := newRegistryContainer(server.Addr()+"/linuxserver/radarr:latest",
+	c := newRegistryContainer(server.Addr()+"/linuxserver/radarr:latest",
 		"lscr.io/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.URL())
+		c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.URL())
 	require.ErrorIs(t, err, ratelimit.ErrRateLimited)
 	assert.False(t, match)
 }
@@ -1487,11 +1487,11 @@ func TestCompareDigestWithRemote_429DoesNotContinueToNextEndpoint(t *testing.T) 
 	// The mirror has no handlers, so any request to it fails the test.
 	mirror := httpstub.New(t)
 
-	container := newRegistryContainer(primary.Addr()+"/linuxserver/radarr:latest",
+	c := newRegistryContainer(primary.Addr()+"/linuxserver/radarr:latest",
 		"lscr.io/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), primary.URL(), mirror.URL())
+		c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), primary.URL(), mirror.URL())
 	require.ErrorIs(t, err, ratelimit.ErrRateLimited)
 	assert.False(t, match)
 	assert.Len(t, primary.ReceivedRequests(), 3)
@@ -1524,10 +1524,10 @@ func TestTokenService_SeparatesTestsSharingATokenURL(t *testing.T) {
 				manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
 			)
 
-			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 			match, err := CompareDigest(newTestLogger(t), context.Background(),
-				container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 			require.NoError(t, err)
 			assert.True(t, match)
 		})
@@ -1571,11 +1571,11 @@ func TestCompareDigestWithRemote_UnauthorizedIsError(t *testing.T) {
 		manifestHandler(t, http.MethodGet, manifestPath, http.StatusUnauthorized, nil),
 	)
 
-	container := newRegistryContainer(registry.Addr()+"/linuxserver/radarr:latest",
+	c := newRegistryContainer(registry.Addr()+"/linuxserver/radarr:latest",
 		registry.Addr()+"/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+		c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 	require.ErrorIs(t, err, errInvalidRegistryResponse)
 	assert.False(t, match)
 	assert.Empty(t, remoteDigest)
@@ -1608,11 +1608,11 @@ func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(registry.Addr()+"/linuxserver/radarr:latest",
+	c := newRegistryContainer(registry.Addr()+"/linuxserver/radarr:latest",
 		registry.Addr()+"/linuxserver/radarr@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
 
 	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-		container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+		c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 	require.NoError(t, err)
 	assert.False(t, match)
 	assert.Equal(t, remote, remoteDigest)
@@ -1671,10 +1671,10 @@ func TestFetchDigestForTag(t *testing.T) {
 				),
 			)
 
-			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 			got, err := FetchDigestForTag(newTestLogger(t), t.Context(),
-				container, "", "v1.2.3", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+				c, "", "v1.2.3", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				assert.Empty(t, got)
@@ -1711,10 +1711,10 @@ func TestFetchDigestForTag_MirrorHeadFailure(t *testing.T) {
 		manifestHandler(t, http.MethodHead, manifestPath, http.StatusNotFound, nil),
 	)
 
-	container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+	c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
 	got, err := FetchDigestForTag(newTestLogger(t), t.Context(),
-		container, "", "v1.2.3", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+		c, "", "v1.2.3", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
@@ -1837,11 +1837,11 @@ func TestCompareDigestWithRemote_FailedProbeIsNotLocalOnly(t *testing.T) {
 			server.AppendHandlers(tt.probe(t)...)
 			server.AppendHandlers(tt.probe(t)...)
 
-			container := newRegistryContainer("nginx:latest", "nginx@"+testLocalDigest)
+			c := newRegistryContainer("nginx:latest", "nginx@"+testLocalDigest)
 
 			for range 2 {
 				match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-					container, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.Addr())
+					c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), server.Addr())
 				require.ErrorIs(t, err, tt.wantErr)
 				assert.False(t, match)
 			}
@@ -1866,7 +1866,7 @@ func TestIsRefusedLocalImage(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		container types.Container
+		container *container.Container
 		err       error
 		want      bool
 	}{
@@ -1981,11 +1981,11 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	server.AppendHandlers(refusedProbeHandlers(t, manifestPath)...)
 
 	// compare compares the container with the registry and expects a match.
-	compare := func(container types.Container) {
+	compare := func(c *container.Container) {
 		t.Helper()
 
 		match, _, err := CompareDigestWithRemote(newTestLogger(t), context.Background(),
-			container, "", settings, ratelimit.New(), server.Addr())
+			c, "", settings, ratelimit.New(), server.Addr())
 		require.NoError(t, err)
 		assert.True(t, match)
 	}
@@ -2086,10 +2086,10 @@ func TestFetchDigestWithGet(t *testing.T) {
 				),
 			)
 
-			container := newRegistryContainer("registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
+			c := newRegistryContainer("registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-				container, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
+				c, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
@@ -2204,10 +2204,10 @@ func TestFetchDigestWithGet_StubRegistry(t *testing.T) {
 				image = tt.image(server.Addr())
 			}
 
-			container := newRegistryContainer(image, testRepoDigest)
+			c := newRegistryContainer(image, testRepoDigest)
 
 			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-				container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+				c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 			if tt.errContains != "" {
 				require.ErrorContains(t, err, tt.errContains)
 				assert.Empty(t, got)
@@ -2264,10 +2264,10 @@ func TestFetchDigestWithGet_RedirectedChallenge(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
+	c := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 	got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 	require.NoError(t, err)
 	assert.Equal(t, "d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547", got)
 }
@@ -2291,13 +2291,13 @@ func TestFetchDigestWithGet_SlowResponse(t *testing.T) {
 		)...,
 	)
 
-	container := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
+	c := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 
 	_, err := fetchDigestWithGet(newTestLogger(t), ctx,
-		container, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 

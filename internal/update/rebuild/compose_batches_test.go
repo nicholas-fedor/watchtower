@@ -9,13 +9,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // batchTestContainer returns a container whose name and ID are the given name.
 // It links to the named containers.
-func batchTestContainer(name string, links ...string) types.Container {
+func batchTestContainer(name string, links ...string) *container.Container {
 	containerLinks := make([]string, 0, len(links))
 	for _, link := range links {
 		containerLinks = append(containerLinks, "/"+link+":"+link)
@@ -26,7 +27,7 @@ func batchTestContainer(name string, links ...string) types.Container {
 
 // testBatch returns a batch for the Compose project in the given directory
 // with the given members.
-func testBatch(dir string, members ...types.Container) *composeBatch {
+func testBatch(dir string, members ...*container.Container) *composeBatch {
 	batch := &composeBatch{ref: composeProject.ProjectRef{Dir: dir, Name: dir}}
 	for _, c := range members {
 		batch.members = append(batch.members, composeMember{container: c})
@@ -46,7 +47,7 @@ func batchDirs(batches []*composeBatch) []string {
 }
 
 // orderBatches returns the batches in the dependency order of the containers.
-func orderBatches(log *zerolog.Logger, batches []*composeBatch, containers []types.Container) []*composeBatch {
+func orderBatches(log *zerolog.Logger, batches []*composeBatch, containers []*container.Container) []*composeBatch {
 	return (&composeBatches{firstSeen: batches}).inDependencyOrder(log, containers, false)
 }
 
@@ -103,85 +104,85 @@ func TestComposeBatches_inDependencyOrder(t *testing.T) {
 	tests := []struct {
 		name string
 		// build returns the batches in first-seen order and every container.
-		build       func() ([]*composeBatch, []types.Container)
+		build       func() ([]*composeBatch, []*container.Container)
 		want        []string
 		wantWarning string
 	}{
 		{
 			name: "a single batch",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				app := batchTestContainer("app")
 
-				return []*composeBatch{testBatch("a", app)}, []types.Container{app}
+				return []*composeBatch{testBatch("a", app)}, []*container.Container{app}
 			},
 			want: []string{"a"},
 		},
 		{
 			name: "independent batches keep first-seen order",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				app, web := batchTestContainer("app"), batchTestContainer("web")
 
-				return []*composeBatch{testBatch("a", app), testBatch("b", web)}, []types.Container{app, web}
+				return []*composeBatch{testBatch("a", app), testBatch("b", web)}, []*container.Container{app, web}
 			},
 			want: []string{"a", "b"},
 		},
 		{
 			name: "a dependency seen later runs first",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				app, db := batchTestContainer("app", "db"), batchTestContainer("db")
 
-				return []*composeBatch{testBatch("a", app), testBatch("b", db)}, []types.Container{app, db}
+				return []*composeBatch{testBatch("a", app), testBatch("b", db)}, []*container.Container{app, db}
 			},
 			want: []string{"b", "a"},
 		},
 		{
 			name: "a project with an independent service still waits for its dependency",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				solo, app, db := batchTestContainer("solo"), batchTestContainer("app", "db"), batchTestContainer("db")
 
-				return []*composeBatch{testBatch("a", solo, app), testBatch("b", db)}, []types.Container{solo, app, db}
+				return []*composeBatch{testBatch("a", solo, app), testBatch("b", db)}, []*container.Container{solo, app, db}
 			},
 			want: []string{"b", "a"},
 		},
 		{
 			name: "a dependency inside one batch adds no order",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				app, db, web := batchTestContainer("app", "db"), batchTestContainer("db"), batchTestContainer("web")
 
-				return []*composeBatch{testBatch("a", app, db), testBatch("b", web)}, []types.Container{app, db, web}
+				return []*composeBatch{testBatch("a", app, db), testBatch("b", web)}, []*container.Container{app, db, web}
 			},
 			want: []string{"a", "b"},
 		},
 		{
 			name: "ready batches run in first-seen order",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				front := batchTestContainer("front", "api", "worker")
 				api, worker, db := batchTestContainer("api", "db"), batchTestContainer("worker", "db"), batchTestContainer("db")
 
 				return []*composeBatch{
 					testBatch("a", front), testBatch("b", worker), testBatch("c", api), testBatch("d", db),
-				}, []types.Container{front, api, worker, db}
+				}, []*container.Container{front, api, worker, db}
 			},
 			want: []string{"d", "b", "c", "a"},
 		},
 		{
 			name: "a cycle follows the resolvable batches",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				x, y, solo := batchTestContainer("x", "y"), batchTestContainer("y", "x"), batchTestContainer("solo")
 
 				return []*composeBatch{testBatch("a", x), testBatch("b", y), testBatch("c", solo)},
-					[]types.Container{x, y, solo}
+					[]*container.Container{x, y, solo}
 			},
 			want:        []string{"c", "a", "b"},
 			wantWarning: "Compose batch dependencies are cyclic",
 		},
 		{
 			name: "a dependency lookup failure keeps first-seen order",
-			build: func() ([]*composeBatch, []types.Container) {
+			build: func() ([]*composeBatch, []*container.Container) {
 				first, second := batchTestContainer("app"), batchTestContainer("app")
 				db := batchTestContainer("db")
 
-				return []*composeBatch{testBatch("a", first), testBatch("b", db)}, []types.Container{first, second, db}
+				return []*composeBatch{testBatch("a", first), testBatch("b", db)}, []*container.Container{first, second, db}
 			},
 			want:        []string{"a", "b"},
 			wantWarning: "Could not order Compose batches by dependencies",

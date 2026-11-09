@@ -126,7 +126,7 @@ func setProcessFs(t *testing.T, fsys fs.FS) {
 // selfContainer returns the Watchtower container preRun detects, with the
 // given name and container hostname. Its restart policy is "unless-stopped",
 // so disabling its restarts sends a policy update.
-func selfContainer(name, hostname string) types.Container {
+func selfContainer(name, hostname string) *container.Container {
 	return container.NewContainer(nil,
 		&dockerContainer.InspectResponse{
 			ID:      string(selfID),
@@ -221,7 +221,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			detection: selfDetection{hostname: "wt-host"},
 			setup: func(client *mockContainerClient.MockClient) {
 				self := selfContainer("/watchtower", "wt-host")
-				client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{self}, nil)
+				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{self}, nil)
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(self, nil)
 			},
 			wantID:    selfID,
@@ -355,7 +355,7 @@ func captureStderr(t *testing.T) func() string {
 }
 
 // containerName names a container, or returns "" when it is nil.
-func containerName(c types.Container) string {
+func containerName(c *container.Container) string {
 	if c == nil {
 		return ""
 	}
@@ -793,7 +793,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{old}, nil).Maybe()
+		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{old}, nil).Maybe()
 	case "invalid-restart-of-chain-parent":
 		// The container's chain lists its own ID, which marks it as the parent
 		// of a newer instance.
@@ -802,7 +802,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(parent, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]types.Container{parent}, nil).Maybe()
+		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{parent}, nil).Maybe()
 	case "rejected-notification-url":
 		args = []string{"--notification-url", "discord://secrettoken@notanumber"}
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}

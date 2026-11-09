@@ -38,7 +38,7 @@ type panickingFetcher struct {
 func (f panickingFetcher) FetchDigestForTag(
 	_ *zerolog.Logger,
 	_ context.Context,
-	_ types.Container,
+	_ *container.Container,
 	_ string,
 	_ string,
 	_ ...string,
@@ -57,7 +57,7 @@ type stubFetcher struct {
 func (f *stubFetcher) FetchDigestForTag(
 	_ *zerolog.Logger,
 	_ context.Context,
-	_ types.Container,
+	_ *container.Container,
 	_ string,
 	tag string,
 	_ ...string,
@@ -314,7 +314,7 @@ type missFetcher struct{}
 func (f *missFetcher) FetchDigestForTag(
 	_ *zerolog.Logger,
 	_ context.Context,
-	_ types.Container,
+	_ *container.Container,
 	_ string,
 	_ string,
 	_ ...string,

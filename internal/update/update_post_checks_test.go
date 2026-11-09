@@ -11,6 +11,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
@@ -33,7 +34,7 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 	)
 
 	// appContainer returns a running container with a post-check hook.
-	appContainer := func(id string) types.Container {
+	appContainer := func(id string) *container.Container {
 		return mockUpdate.CreateMockContainerWithConfig(
 			id,
 			"/app",
@@ -85,15 +86,15 @@ func TestUpdate_PostChecksTargetCurrentContainers(t *testing.T) {
 			// The scan lists the container before the update, and the post-checks
 			// list again to find the containers that exist afterwards.
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-				Return([]types.Container{scanned}, nil).Once()
+				Return([]*container.Container{scanned}, nil).Once()
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).
-				Return([]types.Container{afterUpdate}, nil).Once()
+				Return([]*container.Container{afterUpdate}, nil).Once()
 
 			var targets []types.ContainerID
 
 			client.EXPECT().
 				ExecuteCommand(mock.Anything, mock.Anything, postCheck, mock.Anything, mock.Anything, mock.Anything).
-				Run(func(_ context.Context, c types.Container, _ string, _, _, _ int) {
+				Run(func(_ context.Context, c *container.Container, _ string, _, _, _ int) {
 					targets = append(targets, c.ID())
 				}).
 				Return(false, nil)

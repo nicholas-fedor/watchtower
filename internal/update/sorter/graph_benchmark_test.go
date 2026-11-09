@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // cycleBenchmarkCase is a dependency graph that the cycle and sort benchmarks
@@ -13,24 +13,24 @@ type cycleBenchmarkCase struct {
 	// name identifies the graph in benchmark output.
 	name string
 	// containers builds the graph.
-	containers func() []types.Container
+	containers func() []*container.Container
 }
 
 // cycleBenchmarkCases returns graphs from acyclic to fully cyclic, at the sizes
 // the dependency sort benchmarks use.
 func cycleBenchmarkCases() []cycleBenchmarkCase {
 	return []cycleBenchmarkCase{
-		{name: "NoCycle_50", containers: func() []types.Container { return generateBenchmarkContainers(50, 0.2) }},
-		{name: "NoCycle_500", containers: func() []types.Container { return generateBenchmarkContainers(500, 0.1) }},
-		{name: "Chain_500", containers: func() []types.Container { return generateChainDependencies(500) }},
-		{name: "Diamond_10", containers: func() []types.Container { return generateDiamondDependencies(10) }},
-		{name: "Ring_500", containers: func() []types.Container { return generateRingDependencies(500) }},
+		{name: "NoCycle_50", containers: func() []*container.Container { return generateBenchmarkContainers(50, 0.2) }},
+		{name: "NoCycle_500", containers: func() []*container.Container { return generateBenchmarkContainers(500, 0.1) }},
+		{name: "Chain_500", containers: func() []*container.Container { return generateChainDependencies(500) }},
+		{name: "Diamond_10", containers: func() []*container.Container { return generateDiamondDependencies(10) }},
+		{name: "Ring_500", containers: func() []*container.Container { return generateRingDependencies(500) }},
 	}
 }
 
 // generateRingDependencies creates containers that each depend on the next,
 // with the last depending on the first, so every container is in one cycle.
-func generateRingDependencies(count int) []types.Container {
+func generateRingDependencies(count int) []*container.Container {
 	specs := make([]deployed, count)
 
 	for i := range count {
@@ -92,14 +92,14 @@ func BenchmarkDependencyGraph_Sort(b *testing.B) {
 
 		all := tc.containers()
 
-		subset := make([]types.Container, 0, len(all)/2+1)
+		subset := make([]*container.Container, 0, len(all)/2+1)
 		for i := 0; i < len(all); i += 2 {
 			subset = append(subset, all[i])
 		}
 
 		b.Run(tc.name+"/Graph", func(b *testing.B) {
 			benchLog := newNopLogger()
-			sorted := make([]types.Container, len(subset))
+			sorted := make([]*container.Container, len(subset))
 
 			graph, err := NewDependencyGraph(benchLog, all, nil, true)
 			if err != nil {
@@ -120,7 +120,7 @@ func BenchmarkDependencyGraph_Sort(b *testing.B) {
 
 		b.Run(tc.name+"/Alone", func(b *testing.B) {
 			benchLog := newNopLogger()
-			sorted := make([]types.Container, len(subset))
+			sorted := make([]*container.Container, len(subset))
 
 			b.ReportAllocs()
 
@@ -143,7 +143,7 @@ func BenchmarkDependencyGraph_Sort(b *testing.B) {
 // mode and a backup container mounting the db volumes. A Watchtower container
 // runs beside the stacks. Links come from real container labels and host
 // config, as Container.Links reads them.
-func generateComposeHost(stacks int) []types.Container {
+func generateComposeHost(stacks int) []*container.Container {
 	specs := []deployed{{name: "watchtower", watchtower: true}}
 
 	for s := range stacks {
@@ -189,15 +189,15 @@ func BenchmarkScanOrdering(b *testing.B) {
 	for _, stacks := range []int{2, 10, 70} {
 		all := generateComposeHost(stacks)
 
-		restart := make([]types.Container, 0, len(all)/10+1)
+		restart := make([]*container.Container, 0, len(all)/10+1)
 		for i := 0; i < len(all); i += 10 {
 			restart = append(restart, all[i])
 		}
 
 		b.Run(fmt.Sprintf("Containers_%d", len(all)), func(b *testing.B) {
 			benchLog := newNopLogger()
-			sorted := make([]types.Container, len(all))
-			restartSorted := make([]types.Container, len(restart))
+			sorted := make([]*container.Container, len(all))
+			restartSorted := make([]*container.Container, len(restart))
 
 			b.ReportAllocs()
 

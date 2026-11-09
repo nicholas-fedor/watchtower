@@ -11,10 +11,10 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/digest"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // rateLimitCacheTTL is how long a rate-limited lookup is remembered.
@@ -59,7 +59,7 @@ type Fetcher interface {
 	FetchDigestForTag(
 		log *zerolog.Logger,
 		ctx context.Context,
-		container types.Container,
+		c *container.Container,
 		authToken string,
 		tag string,
 		endpoints ...string,
@@ -166,7 +166,7 @@ func NewDigestFetcher(settings registryConfig.Registry, rateLimiter *ratelimit.L
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for request lifecycle control.
-//   - container: Container whose image supplies the repository and registry host.
+//   - c: Container whose image supplies the repository and registry host.
 //   - registryAuth: Base64-encoded auth string for registry access.
 //   - version: OCI version annotation of the new image.
 //   - newDigest: Manifest digest of the new image.
@@ -177,23 +177,23 @@ func NewDigestFetcher(settings registryConfig.Registry, rateLimiter *ratelimit.L
 func (r *Resolver) ResolveTag(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	version string,
 	newDigest string,
 	endpoints ...string,
 ) string {
-	if r == nil || r.fetcher == nil || container == nil || version == "" || newDigest == "" {
+	if r == nil || r.fetcher == nil || c == nil || version == "" || newDigest == "" {
 		return ""
 	}
 
 	fields := map[string]any{
-		"container": container.Name(),
-		"image":     container.ImageName(),
+		"container": c.Name(),
+		"image":     c.ImageName(),
 		"version":   version,
 	}
 
-	pinned, err := isDigestPinned(container.ImageName())
+	pinned, err := isDigestPinned(c.ImageName())
 	if err != nil || pinned {
 		log.Debug().
 			Fields(fields).
@@ -202,7 +202,7 @@ func (r *Resolver) ResolveTag(
 		return ""
 	}
 
-	key := cacheKey(container, newDigest)
+	key := cacheKey(c, newDigest)
 	if cached, ok := r.loadAnswer(key); ok {
 		log.Debug().
 			Fields(fields).
@@ -225,7 +225,7 @@ func (r *Resolver) ResolveTag(
 		results := r.sweeps.DoChan(key, func() (any, error) {
 			led = true
 
-			return r.sweep(log, ctx, container, registryAuth, version, newDigest, key, fields, endpoints...), nil
+			return r.sweep(log, ctx, c, registryAuth, version, newDigest, key, fields, endpoints...), nil
 		})
 
 		select {
@@ -267,7 +267,7 @@ func (r *Resolver) ResolveTag(
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for request lifecycle control.
-//   - container: Container whose image supplies the repository and registry host.
+//   - c: Container whose image supplies the repository and registry host.
 //   - registryAuth: Base64-encoded auth string for registry access.
 //   - version: OCI version annotation of the new image.
 //   - newDigest: Manifest digest of the new image.
@@ -280,7 +280,7 @@ func (r *Resolver) ResolveTag(
 func (r *Resolver) sweep(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	version string,
 	newDigest string,
@@ -292,7 +292,7 @@ func (r *Resolver) sweep(
 		return probeResult{tag: cached.tag, outcome: outcomeCached}
 	}
 
-	outcome := r.probe(log, ctx, container, registryAuth, version, newDigest, endpoints...)
+	outcome := r.probe(log, ctx, c, registryAuth, version, newDigest, endpoints...)
 
 	switch outcome.outcome {
 	case outcomeMatched, outcomeNoMatch:
@@ -356,7 +356,7 @@ func tagCandidates(version string) []string {
 // Parameters:
 //   - log: Logger.
 //   - ctx: The context controlling the request's lifecycle.
-//   - container: Container whose image supplies the repository and registry host.
+//   - c: Container whose image supplies the repository and registry host.
 //   - authToken: A base64-encoded authentication string for registry access.
 //   - tag: Exact tag to fetch the digest for.
 //   - endpoints: Optional registry mirror host overrides to try before the canonical host.
@@ -368,12 +368,12 @@ func tagCandidates(version string) []string {
 func (f DigestFetcher) FetchDigestForTag(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	authToken string,
 	tag string,
 	endpoints ...string,
 ) (string, error) {
-	remote, err := digest.FetchDigestForTag(log, ctx, container, authToken, tag, f.settings, f.rateLimiter, endpoints...)
+	remote, err := digest.FetchDigestForTag(log, ctx, c, authToken, tag, f.settings, f.rateLimiter, endpoints...)
 	if err != nil {
 		return "", fmt.Errorf("%w: %w", errFetchTagDigest, err)
 	}
@@ -408,7 +408,7 @@ func (o probeOutcome) name() string {
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for request lifecycle control.
-//   - container: Container whose image supplies the repository and registry host.
+//   - c: Container whose image supplies the repository and registry host.
 //   - registryAuth: Base64-encoded auth string for registry access.
 //   - version: OCI version annotation of the new image.
 //   - newDigest: Manifest digest of the new image.
@@ -419,7 +419,7 @@ func (o probeOutcome) name() string {
 func (r *Resolver) probe(
 	log *zerolog.Logger,
 	ctx context.Context,
-	container types.Container,
+	c *container.Container,
 	registryAuth string,
 	version string,
 	newDigest string,
@@ -428,15 +428,15 @@ func (r *Resolver) probe(
 	failed := false
 
 	for i, tag := range tagCandidates(version) {
-		found, err := r.fetcher.FetchDigestForTag(log, ctx, container, registryAuth, tag, endpoints...)
+		found, err := r.fetcher.FetchDigestForTag(log, ctx, c, registryAuth, tag, endpoints...)
 		if err != nil {
 			if ratelimit.Is(err) {
 				// The registry is already throttling this host. Abandon the probe
 				// rather than spend a second request the registry will refuse.
 				log.Debug().
 					Err(err).
-					Str("container", container.Name()).
-					Str("image", container.ImageName()).
+					Str("container", c.Name()).
+					Str("image", c.ImageName()).
 					Str("tag", tag).
 					Msg("Abandoning release tag lookup after a rate limit")
 
@@ -445,8 +445,8 @@ func (r *Resolver) probe(
 
 			log.Debug().
 				Err(err).
-				Str("container", container.Name()).
-				Str("image", container.ImageName()).
+				Str("container", c.Name()).
+				Str("image", c.ImageName()).
 				Str("tag", tag).
 				Msg("Release tag candidate lookup failed")
 
@@ -464,8 +464,8 @@ func (r *Resolver) probe(
 		}
 
 		log.Debug().
-			Str("container", container.Name()).
-			Str("image", container.ImageName()).
+			Str("container", c.Name()).
+			Str("image", c.ImageName()).
 			Str("tag", tag).
 			Bool("first_candidate", i == 0).
 			Msg("Confirmed release tag spelling for the pulled image")
@@ -559,13 +559,13 @@ func sameManifestDigest(log *zerolog.Logger, a, b string) bool {
 // be wrong.
 //
 // Parameters:
-//   - container: Container whose image supplies the repository.
+//   - c: Container whose image supplies the repository.
 //   - newDigest: Manifest digest of the new image.
 //
 // Returns:
 //   - string: Cache key.
-func cacheKey(container types.Container, newDigest string) string {
-	host, path, _ := splitReference(container.ImageName())
+func cacheKey(c *container.Container, newDigest string) string {
+	host, path, _ := splitReference(c.ImageName())
 
 	return strings.Join([]string{host, path, newDigest}, "|")
 }

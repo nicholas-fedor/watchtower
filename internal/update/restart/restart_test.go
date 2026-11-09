@@ -16,6 +16,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -77,7 +78,7 @@ func Test_restartStaleContainer(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",
@@ -115,7 +116,7 @@ func Test_restartStaleContainer(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",
@@ -153,7 +154,7 @@ func Test_restartStaleContainer(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"abc123def456",
 						"/watchtower-old-abc123def456",
@@ -191,7 +192,7 @@ func Test_restartStaleContainer(t *testing.T) {
 
 		client := mockUpdate.CreateMockClient(
 			&mockUpdate.TestData{
-				Containers: []types.Container{
+				Containers: []*container.Container{
 					mockUpdate.CreateMockContainerWithConfig(
 						"watchtower",
 						"/watchtower",
@@ -280,7 +281,7 @@ func TestDetachedContext(t *testing.T) {
 				// the restart policy update path where the detached context is used.
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainerWithConfig(
 								"watchtower",
 								"/watchtower",
@@ -363,7 +364,7 @@ func TestDetachedContext(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower-source-id",
 							"/watchtower",
@@ -459,7 +460,7 @@ func TestDetachedContext(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower-source-id",
 							"/watchtower",
@@ -588,7 +589,7 @@ func TestDetachedContext(t *testing.T) {
 
 					client := mockUpdate.CreateMockClient(
 						&mockUpdate.TestData{
-							Containers: []types.Container{
+							Containers: []*container.Container{
 								mockUpdate.CreateMockContainerWithConfig(
 									"watchtower-source-id",
 									"/watchtower",
@@ -652,7 +653,7 @@ func TestDetachedContext(t *testing.T) {
 			// Add simulated latency to allow time for operations to complete.
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -743,7 +744,7 @@ func TestDetachedContext(t *testing.T) {
 			// Create a mock client with a Watchtower container.
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -803,7 +804,7 @@ func TestDetachedContext(t *testing.T) {
 			// Create a mock client with a Watchtower container that succeeds.
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{
+					Containers: []*container.Container{
 						mockUpdate.CreateMockContainerWithConfig(
 							"watchtower",
 							"/watchtower",
@@ -935,7 +936,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 				t.Log(tc.description)
 
 				// Create mock containers with ToRestart set to true.
-				containers := make([]types.Container, tc.numContainers)
+				containers := make([]*container.Container, tc.numContainers)
 				for i := range tc.numContainers {
 					containerID := fmt.Sprintf("container-%d", i)
 					containerName := fmt.Sprintf("/container-%d", i)
@@ -1030,7 +1031,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			// - At i=3, ctx.Err() != nil, so container 3 is added to failed
 			// - Then containers 2,1,0 are also added to failed
 			// - All 4 containers are properly tracked as failed
-			containers := make([]types.Container, 4)
+			containers := make([]*container.Container, 4)
 
 			for i := range 4 {
 				containerID := fmt.Sprintf("container-%d", i)
@@ -1105,7 +1106,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			// - At i=2, ctx.Err() != nil, so container 2 is logged and added to failed
 			// - Then containers 1,0 are also logged and added to failed
 			// - All 3 containers are properly logged
-			containers := make([]types.Container, 3)
+			containers := make([]*container.Container, 3)
 			expectedNames := []string{"container-0", "container-1", "container-2"} // All 3 are logged
 
 			for i := range 3 {
@@ -1187,7 +1188,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			t.Parallel()
 
 			// Create containers.
-			containers := make([]types.Container, 3)
+			containers := make([]*container.Container, 3)
 
 			for i := range 3 {
 				c := mockUpdate.CreateMockContainerWithConfig(
@@ -1248,7 +1249,7 @@ func Test_stopContainersInReversedOrder(t *testing.T) {
 			t.Parallel()
 
 			// Create containers.
-			containers := make([]types.Container, 3)
+			containers := make([]*container.Container, 3)
 
 			for i := range 3 {
 				c := mockUpdate.CreateMockContainerWithConfig(
@@ -1306,7 +1307,7 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 	t.Run("still recreates containers that were already stopped when parent ctx is canceled", func(t *testing.T) {
 		t.Parallel()
 
-		containers := make([]types.Container, 3)
+		containers := make([]*container.Container, 3)
 
 		for i := range 3 {
 			c := mockUpdate.CreateMockContainerWithConfig(
@@ -1444,7 +1445,7 @@ func Test_performRollingRestart(t *testing.T) {
 				t.Log(tc.description)
 
 				// Create mock containers with ToRestart set to true.
-				containers := make([]types.Container, tc.numContainers)
+				containers := make([]*container.Container, tc.numContainers)
 				for i := range tc.numContainers {
 					containerID := fmt.Sprintf("container-%d", i)
 					containerName := fmt.Sprintf("/container-%d", i)
@@ -1549,7 +1550,7 @@ func Test_performRollingRestart(t *testing.T) {
 			// - At i=0, ctx.Done() is triggered, so container 0 is added to failed
 			// - Then containers 1,2,3 are also added to failed
 			// - All 4 containers are properly tracked as failed
-			containers := make([]types.Container, 4)
+			containers := make([]*container.Container, 4)
 
 			for i := range 4 {
 				containerID := fmt.Sprintf("container-%d", i)
@@ -1632,7 +1633,7 @@ func Test_performRollingRestart(t *testing.T) {
 			// - At i=0, ctx.Done() is triggered, so container 0 is logged and added to failed
 			// - Then containers 1,2 are also logged and added to failed
 			// - All 3 containers are properly logged
-			containers := make([]types.Container, 3)
+			containers := make([]*container.Container, 3)
 			expectedNames := []string{"container-0", "container-1", "container-2"} // All 3 are logged
 
 			for i := range 3 {
@@ -1719,7 +1720,7 @@ func Test_performRollingRestart(t *testing.T) {
 			t.Parallel()
 
 			// Create containers.
-			containers := make([]types.Container, 3)
+			containers := make([]*container.Container, 3)
 
 			for i := range 3 {
 				c := mockUpdate.CreateMockContainerWithConfig(
@@ -1785,7 +1786,7 @@ func Test_performRollingRestart(t *testing.T) {
 			t.Parallel()
 
 			// Create containers.
-			containers := make([]types.Container, 3)
+			containers := make([]*container.Container, 3)
 
 			for i := range 3 {
 				c := mockUpdate.CreateMockContainerWithConfig(
@@ -1866,7 +1867,7 @@ func Test_performRollingRestart(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{watchtower},
+					Containers: []*container.Container{watchtower},
 					Staleness:  map[string]bool{"watchtower": true},
 				},
 				false,
@@ -1879,7 +1880,7 @@ func Test_performRollingRestart(t *testing.T) {
 
 			failed, err := performRollingRestart(log,
 				t.Context(),
-				[]types.Container{watchtower},
+				[]*container.Container{watchtower},
 				client,
 				updateParams.Params{RollingRestart: true, EphemeralSelfUpdate: true},
 				&cleanupImageInfos,
@@ -1904,7 +1905,7 @@ func Test_performRollingRestart(t *testing.T) {
 			t.Parallel()
 
 			// Create a single container.
-			containers := []types.Container{
+			containers := []*container.Container{
 				mockUpdate.CreateMockContainerWithConfig(
 					"container-0",
 					"/container-0",
@@ -1966,7 +1967,7 @@ func Test_performRollingRestart(t *testing.T) {
 			t.Parallel()
 
 			// Create a single container.
-			containers := []types.Container{
+			containers := []*container.Container{
 				mockUpdate.CreateMockContainerWithConfig(
 					"container-0",
 					"/container-0",
@@ -2063,7 +2064,7 @@ func TestRun(t *testing.T) {
 
 			client := mockUpdate.CreateMockClient(
 				&mockUpdate.TestData{
-					Containers: []types.Container{c},
+					Containers: []*container.Container{c},
 					Staleness:  map[string]bool{"container-0": true},
 				},
 				false,
@@ -2079,7 +2080,7 @@ func TestRun(t *testing.T) {
 
 			var cleanupImageInfos []cleanup.RemovedImageInfo
 
-			err := Run(log, ctx, []types.Container{c}, client, config, &cleanupImageInfos, &progress, nil)
+			err := Run(log, ctx, []*container.Container{c}, client, config, &cleanupImageInfos, &progress, nil)
 			if tt.wantErr {
 				require.ErrorIs(t, err, context.Canceled)
 			} else {

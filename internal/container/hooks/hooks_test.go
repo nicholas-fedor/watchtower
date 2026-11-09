@@ -124,7 +124,7 @@ func TestExecutePreChecks(t *testing.T) {
 		{
 			name: "successful execution",
 			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
-				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]types.Container{
+				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]*container.Container{
 					mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 					})),
@@ -178,7 +178,7 @@ func TestExecutePostChecks(t *testing.T) {
 		{
 			name: "successful execution",
 			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
-				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]types.Container{
+				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]*container.Container{
 					mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 					})),
@@ -221,7 +221,7 @@ func TestExecutePostChecks(t *testing.T) {
 func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 	log, logBuf := newDebugLog()
 	client := mockContainerClient.NewMockClient(t)
-	listed := []types.Container{
+	listed := []*container.Container{
 		mockedContainer(withLabels(map[string]string{
 			"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 		})),
@@ -239,7 +239,7 @@ func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 	log, logBuf := newDebugLog()
 	client := mockContainerClient.NewMockClient(t)
-	listed := []types.Container{
+	listed := []*container.Container{
 		mockedContainer(withLabels(map[string]string{
 			"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 		})),
@@ -257,7 +257,7 @@ func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 	log, _ := newDebugLog()
 	client := mockContainerClient.NewMockClient(t)
-	listed := []types.Container{}
+	listed := []*container.Container{}
 
 	ExecutePreChecks(log, context.Background(), client, func(types.FilterableContainer) bool { return true }, 0, 0, listed)
 
@@ -268,7 +268,7 @@ func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
 	log, _ := newDebugLog()
 	client := mockContainerClient.NewMockClient(t)
-	listed := []types.Container{}
+	listed := []*container.Container{}
 
 	ExecutePostChecks(log, context.Background(), client, func(types.FilterableContainer) bool { return true }, 0, 0, listed)
 
@@ -280,7 +280,7 @@ func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
 func TestExecutePreCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
-		container      types.Container
+		container      *container.Container
 		setupClient    func(*mockContainerClient.MockClient)
 		expectedLogMsg string
 	}{
@@ -371,7 +371,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 func TestExecutePostCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
-		container      types.Container
+		container      *container.Container
 		setupClient    func(*mockContainerClient.MockClient)
 		expectedLogMsg string
 	}{
@@ -482,7 +482,7 @@ func TestExecuteCheckCommand_NoCommandSkipsLabels(t *testing.T) {
 	t.Parallel()
 
 	log, logBuf := newDebugLog()
-	cont := containerWithLabels(log, false, map[string]string{
+	c := containerWithLabels(log, false, map[string]string{
 		"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout":  "-1",
 		"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "-1",
 		"com.centurylinklabs.watchtower.lifecycle.uid":                "-5",
@@ -490,8 +490,8 @@ func TestExecuteCheckCommand_NoCommandSkipsLabels(t *testing.T) {
 	})
 	client := mockContainerClient.NewMockClient(t)
 
-	executePreCheckCommand(log, context.Background(), client, cont, 0, 0)
-	executePostCheckCommand(log, context.Background(), client, cont, 0, 0)
+	executePreCheckCommand(log, context.Background(), client, c, 0, 0)
+	executePostCheckCommand(log, context.Background(), client, c, 0, 0)
 
 	output := logBuf.String()
 	assert.Contains(t, output, "No pre-check command supplied")
@@ -533,10 +533,10 @@ func TestExecutePreUpdateCommand_SkippedHookReadsNoLabels(t *testing.T) {
 			}
 
 			log, logBuf := newDebugLog()
-			cont := containerWithLabels(log, tt.running, labels)
+			c := containerWithLabels(log, tt.running, labels)
 			client := mockContainerClient.NewMockClient(t)
 
-			skip, err := ExecutePreUpdateCommand(log, context.Background(), client, cont, 0, 0)
+			skip, err := ExecutePreUpdateCommand(log, context.Background(), client, c, 0, 0)
 			require.NoError(t, err)
 			assert.False(t, skip)
 
@@ -555,13 +555,13 @@ func TestExecutePostUpdateCommand_NoCommandReadsNoLabels(t *testing.T) {
 	t.Parallel()
 
 	log, logBuf := newDebugLog()
-	cont := containerWithLabels(log, true, map[string]string{
+	c := containerWithLabels(log, true, map[string]string{
 		"com.centurylinklabs.watchtower.lifecycle.post-update-timeout": "-1",
 		"com.centurylinklabs.watchtower.lifecycle.uid":                 "-5",
 		"com.centurylinklabs.watchtower.lifecycle.gid":                 "-5",
 	})
 	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().GetContainer(mock.Anything, types.ContainerID("test")).Return(cont, nil).Once()
+	client.EXPECT().GetContainer(mock.Anything, types.ContainerID("test")).Return(c, nil).Once()
 
 	ExecutePostUpdateCommand(log, context.Background(), client, "test", 0, 0)
 
@@ -575,7 +575,7 @@ func TestExecutePostUpdateCommand_NoCommandReadsNoLabels(t *testing.T) {
 func TestExecutePreUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
-		container      types.Container
+		container      *container.Container
 		setupClient    func(*mockContainerClient.MockClient)
 		expectedResult bool
 		expectedErr    bool
@@ -663,7 +663,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 // runPreUpdateTest executes a single pre-update command test case and validates its results.
 func runPreUpdateTest(t *testing.T, tt struct {
 	name           string
-	container      types.Container
+	container      *container.Container
 	setupClient    func(*mockContainerClient.MockClient)
 	expectedResult bool
 	expectedErr    bool

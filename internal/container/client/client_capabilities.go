@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/copyfile"
 	"github.com/nicholas-fedor/watchtower/internal/container/ephemeral"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
@@ -13,7 +14,7 @@ import (
 // CopyFileStore captures labeled files around recreate and discards leftovers.
 type CopyFileStore interface {
 	// SnapshotCopyFiles captures labeled files before the source is removed.
-	SnapshotCopyFiles(ctx context.Context, container types.Container) error
+	SnapshotCopyFiles(ctx context.Context, c *container.Container) error
 	// DiscardCopyFiles drops a leftover snapshot for the source container.
 	DiscardCopyFiles(containerID types.ContainerID)
 }
@@ -50,7 +51,7 @@ func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string
 //
 // Returns:
 //   - error: Non-nil if a labeled path cannot be snapshotted.
-func (c *client) SnapshotCopyFiles(ctx context.Context, source types.Container) error {
+func (c *client) SnapshotCopyFiles(ctx context.Context, source *container.Container) error {
 	snapshot, err := copyfile.Capture(c.logger(), ctx, c.api, source)
 	if err != nil {
 		return fmt.Errorf("capture copy-file snapshot: %w", err)
@@ -79,7 +80,7 @@ func (c *client) SnapshotCopyFiles(ctx context.Context, source types.Container) 
 //   - error: Non-nil if a stored file cannot be written into the new container.
 func (c *client) injectStoredCopyFiles(
 	ctx context.Context,
-	source types.Container,
+	source *container.Container,
 	newID types.ContainerID,
 ) error {
 	snapshot, ok := c.copyFiles.Take(source.ID())
@@ -126,7 +127,7 @@ func (c *client) DiscardCopyFiles(containerID types.ContainerID) {
 //   - error: Non-nil if creation or start fails, nil on success.
 func (c *client) CreateEphemeralOrchestrator(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	newImage string,
 	containerChain string,
 	cleanup bool,

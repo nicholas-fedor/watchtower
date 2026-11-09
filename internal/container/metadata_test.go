@@ -1818,7 +1818,7 @@ func TestIsSuperseded(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		container types.Container
+		container *Container
 		want      bool
 	}{
 		{name: "no container", container: nil, want: false},
@@ -1911,7 +1911,7 @@ func TestIsOrphanedReplacement(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		candidate types.Container
+		candidate *Container
 		want      bool
 	}{
 		{

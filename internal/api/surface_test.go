@@ -17,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
@@ -39,8 +40,8 @@ func newFullSurfaceApp(t *testing.T) *fiber.App {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().Ping(mock.Anything).Return(nil).Maybe()
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]types.Container{}, nil).Maybe()
-	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{}, nil).Maybe()
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil).Maybe()
+	client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{}, nil).Maybe()
 
 	opts := withTestLogger(t, routes.Options{
 		Token:               "api-token",

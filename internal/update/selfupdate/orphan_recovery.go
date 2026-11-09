@@ -10,7 +10,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TryRecoverOrphanedContainer attempts to start an orphaned Watchtower container
@@ -29,14 +28,14 @@ import (
 //   - currentContainer: The current running container to exclude from recovery.
 //
 // Returns:
-//   - types.Container: The recovered container if successful, nil otherwise.
+//   - *container.Container: The recovered container if successful, nil otherwise.
 //   - bool: True if a container was found and started, false otherwise.
 func TryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	currentContainer types.Container,
-) (types.Container, bool) {
+	currentContainer *container.Container,
+) (*container.Container, bool) {
 	if currentContainer == nil {
 		return nil, false
 	}
@@ -97,7 +96,7 @@ func TryRecoverOrphanedContainer(
 func DisableOldRestarts(
 	log *zerolog.Logger,
 	ctx context.Context,
-	oldContainer types.Container,
+	oldContainer *container.Container,
 	client containerClient.Client,
 ) {
 	err := client.SetRestartPolicy(

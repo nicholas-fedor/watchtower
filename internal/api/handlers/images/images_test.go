@@ -12,7 +12,6 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // imageContainer returns a running container of the named image, whose image
@@ -32,20 +31,20 @@ func TestListImageStatuses(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		listErr    error
 		want       []ImageStatus
 	}{
 		{
 			name:       "successful list with single image",
-			containers: []types.Container{imageContainer("nginx:latest", "sha256:abc123")},
+			containers: []*container.Container{imageContainer("nginx:latest", "sha256:abc123")},
 			want: []ImageStatus{
 				{Name: "nginx:latest", ImageID: "sha256:abc123", Containers: 1},
 			},
 		},
 		{
 			name: "multiple containers same image",
-			containers: []types.Container{
+			containers: []*container.Container{
 				imageContainer("nginx:latest", "sha256:abc123"),
 				imageContainer("nginx:latest", "sha256:abc123"),
 			},
@@ -55,7 +54,7 @@ func TestListImageStatuses(t *testing.T) {
 		},
 		{
 			name:       "multiple repositories uses the container's repository",
-			containers: []types.Container{imageContainer("ghcr.io/org/app:latest", "sha256:abc123", "docker.io/org/app@sha256:hub", "ghcr.io/org/app@sha256:ghcr")},
+			containers: []*container.Container{imageContainer("ghcr.io/org/app:latest", "sha256:abc123", "docker.io/org/app@sha256:hub", "ghcr.io/org/app@sha256:ghcr")},
 			want: []ImageStatus{
 				{Name: "ghcr.io/org/app:latest", ImageID: "sha256:abc123", Digest: "sha256:ghcr", Containers: 1},
 			},
@@ -100,7 +99,7 @@ func TestListImageStatuses_SortsByNameThenImageID(t *testing.T) {
 	t.Parallel()
 
 	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything).Return([]types.Container{
+	client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{
 		imageContainer("redis:7", "sha256:bbb"),
 		imageContainer("nginx:1.27", "sha256:zzz"),
 		imageContainer("ghcr.io/org/app:latest", "sha256:ccc"),
@@ -141,7 +140,7 @@ func TestListImageStatuses_NameForSeveralTags(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			containers := make([]types.Container, 0, len(tt.names))
+			containers := make([]*container.Container, 0, len(tt.names))
 
 			for _, name := range tt.names {
 				containers = append(containers, imageContainer(name, "sha256:abc123"))

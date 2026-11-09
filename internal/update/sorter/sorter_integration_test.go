@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerLabels "github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestContainerSorting verifies through the exported API that containers are
@@ -31,7 +31,7 @@ func TestContainerSorting(t *testing.T) {
 
 				c1 := modelContainer("c1", "c2")
 				c2 := modelContainer("c2", "")
-				containers := []types.Container{c1, c2}
+				containers := []*container.Container{c1, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
 				require.Len(t, containers, 2)
@@ -45,7 +45,7 @@ func TestContainerSorting(t *testing.T) {
 				c1 := modelContainer("c1", "c2,c3")
 				c2 := modelContainer("c2", "c3")
 				c3 := modelContainer("c3", "")
-				containers := []types.Container{c1, c2, c3}
+				containers := []*container.Container{c1, c2, c3}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
 				require.Len(t, containers, 3)
@@ -59,7 +59,7 @@ func TestContainerSorting(t *testing.T) {
 
 				c1 := modelContainer("c1", "c2")
 				c2 := modelContainer("c2", "c1")
-				containers := []types.Container{c1, c2}
+				containers := []*container.Container{c1, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "circular reference detected")
@@ -71,7 +71,7 @@ func TestContainerSorting(t *testing.T) {
 
 				c1 := modelContainer("c1", "c2")
 				c3 := modelContainer("c3", "")
-				containers := []types.Container{c1, c3}
+				containers := []*container.Container{c1, c3}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
 				require.Len(t, containers, 2)
@@ -82,7 +82,7 @@ func TestContainerSorting(t *testing.T) {
 			t.Run("handles empty list", func(t *testing.T) {
 				t.Parallel()
 
-				containers := []types.Container{}
+				containers := []*container.Container{}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
 				assert.Empty(t, containers)
@@ -94,7 +94,7 @@ func TestContainerSorting(t *testing.T) {
 				watchtower := watchtowerContainer("watchtower")
 				c1 := modelContainer("c1", "c2")
 				c2 := modelContainer("c2", "")
-				containers := []types.Container{watchtower, c1, c2}
+				containers := []*container.Container{watchtower, c1, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
 				require.Len(t, containers, 3)
@@ -111,7 +111,7 @@ func TestContainerSorting(t *testing.T) {
 				c1 := modelContainer("c1", "c2")
 				watchtower2 := watchtowerContainer("watchtower2")
 				c2 := modelContainer("c2", "")
-				containers := []types.Container{watchtower1, c1, watchtower2, c2}
+				containers := []*container.Container{watchtower1, c1, watchtower2, c2}
 				err := sorter.SortByDependencies(newTestLogger(t), containers, true)
 				require.NoError(t, err)
 				require.Len(t, containers, 4)
@@ -128,12 +128,12 @@ func TestContainerSorting(t *testing.T) {
 
 				testCases := []struct {
 					name          string
-					containers    []types.Container
+					containers    []*container.Container
 					expectedOrder []string
 				}{
 					{
 						name: "simple chain with slashes",
-						containers: []types.Container{
+						containers: []*container.Container{
 							modelContainer("c", ""),
 							modelContainer("b", "/c"),
 							modelContainer("a", "/b"),
@@ -142,7 +142,7 @@ func TestContainerSorting(t *testing.T) {
 					},
 					{
 						name: "multiple dependencies with slashes",
-						containers: []types.Container{
+						containers: []*container.Container{
 							modelContainer("d", ""),
 							modelContainer("c", ""),
 							modelContainer("b", "/d"),
@@ -152,7 +152,7 @@ func TestContainerSorting(t *testing.T) {
 					},
 					{
 						name: "diamond dependency graph",
-						containers: []types.Container{
+						containers: []*container.Container{
 							modelContainer("d", ""),
 							modelContainer("b", "/d"),
 							modelContainer("c", "/d"),
@@ -167,7 +167,7 @@ func TestContainerSorting(t *testing.T) {
 					},
 					{
 						name: "no dependencies",
-						containers: []types.Container{
+						containers: []*container.Container{
 							modelContainer("c", ""),
 							modelContainer("b", ""),
 							modelContainer("a", ""),
@@ -210,8 +210,8 @@ func TestContainerSorting(t *testing.T) {
 //   - dependsOn: Value of the depends-on label, or empty for none.
 //
 // Returns:
-//   - types.Container: The container.
-func modelContainer(name, dependsOn string) types.Container {
+//   - *container.Container: The container.
+func modelContainer(name, dependsOn string) *container.Container {
 	labels := map[string]string{}
 	if dependsOn != "" {
 		labels[containerLabels.DependsOn] = dependsOn
@@ -231,8 +231,8 @@ func modelContainer(name, dependsOn string) types.Container {
 //   - name: Container name.
 //
 // Returns:
-//   - types.Container: The container.
-func watchtowerContainer(name string) types.Container {
+//   - *container.Container: The container.
+func watchtowerContainer(name string) *container.Container {
 	return modelfixture.Container(
 		containerfixture.WithName("/"+name),
 		containerfixture.WithID("id-"+name),

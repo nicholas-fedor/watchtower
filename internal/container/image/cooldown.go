@@ -16,7 +16,6 @@ import (
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // ErrImageCooldown indicates the image is within the configured cooldown window
@@ -84,7 +83,7 @@ func (e *CooldownError) Is(target error) bool {
 //   - error: non-nil when deferred (carries CooldownError for details).
 func (c Client) isOutsideCooldown(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	policy updateConfig.Policy,
 ) (bool, error) {
 	delay, skip := shouldCheckCooldown(sourceContainer, policy)
@@ -119,7 +118,7 @@ func (c Client) isOutsideCooldown(
 // Returns:
 //   - time.Duration: The effective cooldown delay (0 if skipped).
 //   - bool: True if the cooldown check should be skipped entirely.
-func shouldCheckCooldown(sourceContainer types.Container, policy updateConfig.Policy) (time.Duration, bool) {
+func shouldCheckCooldown(sourceContainer *container.Container, policy updateConfig.Policy) (time.Duration, bool) {
 	delay := sourceContainer.CooldownDelay(policy)
 	if delay <= 0 || sourceContainer.IsNoPull(policy) || sourceContainer.IsMonitorOnly(policy) {
 		return 0, true
@@ -144,7 +143,7 @@ func shouldCheckCooldown(sourceContainer types.Container, policy updateConfig.Po
 //   - error: Non-nil CooldownError on failure.
 func fetchImageCreationTime(
 	ctx context.Context,
-	sourceContainer types.Container,
+	sourceContainer *container.Container,
 	delay time.Duration,
 	settings registryConfig.Registry,
 	rateLimiter *ratelimit.Limiter,
@@ -277,7 +276,7 @@ func logClockSkew(imageAge, delay time.Duration, clog *zerolog.Logger) {
 //
 // Returns:
 //   - error: Non-nil CooldownError when the image is inside the cooldown window.
-func CheckLocalImageCooldown(c types.Container, policy updateConfig.Policy) error {
+func CheckLocalImageCooldown(c *container.Container, policy updateConfig.Policy) error {
 	delay, skip := shouldCheckCooldown(c, policy)
 	if skip {
 		return nil
@@ -288,17 +287,12 @@ func CheckLocalImageCooldown(c types.Container, policy updateConfig.Policy) erro
 		return nil
 	}
 
-	base := nopLog()
-	if concrete, isConcrete := c.(*container.Container); isConcrete {
-		base = concrete.Logger()
-	}
-
-	_, err := evalImageAge(created, delay, cooldownLogger(base, c))
+	_, err := evalImageAge(created, delay, cooldownLogger(c.Logger(), c))
 
 	return err
 }
 
-func localImageCreated(c types.Container) (time.Time, bool) {
+func localImageCreated(c *container.Container) (time.Time, bool) {
 	if c == nil || !c.HasImageInfo() {
 		return time.Time{}, false
 	}
@@ -328,7 +322,7 @@ func localImageCreated(c types.Container) (time.Time, bool) {
 //
 // Returns:
 //   - *zerolog.Logger: The logger with the container and image fields.
-func cooldownLogger(base *zerolog.Logger, c types.Container) *zerolog.Logger {
+func cooldownLogger(base *zerolog.Logger, c *container.Container) *zerolog.Logger {
 	log := base.With().
 		Str("container", c.Name()).
 		Str("image", c.ImageName()).

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -28,7 +29,7 @@ import (
 //   - error: Non-nil on monitor or cooldown failure.
 func (s *Session) Check(
 	ctx context.Context,
-	c types.Container,
+	c *container.Container,
 	params updateParams.Params,
 ) (bool, types.ImageID, error) {
 	result, err := git.CheckContainer(ctx, s.client, c, params.Git)

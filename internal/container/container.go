@@ -13,6 +13,38 @@ import (
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
+// Container represents a running Docker container managed by Watchtower.
+//
+// It stores state and metadata for container operations such as updates and
+// lifecycle hooks.
+type Container struct {
+	// containerInfo is the container's inspect data. A change replaces it with
+	// an updated copy, so inspect data a caller already holds never changes.
+	containerInfo *dockerContainer.InspectResponse
+	// imageInfo is the image's inspect data, or nil when the image could not be
+	// inspected.
+	imageInfo *dockerImage.InspectResponse
+	// log is the process logger for the container's messages. Logger returns a
+	// no-op logger when it is nil.
+	log *zerolog.Logger
+	// OldImageID is the image ID the container ran before its update.
+	OldImageID types.ImageID
+	// normalizedName is the container name without its leading slash.
+	normalizedName string
+	// imageName is the image reference with its tag. It is resolved when the
+	// container is built and replaced by SetImageName.
+	imageName string
+	// mu guards containerInfo, imageName, OldImageID, LinkedToRestarting and
+	// Stale.
+	mu sync.RWMutex
+	// LinkedToRestarting reports whether the container restarts because a
+	// container it depends on restarts.
+	LinkedToRestarting bool
+	// Stale reports whether the container's image is out of date and the
+	// container is to be updated.
+	Stale bool
+}
+
 // Constants for container operations.
 const (
 	linkPartsCount = 2 // Number of parts expected in a link (name:alias)
@@ -24,27 +56,6 @@ func nopLog() *zerolog.Logger {
 	n := zerolog.Nop()
 
 	return &n
-}
-
-// Container represents a running Docker container managed by Watchtower.
-//
-// It implements the types.Container interface, storing state and metadata
-// for container operations such as updates and lifecycle hooks.
-//
-
-type Container struct {
-	containerInfo *dockerContainer.InspectResponse // Docker container metadata
-	imageInfo     *dockerImage.InspectResponse     // Docker image metadata
-	// log is the process logger for operational Warn/Error/Debug on this instance.
-	// Set at construction (client list/get). Nil falls back to nopLog() so interface
-	// methods never panic. Production paths always set a real logger.
-	log                *zerolog.Logger
-	OldImageID         types.ImageID // Stores the image ID before update for cleanup tracking
-	normalizedName     string        // Cached normalized container name
-	imageName          string        // Cached resolved image name with tag
-	mu                 sync.RWMutex  // Protects concurrent access to mutable fields
-	LinkedToRestarting bool          // Indicates if linked to a restarting container
-	Stale              bool          // Marks the container as having an outdated image
 }
 
 // NewContainer creates a new Container instance with the specified metadata.

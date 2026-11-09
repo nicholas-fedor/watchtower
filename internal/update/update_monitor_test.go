@@ -9,6 +9,7 @@ import (
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -33,7 +34,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
 						NameOfContainerToKeep: "test-container-02",
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainer(
 								"test-container-01",
 								"test-container-01",
@@ -80,7 +81,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 
 				client := mockUpdate.CreateMockClient(
 					&mockUpdate.TestData{
-						Containers: []types.Container{
+						Containers: []*container.Container{
 							mockUpdate.CreateMockContainer(
 								"test-container-01",
 								"test-container-01",
@@ -118,7 +119,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 
 					client := mockUpdate.CreateMockClient(
 						&mockUpdate.TestData{
-							Containers: []types.Container{
+							Containers: []*container.Container{
 								mockUpdate.CreateMockContainerWithConfig(
 									"test-container-02",
 									"test-container-02",
@@ -158,7 +159,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 
 					client := mockUpdate.CreateMockClient(
 						&mockUpdate.TestData{
-							Containers: []types.Container{
+							Containers: []*container.Container{
 								mockUpdate.CreateMockContainerWithConfig(
 									"test-container-02",
 									"test-container-02",
@@ -197,7 +198,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 
 					client := mockUpdate.CreateMockClient(
 						&mockUpdate.TestData{
-							Containers: []types.Container{
+							Containers: []*container.Container{
 								mockUpdate.CreateMockContainer(
 									"test-container-01",
 									"test-container-01",

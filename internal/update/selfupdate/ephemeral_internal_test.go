@@ -18,6 +18,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -35,11 +36,11 @@ const handoffNewID types.ContainerID = "wt-new-id"
 //   - portBindings: Optional host port bindings. Nil yields empty bindings.
 //
 // Returns:
-//   - types.Container: Configured mock container.
+//   - *container.Container: Configured mock container.
 func createEphemeralHandoffContainer(
 	id string,
 	portBindings dockerNetwork.PortMap,
-) types.Container {
+) *container.Container {
 	if portBindings == nil {
 		portBindings = dockerNetwork.PortMap{}
 	}
@@ -91,7 +92,7 @@ type handoffCalls struct {
 //
 // Returns:
 //   - handoffCalls: The stop, rename, and start expectations.
-func expectHandoffStart(client *mockContainerClient.MockClient, old types.Container, startErr error) handoffCalls {
+func expectHandoffStart(client *mockContainerClient.MockClient, old *container.Container, startErr error) handoffCalls {
 	client.EXPECT().GetContainer(mock.Anything, old.ID()).Return(old, nil).Once()
 
 	newID := handoffNewID
@@ -116,7 +117,7 @@ func expectHandoffStart(client *mockContainerClient.MockClient, old types.Contai
 //
 // Returns:
 //   - *mock.Call: The removal expectation.
-func expectHandoffFinish(client *mockContainerClient.MockClient, old types.Container) *mock.Call {
+func expectHandoffFinish(client *mockContainerClient.MockClient, old *container.Container) *mock.Call {
 	client.EXPECT().GetContainer(mock.Anything, handoffNewID).
 		Return(createEphemeralHandoffContainer(string(handoffNewID), nil), nil).Once()
 
@@ -128,7 +129,7 @@ func expectHandoffFinish(client *mockContainerClient.MockClient, old types.Conta
 // Parameters:
 //   - client: Mocked container client.
 //   - old: The Watchtower container being replaced.
-func expectHandoff(client *mockContainerClient.MockClient, old types.Container) {
+func expectHandoff(client *mockContainerClient.MockClient, old *container.Container) {
 	expectHandoffStart(client, old, nil)
 	expectHandoffFinish(client, old)
 }
@@ -219,7 +220,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, nil)
 		calls.start.Run(func(args mock.Arguments) {
-			created, ok := args.Get(1).(types.Container)
+			created, ok := args.Get(1).(*container.Container)
 			require.True(t, ok)
 			assert.Equal(t, "watchtower:v2", created.ImageName())
 		})
@@ -239,7 +240,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client := mockContainerClient.NewMockClient(t)
 		calls := expectHandoffStart(client, old, nil)
 		calls.start.Run(func(args mock.Arguments) {
-			created, ok := args.Get(1).(types.Container)
+			created, ok := args.Get(1).(*container.Container)
 			require.True(t, ok)
 
 			gotChain, present := created.GetContainerChain()

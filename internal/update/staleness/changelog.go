@@ -13,7 +13,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/changelog"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // releaseTagLookupTimeout bounds the optional release tag lookup.
@@ -59,7 +58,7 @@ func ResolveLatestImageMeta(
 	log *zerolog.Logger,
 	ctx context.Context,
 	resolver *changelog.Resolver,
-	c types.Container,
+	c *container.Container,
 	config updateParams.Params,
 	latest LatestImage,
 ) (provenance.ChangelogVars, oci.Annotations) {
@@ -69,8 +68,7 @@ func ResolveLatestImageMeta(
 		Logger()
 	clog := &clogVal
 
-	concrete, ok := c.(*container.Container)
-	if !ok || !concrete.IsChangelogEnabled(config.Policy) {
+	if !c.IsChangelogEnabled(config.Policy) {
 		// The gate is off. Still record the new image's version and revision so
 		// a custom template can print a transition, but never spend a request
 		// to confirm a release tag.
@@ -106,7 +104,7 @@ func ResolveLatestImageMeta(
 func ApplyLatestImageMeta(
 	log *zerolog.Logger,
 	progress *state.Progress,
-	c types.Container,
+	c *container.Container,
 	config updateParams.Params,
 	vars provenance.ChangelogVars,
 	annotations oci.Annotations,
@@ -139,7 +137,7 @@ func resolveReleaseTag(
 	clog *zerolog.Logger,
 	ctx context.Context,
 	resolver *changelog.Resolver,
-	c types.Container,
+	c *container.Container,
 	latest LatestImage,
 ) string {
 	version := latest.Annotations.Version

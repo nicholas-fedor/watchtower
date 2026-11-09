@@ -3,7 +3,7 @@ package oci
 import (
 	"strings"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // Annotations are OCI image labels from inspect. They never associate a Git watcher.
@@ -22,7 +22,7 @@ type Annotations struct {
 //
 // Returns:
 //   - Annotations: Empty fields when image info is missing.
-func Read(c types.Container) Annotations {
+func Read(c *container.Container) Annotations {
 	if c == nil || !c.HasImageInfo() {
 		return Annotations{}
 	}

@@ -40,14 +40,14 @@ func TestListContainerStatuses(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		containers []types.Container
+		containers []*container.Container
 		listErr    error
 		filter     types.Filter
 		wantLen    int
 	}{
 		{
 			name: "successful list with containers",
-			containers: []types.Container{
+			containers: []*container.Container{
 				nginxContainer("test-container"),
 			},
 			wantLen: 1,
@@ -58,12 +58,12 @@ func TestListContainerStatuses(t *testing.T) {
 		},
 		{
 			name:       "empty container list",
-			containers: []types.Container{},
+			containers: []*container.Container{},
 			wantLen:    0,
 		},
 		{
 			name:       "non-nil filter is passed through to ListContainers",
-			containers: []types.Container{kept},
+			containers: []*container.Container{kept},
 			filter:     func(c types.FilterableContainer) bool { return c.Name() == kept.Name() },
 			wantLen:    1,
 		},

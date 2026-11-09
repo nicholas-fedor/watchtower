@@ -15,6 +15,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
@@ -732,7 +733,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		})
 
 		// newSource returns the Watchtower container being replaced.
-		newSource := func() types.Container {
+		newSource := func() *container.Container {
 			return modelfixture.Container(
 				containerfixture.WithID("source123"),
 				containerfixture.WithName("watchtower-source"),

@@ -248,7 +248,7 @@ func TestIsPinned(t *testing.T) {
 
 				image, wantPinned := tt.image, tt.wantPinned
 
-				cont := mockUpdate.CreateMockContainer(
+				c := mockUpdate.CreateMockContainer(
 					"id1",
 					"/name",
 					image,
@@ -257,7 +257,7 @@ func TestIsPinned(t *testing.T) {
 				progress := state.Progress{}
 				params := updateParams.Params{}
 
-				pinned, err := IsPinned(newTestLogger(t), cont, &progress, params, nil)
+				pinned, err := IsPinned(newTestLogger(t), c, &progress, params, nil)
 				require.NoError(t, err)
 				assert.Equal(t, wantPinned, pinned)
 
@@ -274,7 +274,7 @@ func TestIsPinned(t *testing.T) {
 		t.Parallel()
 
 		// ImageName is a valid digest pin. Even if parse were flaky, pin must win.
-		cont := mockUpdate.CreateMockContainer(
+		c := mockUpdate.CreateMockContainer(
 			"pinned-id",
 			"/pinned-name",
 			"library/nginx@"+fullDigest,
@@ -282,7 +282,7 @@ func TestIsPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), c, &progress, updateParams.Params{}, nil)
 		require.NoError(t, err)
 		assert.True(t, pinned)
 		require.Len(t, progress, 1)
@@ -291,7 +291,7 @@ func TestIsPinned(t *testing.T) {
 	t.Run("returns error for unresolvable invalid image names", func(t *testing.T) {
 		t.Parallel()
 
-		cont := mockUpdate.CreateMockContainer(
+		c := mockUpdate.CreateMockContainer(
 			"InvalidContainer",
 			"/InvalidContainer",
 			":latest",
@@ -299,7 +299,7 @@ func TestIsPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), c, &progress, updateParams.Params{}, nil)
 		require.Error(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
@@ -310,7 +310,7 @@ func TestIsPinned(t *testing.T) {
 
 		// The image name does not parse, so IsPinned falls back to the
 		// container name. The fallback sha256:latest is a tag, not a digest.
-		cont := mockUpdate.CreateMockContainer(
+		c := mockUpdate.CreateMockContainer(
 			"sha256-name-id",
 			"/sha256",
 			"Nginx:latest",
@@ -318,7 +318,7 @@ func TestIsPinned(t *testing.T) {
 		)
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), c, &progress, updateParams.Params{}, nil)
 		require.NoError(t, err)
 		assert.False(t, pinned)
 		assert.Empty(t, progress)
@@ -327,7 +327,7 @@ func TestIsPinned(t *testing.T) {
 	t.Run("does not panic when ContainerInfo Config is nil", func(t *testing.T) {
 		t.Parallel()
 
-		cont := modelfixture.Container(
+		c := modelfixture.Container(
 			containerfixture.WithName("/nil-config"),
 			func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
 				c.Config = nil
@@ -336,7 +336,7 @@ func TestIsPinned(t *testing.T) {
 
 		progress := state.Progress{}
 
-		pinned, err := IsPinned(newTestLogger(t), cont, &progress, updateParams.Params{}, nil)
+		pinned, err := IsPinned(newTestLogger(t), c, &progress, updateParams.Params{}, nil)
 		require.NoError(t, err)
 		assert.False(t, pinned)
 	})

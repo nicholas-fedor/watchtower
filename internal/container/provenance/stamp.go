@@ -4,10 +4,10 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // gitImageTagPrefix is the tag prefix Watchtower writes as name:git-<shortsha>.
@@ -24,7 +24,7 @@ const minGitSHAPrefix = 7
 // Returns:
 //   - string: Last stamped commit SHA, or empty.
 //   - string: Last stamped tag, or empty.
-func LastStamp(c types.Container) (string, string) {
+func LastStamp(c *container.Container) (string, string) {
 	if c == nil {
 		return "", ""
 	}
@@ -44,7 +44,7 @@ func LastStamp(c types.Container) (string, string) {
 // Returns:
 //   - string: Known commit SHA or short SHA, or empty.
 //   - string: Known tag, or empty.
-func Baseline(c types.Container) (string, string) {
+func Baseline(c *container.Container) (string, string) {
 	commit, tag := LastStamp(c)
 	if commit != "" || tag != "" {
 		return commit, tag
@@ -61,7 +61,7 @@ func Baseline(c types.Container) (string, string) {
 // Returns:
 //   - string: OCI revision or git-<shortsha> tag, or empty.
 //   - string: OCI image version when it looks like a semver tag, or empty.
-func imageRevision(c types.Container) (string, string) {
+func imageRevision(c *container.Container) (string, string) {
 	if c == nil {
 		return "", ""
 	}

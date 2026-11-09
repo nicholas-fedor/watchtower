@@ -7,6 +7,7 @@ package mocks
 import (
 	"context"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -88,16 +89,16 @@ func (_c *MockCopyFileStore_DiscardCopyFiles_Call) RunAndReturn(run func(contain
 }
 
 // SnapshotCopyFiles provides a mock function for the type MockCopyFileStore
-func (_mock *MockCopyFileStore) SnapshotCopyFiles(ctx context.Context, container types.Container) error {
-	ret := _mock.Called(ctx, container)
+func (_mock *MockCopyFileStore) SnapshotCopyFiles(ctx context.Context, container1 *container.Container) error {
+	ret := _mock.Called(ctx, container1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SnapshotCopyFiles")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, types.Container) error); ok {
-		r0 = returnFunc(ctx, container)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *container.Container) error); ok {
+		r0 = returnFunc(ctx, container1)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -111,20 +112,20 @@ type MockCopyFileStore_SnapshotCopyFiles_Call struct {
 
 // SnapshotCopyFiles is a helper method to define mock.On call
 //   - ctx context.Context
-//   - container types.Container
-func (_e *MockCopyFileStore_Expecter) SnapshotCopyFiles(ctx any, container any) *MockCopyFileStore_SnapshotCopyFiles_Call {
-	return &MockCopyFileStore_SnapshotCopyFiles_Call{Call: _e.mock.On("SnapshotCopyFiles", ctx, container)}
+//   - container1 *container.Container
+func (_e *MockCopyFileStore_Expecter) SnapshotCopyFiles(ctx any, container1 any) *MockCopyFileStore_SnapshotCopyFiles_Call {
+	return &MockCopyFileStore_SnapshotCopyFiles_Call{Call: _e.mock.On("SnapshotCopyFiles", ctx, container1)}
 }
 
-func (_c *MockCopyFileStore_SnapshotCopyFiles_Call) Run(run func(ctx context.Context, container types.Container)) *MockCopyFileStore_SnapshotCopyFiles_Call {
+func (_c *MockCopyFileStore_SnapshotCopyFiles_Call) Run(run func(ctx context.Context, container1 *container.Container)) *MockCopyFileStore_SnapshotCopyFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 types.Container
+		var arg1 *container.Container
 		if args[1] != nil {
-			arg1 = args[1].(types.Container)
+			arg1 = args[1].(*container.Container)
 		}
 		run(
 			arg0,
@@ -139,7 +140,7 @@ func (_c *MockCopyFileStore_SnapshotCopyFiles_Call) Return(err error) *MockCopyF
 	return _c
 }
 
-func (_c *MockCopyFileStore_SnapshotCopyFiles_Call) RunAndReturn(run func(ctx context.Context, container types.Container) error) *MockCopyFileStore_SnapshotCopyFiles_Call {
+func (_c *MockCopyFileStore_SnapshotCopyFiles_Call) RunAndReturn(run func(ctx context.Context, container1 *container.Container) error) *MockCopyFileStore_SnapshotCopyFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }
