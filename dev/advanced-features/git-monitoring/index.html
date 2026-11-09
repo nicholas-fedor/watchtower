@@ -4801,7 +4801,12 @@ Watchtower stays on the registry path and logs at debug.</p>
 <h3 id="accepted_git-watch_values">Accepted git-watch Values<a class="headerlink" href="#accepted_git-watch_values" title="Permanent link">&para;</a></h3>
 <p>Enabling values are <code>true</code>, <code>yes</code>, <code>1</code>, and <code>t</code>.
 Disabling values are <code>false</code>, <code>no</code>, <code>0</code>, and <code>f</code>.
-Those are the same loose booleans as other Watchtower labels.</p>
+Case and surrounding spaces are ignored.
+An empty or unrecognized value counts as absent.
+The <a href="../../configuration/git-monitoring/#git_enable">Git Enable</a> configuration option then decides.
+Watchtower does not warn about an unrecognized value.
+Watchtower's other boolean labels do not accept <code>yes</code> or <code>no</code>.
+They warn about a value they cannot read.</p>
 <h3 id="how_watchtower_chooses_a_running_revision">How Watchtower Chooses a Running Revision<a class="headerlink" href="#how_watchtower_chooses_a_running_revision" title="Permanent link">&para;</a></h3>
 <p>Watchtower compares the hosted tip to the first known running revision it can find, in this order:</p>
 <ol>
@@ -5069,9 +5074,26 @@ The host directory must be bind-mounted there, and <code>webstack</code> must ma
 <h4 id="per-container_override">Per-Container Override<a class="headerlink" href="#per-container_override" title="Permanent link">&para;</a></h4>
 <p>Override that default with <code>com.centurylinklabs.watchtower.git-watch</code>.</p>
 <h4 id="what_is_written_after_a_rebuild">What Is Written After a Rebuild<a class="headerlink" href="#what_is_written_after_a_rebuild" title="Permanent link">&para;</a></h4>
+<p>A rebuilt container, whether Watchtower recreated it or Compose applied it, carries the association labels it needs on its next check.</p>
+<ul>
+<li><code>com.centurylinklabs.watchtower.git-repo</code> is written without credentials.</li>
+<li><code>com.centurylinklabs.watchtower.git-host</code> is written as the API origin, without credentials or a query.</li>
+<li><code>com.centurylinklabs.watchtower.git-ref</code>, <code>com.centurylinklabs.watchtower.git-semver-policy</code>, <code>com.centurylinklabs.watchtower.git-dockerfile</code>, and <code>com.centurylinklabs.watchtower.git-context</code> are written only when a label or a <a href="../../configuration/git-monitoring/#git_image">Git Image</a> mapping supplied them.</li>
+<li>Values that came from the <a href="../../configuration/git-monitoring/#git_dockerfile">Git Dockerfile</a> or <a href="../../configuration/git-monitoring/#git_context">Git Context</a> configuration options are not written.
+    A later change to those options still applies to the rebuilt container.</li>
+<li>The built-in defaults, the <code>main</code> ref and the <code>none</code> semver policy, are not written either.</li>
+</ul>
 <p><code>git-watch=true</code> is written only when the source container already had an explicit enabling watch label.
 When the watcher was on only because of the <a href="../../configuration/git-monitoring/#git_enable">Git Enable</a> configuration option, the replacement has no <code>git-watch</code> label.
 Setting <a href="../../configuration/git-monitoring/#git_enable">Git Enable</a> to <code>false</code> later still applies.</p>
+<div class="admonition note">
+<p class="admonition-title">Containers rebuilt through Compose by v1.24.0 or earlier</p>
+<p>Those releases also wrote the default ref, semver policy, Dockerfile, and context onto containers rebuilt through Compose.
+A container rebuilt that way treats them as its own labels.
+A later change to <a href="../../configuration/git-monitoring/#git_dockerfile">Git Dockerfile</a> or <a href="../../configuration/git-monitoring/#git_context">Git Context</a> does not reach it.
+To check a container, run <code>docker inspect -f '{{json .Config.Labels}}' &lt;container&gt;</code> and look for <code>com.centurylinklabs.watchtower.git-dockerfile</code> and <code>com.centurylinklabs.watchtower.git-context</code>.
+If you did not set them, recreate the container with <code>docker compose up -d --force-recreate &lt;service&gt;</code> so it starts from the labels in your Compose file.</p>
+</div>
 <h3 id="where_settings_come_from">Where Settings Come From<a class="headerlink" href="#where_settings_come_from" title="Permanent link">&para;</a></h3>
 <p>Watchtower reads the repository URL, ref, and semver policy from the container's Watchtower labels when <code>com.centurylinklabs.watchtower.git-repo</code> is set.</p>
 <p>If that label is absent, Watchtower uses the <a href="../../configuration/git-monitoring/#git_image">Git Image</a> mapping whose key matches the container's exact <code>ImageName()</code>.
@@ -5653,7 +5675,11 @@ It does not rebuild only to write a stamp.</p>
 They report stale only when the remote has advanced past the known running revision.</p>
 <h3 id="disable_container_restart">Disable Container Restart<a class="headerlink" href="#disable_container_restart" title="Permanent link">&para;</a></h3>
 <p>The <a href="../../configuration/update-behavior/#disable_container_restart">Disable Container Restart</a> configuration option can ask Docker to build, or Compose to build, but cannot persist the stamp on the running container.
-The next session uses image identity or the remembered tip, and rebuilds only if the remote has advanced again.</p>
+The container stays stale until you recreate it.
+Watchtower remembers the image it built for that container and commit.
+Later sessions report the container stale with that image and build again only when the remote advances.
+The memory lasts only while Watchtower runs.
+The first session after Watchtower restarts builds the current commit once more.</p>
 <p>When the watcher is off, the container stays on the registry digest path.</p>
 
 
@@ -5677,7 +5703,7 @@ The next session uses image identity or the remembered tip, and rebuilds only if
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 3, 2026 08:21:39 UTC"><span class="timeago" datetime="2026-11-03T08:21:39+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 3, 2026 08:21:39 UTC">2026-11-03</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 9, 2026 19:43:22 UTC"><span class="timeago" datetime="2026-11-09T19:43:22+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 9, 2026 19:43:22 UTC">2026-11-09</span>
   </span>
 
     
