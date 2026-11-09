@@ -15,10 +15,10 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	mockSelfupdate "github.com/nicholas-fedor/watchtower/internal/update/selfupdate/mocks"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -63,8 +63,8 @@ func createDefaultMockContainer(id string, labels map[string]string) *container.
 // expectOrchestrator expects one orchestrator to be created for source with
 // the given container chain and cleanup setting, and answers it with err.
 //
-// The mock has no other expectations, so a stop, start, or rename of the
-// source fails the test.
+// StartOrchestrator takes an interface with only the creation method, so it
+// cannot stop, start or rename the source itself.
 //
 // Parameters:
 //   - t: Test the mock belongs to.
@@ -74,11 +74,11 @@ func createDefaultMockContainer(id string, labels map[string]string) *container.
 //   - err: Error the creation returns.
 //
 // Returns:
-//   - *mockContainer.MockClient: Mocked container client.
-func expectOrchestrator(t *testing.T, source *container.Container, chain string, cleanup bool, err error) *mockContainerClient.MockClient {
+//   - *mockSelfupdate.MockOrchestratorCreator: Mocked orchestrator creator.
+func expectOrchestrator(t *testing.T, source *container.Container, chain string, cleanup bool, err error) *mockSelfupdate.MockOrchestratorCreator {
 	t.Helper()
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockSelfupdate.NewMockOrchestratorCreator(t)
 	client.EXPECT().
 		CreateEphemeralOrchestrator(mock.Anything, source, "watchtower:latest", chain, cleanup).
 		Return(container.ContainerID("orchestrator-id"), err).Once()
@@ -189,8 +189,8 @@ func TestStartOrchestrator(t *testing.T) {
 		t.Run("returns without performing stop or start on the source client path", func(t *testing.T) {
 			t.Parallel()
 
-			// expectOrchestrator allows no other calls, so a stop, start, or
-			// rename fails the test.
+			// StartOrchestrator's interface holds only the orchestrator
+			// creation, so it cannot stop, start or rename the source.
 			source := createDefaultMockContainer("source-async", watchtowerLabels)
 			client := expectOrchestrator(t, source, "source-async", false, nil)
 
@@ -227,7 +227,7 @@ func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
 				"com.centurylinklabs.watchtower": "true",
 			})
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockSelfupdate.NewMockOrchestratorCreator(t)
 			client.EXPECT().
 				CreateEphemeralOrchestrator(mock.Anything, source, mock.Anything, mock.Anything, mock.Anything).
 				Return(container.ContainerID("orchestrator"), tt.createErr).Once()
@@ -280,7 +280,7 @@ func TestEphemeralSelfUpdate_OutlivesCanceledUpdate(t *testing.T) {
 		"com.centurylinklabs.watchtower": "true",
 	})
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockSelfupdate.NewMockOrchestratorCreator(t)
 	client.EXPECT().
 		CreateEphemeralOrchestrator(
 			mock.MatchedBy(func(created context.Context) bool {

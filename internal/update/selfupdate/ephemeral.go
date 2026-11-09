@@ -14,12 +14,46 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
+
+// OrchestratorCreator starts the container that carries out a self-update.
+type OrchestratorCreator interface {
+	// CreateEphemeralOrchestrator creates and starts a short-lived container
+	// that replaces the source container with one running the new image.
+	CreateEphemeralOrchestrator(
+		ctx context.Context,
+		sourceContainer *container.Container,
+		newImage string,
+		containerChain string,
+		cleanup bool,
+	) (container.ContainerID, error)
+}
+
+// HandoffClient replaces the old Watchtower container with its successor.
+type HandoffClient interface {
+	// GetContainer returns the container with the given ID.
+	GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
+	// StopContainer stops the container. The stop waits up to timeout.
+	StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
+	// RenameContainer gives the container a new name.
+	RenameContainer(ctx context.Context, target *container.Container, newName string) error
+	// StartContainer creates and starts a container from the given container's
+	// configuration and returns the new container's ID.
+	StartContainer(ctx context.Context, target *container.Container) (container.ContainerID, error)
+	// StartContainerByID starts an existing container.
+	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
+	// StopAndRemoveContainer stops the container and removes it. The stop
+	// waits up to timeout.
+	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
+	// RemoveContainer removes the container.
+	RemoveContainer(ctx context.Context, target *container.Container) error
+	// RemoveImageByID removes the image. The image name is used in logs.
+	RemoveImageByID(ctx context.Context, imageID container.ImageID, imageName string) error
+}
 
 // orchestratorTimeout defines the maximum duration for the orchestrator to complete.
 // This covers: inspect old, stop old, create new, start new, remove old.
@@ -107,7 +141,7 @@ var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 //     removes the old container and, when cleanup is enabled, the old image.
 //   - error: Non-nil if orchestrator creation fails.
 func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client OrchestratorCreator,
 	sourceContainer *container.Container,
 	config updateParams.Params,
 ) (container.ContainerID, bool, error) {
@@ -227,7 +261,7 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
-func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client containerClient.Client) {
+func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffClient) {
 	clogVal := log.With().
 		Str("mode", "orchestrator").
 		Logger()
@@ -378,7 +412,7 @@ func readOrchestratorEnv() (string, string, string, string, bool, error) {
 // Returns:
 //   - error: Non-nil if any step in the orchestration fails.
 func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	oldID string,
 	newImage string,
 	originalName string,
@@ -512,7 +546,7 @@ func pinContainerCreateImage(oldContainer *container.Container, newImage string,
 //   - error: Non-nil if rename fails.
 func renameOldContainerForHandoff(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 	originalName string,
@@ -557,7 +591,7 @@ func renameOldContainerForHandoff(
 //   - originalName: Canonical name to restore on the predecessor.
 func restoreAndStartOldContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 	originalName string,
@@ -609,7 +643,7 @@ func restoreAndStartOldContainer(
 //   - oldContainer: Stopped predecessor to start.
 func restartOldContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 ) {
@@ -641,7 +675,7 @@ func restartOldContainer(
 //   - newContainerID: ID of the failed replacement container to remove.
 func cleanupFailedNewContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 	newContainerID container.ContainerID,
@@ -695,7 +729,7 @@ func cleanupFailedNewContainer(
 //   - error: Non-nil if inspection fails.
 func inspectOldContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldID string,
 	containerChain string,
@@ -755,7 +789,7 @@ func inspectOldContainer(
 //   - error: Non-nil if stopping fails fatally while the container still runs.
 func stopOldContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 ) (bool, error) {
@@ -825,7 +859,7 @@ func stopOldContainer(
 //   - error: Non-nil if removal fails for a reason other than NotFound.
 func removeOldContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 ) error {
@@ -864,7 +898,7 @@ func removeOldContainer(
 //   - imageName: Name of the predecessor image captured before create-image pinning.
 func removeOldImage(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	imageID container.ImageID,
 	imageName string,
@@ -936,7 +970,7 @@ func removeOldImage(
 //   - error: Non-nil if creation or starting fails.
 func createAndStartNewContainer(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 ) (container.ContainerID, error) {
@@ -972,7 +1006,7 @@ func createAndStartNewContainer(
 //   - error: Non-nil if the container cannot be verified or started.
 func ensureContainerRunning(
 	ctx context.Context,
-	client containerClient.Client,
+	client HandoffClient,
 	clog *zerolog.Logger,
 	containerID container.ContainerID,
 ) error {

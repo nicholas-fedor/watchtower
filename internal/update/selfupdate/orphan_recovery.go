@@ -8,9 +8,27 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 )
+
+// RecoveryClient finds and starts an orphaned replacement container.
+type RecoveryClient interface {
+	// ListContainers returns the containers that pass every filter.
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+	// StartContainerByID starts an existing container.
+	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
+}
+
+// RestartPolicySetter changes a container's restart policy.
+type RestartPolicySetter interface {
+	// SetRestartPolicy sets the container's restart policy. An empty container
+	// ID does nothing.
+	SetRestartPolicy(
+		ctx context.Context,
+		containerID container.ContainerID,
+		policy dockerContainer.RestartPolicy,
+	) error
+}
 
 // TryRecoverOrphanedContainer attempts to start an orphaned Watchtower container
 // that is stuck in the Docker "created" state. This can happen when a self-update
@@ -33,7 +51,7 @@ import (
 func TryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client RecoveryClient,
 	currentContainer *container.Container,
 ) (*container.Container, bool) {
 	if currentContainer == nil {
@@ -97,7 +115,7 @@ func DisableOldRestarts(
 	log *zerolog.Logger,
 	ctx context.Context,
 	oldContainer *container.Container,
-	client containerClient.Client,
+	client RestartPolicySetter,
 ) {
 	err := client.SetRestartPolicy(
 		ctx,

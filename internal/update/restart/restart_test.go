@@ -17,13 +17,13 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	mockRestart "github.com/nicholas-fedor/watchtower/internal/update/restart/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
@@ -2114,7 +2114,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 
 				clientErr := errors.New(text)
 				source := staleMockContainer()
-				client := mockContainerClient.NewMockClient(t)
+				client := mockRestart.NewMockClient(t)
 				client.EXPECT().
 					StopAndRemoveContainer(mock.Anything, source, time.Second).
 					Return(clientErr)
@@ -2139,7 +2139,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		text := "create replacement container: failed to create container: daemon unavailable"
 		clientErr := errors.New(text)
 		source := staleMockContainer()
-		client := mockContainerClient.NewMockClient(t)
+		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
 			CreateContainer(mock.Anything, source).
 			Return("", clientErr)
@@ -2155,7 +2155,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		text := "failed to start container abc123: daemon unavailable"
 		clientErr := errors.New(text)
 		source := staleMockContainer()
-		client := mockContainerClient.NewMockClient(t)
+		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
 			CreateContainer(mock.Anything, source).
 			Return(container.ContainerID("abc123"), nil)

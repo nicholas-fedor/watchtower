@@ -24,6 +24,30 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
+// Client recreates containers. It also covers what the lifecycle hooks and the
+// self-update need.
+type Client interface {
+	hooks.Client
+	selfupdate.OrchestratorCreator
+	selfupdate.RestartPolicySetter
+
+	// GetContainer returns the container with the given ID.
+	GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
+	// StopAndRemoveContainer stops the container and removes it. The stop
+	// waits up to timeout.
+	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
+	// CreateContainer creates a container from the given container's
+	// configuration without starting it. It returns the new container's ID.
+	CreateContainer(ctx context.Context, target *container.Container) (container.ContainerID, error)
+	// RenameContainer gives the container a new name.
+	RenameContainer(ctx context.Context, target *container.Container, newName string) error
+	// StartContainerByID starts an existing container.
+	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
+	// WaitForContainerHealthy waits until the container is healthy, for up to
+	// timeout. A timeout of zero or less waits without a limit.
+	WaitForContainerHealthy(ctx context.Context, containerID container.ContainerID, timeout time.Duration) error
+}
+
 // Errors for restarting containers.
 var (
 	// errVerifyConfigFailed indicates a failure to verify container configuration for recreation.
@@ -78,7 +102,7 @@ func Run(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []*container.Container,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
@@ -153,7 +177,7 @@ func performRollingRestart(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []*container.Container,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
@@ -302,7 +326,7 @@ func stopContainersInReversedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []*container.Container,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 ) (map[container.ContainerID]error, []cleanup.RemovedImageInfo) {
 	failed := make(map[container.ContainerID]error, len(containers))
@@ -432,7 +456,7 @@ func stopStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	c *container.Container,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 ) (bool, error) {
 	fields := map[string]any{
@@ -551,7 +575,7 @@ func stopStaleContainer(
 //   - error: Non-nil if a labeled path cannot be snapshotted.
 func snapshotCopyFilesForRecreate(
 	ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	source *container.Container,
 ) error {
 	store, ok := client.(containerClient.CopyFileStore)
@@ -572,7 +596,7 @@ func snapshotCopyFilesForRecreate(
 // Parameters:
 //   - client: Docker client. No-op unless it implements container.CopyFileStore.
 //   - containerID: Source container ID whose snapshot should be discarded.
-func discardCopyFilesForRecreate(client containerClient.Client, containerID container.ContainerID) {
+func discardCopyFilesForRecreate(client Client, containerID container.ContainerID) {
 	store, ok := client.(containerClient.CopyFileStore)
 	if !ok {
 		return
@@ -602,7 +626,7 @@ func restartContainersInSortedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []*container.Container,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 	stoppedImages []cleanup.RemovedImageInfo,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
@@ -734,7 +758,7 @@ func restartStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	sourceContainer *container.Container,
-	client containerClient.Client,
+	client Client,
 	config updateParams.Params,
 ) (container.ContainerID, bool, error) {
 	// Create a detached context to survive parent context cancellation.
