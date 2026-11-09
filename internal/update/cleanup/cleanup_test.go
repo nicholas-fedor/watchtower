@@ -20,6 +20,7 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockCleanup "github.com/nicholas-fedor/watchtower/internal/update/cleanup/mocks"
@@ -41,6 +42,33 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	w := zerolog.TestWriter{T: t, Frame: 4}
 
 	return new(zerolog.New(w))
+}
+
+// listContainers returns a ListContainers result that keeps the given
+// containers passing every filter the call receives, as the client does. A
+// test then fails when the code under test lists with a filter that hides an
+// instance it must remove.
+//
+// Parameters:
+//   - containers: Containers the Docker host holds.
+//
+// Returns:
+//   - func(context.Context, ...filters.Filter) ([]*container.Container, error):
+//     Result function for the mock's RunAndReturn.
+func listContainers(
+	containers ...*container.Container,
+) func(context.Context, ...filters.Filter) ([]*container.Container, error) {
+	return func(_ context.Context, filter ...filters.Filter) ([]*container.Container, error) {
+		listed := make([]*container.Container, 0, len(containers))
+
+		for _, c := range containers {
+			if !slices.ContainsFunc(filter, func(f filters.Filter) bool { return !f(c) }) {
+				listed = append(listed, c)
+			}
+		}
+
+		return listed, nil
+	}
 }
 
 // TestRemoveExcessWatchtowerInstances verifies which other Watchtower instances
@@ -72,7 +100,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{mockContainer}, nil)
+				RunAndReturn(listContainers(mockContainer))
 
 			var cleanupImageInfo []RemovedImageInfo
 
@@ -120,7 +148,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []RemovedImageInfo
@@ -164,7 +192,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{scopedOldContainer}, nil)
+				RunAndReturn(listContainers(scopedOldContainer))
 
 			var cleanupImageIDs []RemovedImageInfo
 
@@ -214,7 +242,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []RemovedImageInfo
@@ -254,7 +282,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{scopedContainer}, nil)
+				RunAndReturn(listContainers(scopedContainer))
 
 			var cleanupImageIDs []RemovedImageInfo
 
@@ -306,7 +334,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []RemovedImageInfo
@@ -334,7 +362,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient := mockCleanup.NewMockClient(t)
 
-			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil)
+			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(listContainers())
 
 			var cleanupImageIDs []RemovedImageInfo
 
@@ -384,7 +412,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{oldContainer, newContainer}, nil)
+					RunAndReturn(listContainers(oldContainer, newContainer))
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 					Return(errors.New("stop container failed")).
@@ -451,7 +479,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{old1Container, old2Container, newContainer}, nil)
+					RunAndReturn(listContainers(old1Container, old2Container, newContainer))
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
 					Return(errors.New("stop container failed")).
@@ -519,7 +547,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{old1Container, old2Container, newContainer}, nil)
+					RunAndReturn(listContainers(old1Container, old2Container, newContainer))
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
 					Return(errors.New("removal of container watchtower-old1 is already in progress")).
@@ -586,7 +614,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{old1Container, old2Container, newContainer}, nil)
+				RunAndReturn(listContainers(old1Container, old2Container, newContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, old1Container, 10*time.Minute).
 				Return(cerrdefs.ErrNotFound)
@@ -645,7 +673,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []RemovedImageInfo
@@ -694,7 +722,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).Return(nil)
 
 			var cleanupImageIDs []RemovedImageInfo
@@ -753,7 +781,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).
 				Return(nil).
@@ -811,7 +839,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).
 				Return(nil).
@@ -890,7 +918,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 			// scope-b container appears first in the list to test that it is skipped
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{scopeBNewContainer, oldContainer, scopeANewContainer}, nil)
+				RunAndReturn(listContainers(scopeBNewContainer, oldContainer, scopeANewContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).
 				Return(nil).
@@ -950,7 +978,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldContainer, newContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(t.Context(), oldContainer, 10*time.Minute).
 				Return(nil).
@@ -1013,7 +1041,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldDifferentScopeContainer, newContainer}, nil)
+				RunAndReturn(listContainers(oldDifferentScopeContainer, newContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldDifferentScopeContainer, 10*time.Minute).
 				Return(nil).
@@ -1072,7 +1100,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{prodOldContainer, prodNewContainer}, nil)
+				RunAndReturn(listContainers(prodOldContainer, prodNewContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, prodOldContainer, 10*time.Minute).
 				Return(nil).
@@ -1133,7 +1161,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{referencedContainer, crossScopeChainContainer}, nil)
+				RunAndReturn(listContainers(referencedContainer, crossScopeChainContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, referencedContainer, 10*time.Minute).
 				Return(nil).
@@ -1209,7 +1237,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{container1, container2, currentContainer}, nil)
+					RunAndReturn(listContainers(container1, container2, currentContainer))
 				// Mock partial failures: container1 stops successfully,
 				// container2 fails to stop entirely (should prevent all image cleanup)
 				mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, container1, 10*time.Minute).Return(nil)
@@ -1284,7 +1312,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{notFoundContainer, stopErrorContainer, currentContainer}, nil)
+					RunAndReturn(listContainers(notFoundContainer, stopErrorContainer, currentContainer))
 				// Mock different error types
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, notFoundContainer, 10*time.Minute).
@@ -1358,7 +1386,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{successContainer, failureContainer, currentContainer}, nil)
+					RunAndReturn(listContainers(successContainer, failureContainer, currentContainer))
 				// Success container stops successfully
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, successContainer, 10*time.Minute).
@@ -1422,7 +1450,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{scopeAContainer, currentContainer}, nil)
+					RunAndReturn(listContainers(scopeAContainer, currentContainer))
 				// Only scope-a operations should occur
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, scopeAContainer, 10*time.Minute).
@@ -2374,7 +2402,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{}, nil)
+				RunAndReturn(listContainers())
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2405,7 +2433,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), nonWT}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), nonWT))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2438,7 +2466,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{current}, nil)
+				RunAndReturn(listContainers(current))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2475,7 +2503,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), oldContainer}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), oldContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
@@ -2516,7 +2544,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer("my-scope"), oldScopedContainer}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer("my-scope"), oldScopedContainer))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2550,7 +2578,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), oldScopedContainer}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), oldScopedContainer))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2584,7 +2612,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer("my-scope"), oldUnscopedContainer}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer("my-scope"), oldUnscopedContainer))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2621,7 +2649,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), oldContainer}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), oldContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
@@ -2658,7 +2686,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer("prod"), oldContainer}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer("prod"), oldContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
@@ -2694,7 +2722,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer}, nil)
+				RunAndReturn(listContainers(oldContainer))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2740,7 +2768,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer("prod"), old1, old2}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer("prod"), old1, old2))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, old1, 10*time.Minute).
 				Return(nil)
@@ -2794,7 +2822,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentContainer, oldContainer}, nil)
+				RunAndReturn(listContainers(currentContainer, oldContainer))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
@@ -2835,7 +2863,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 				mockClient.EXPECT().
 					ListContainers(mock.Anything, mock.Anything).
-					Return([]*container.Container{currentWatchtowerContainer(""), oldContainer}, nil)
+					RunAndReturn(listContainers(currentWatchtowerContainer(""), oldContainer))
 				mockClient.EXPECT().
 					StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 					Return(errors.New("stop container failed")).
@@ -2904,7 +2932,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{oldContainer}, nil)
+				RunAndReturn(listContainers(oldContainer))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2962,7 +2990,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), orphaned}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), orphaned))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, orphaned, 10*time.Minute).
 				Return(nil)
@@ -2994,7 +3022,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), nonWT}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), nonWT))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -3025,7 +3053,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{current}, nil)
+				RunAndReturn(listContainers(current))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -3067,7 +3095,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), oldContainer, orphaned}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), oldContainer, orphaned))
 			mockClient.EXPECT().
 				StopAndRemoveContainer(mock.Anything, oldContainer, 10*time.Minute).
 				Return(nil)
@@ -3105,7 +3133,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
-				Return([]*container.Container{currentWatchtowerContainer(""), differentScopeOrphaned}, nil)
+				RunAndReturn(listContainers(currentWatchtowerContainer(""), differentScopeOrphaned))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),

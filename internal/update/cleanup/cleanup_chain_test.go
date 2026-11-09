@@ -130,7 +130,7 @@ func TestRemoveExcessWatchtowerInstances_ChainKeepsOtherContainers(t *testing.T)
 
 	// The mock fails the test on any other stop.
 	client := mockCleanup.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{current, oldA, app}, nil)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(listContainers(current, oldA, app))
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, oldA, mock.Anything).Return(nil).Once()
 
 	removed, err := RemoveExcessWatchtowerInstances(newTestLogger(t), t.Context(), client, false, "", nil, current)
