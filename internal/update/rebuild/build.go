@@ -11,7 +11,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -20,6 +19,13 @@ import (
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
+
+// ImageBuilder builds images from a remote Git build context.
+type ImageBuilder interface {
+	// BuildRemoteImage builds the Dockerfile at the remote context and tags the
+	// result with every given tag.
+	BuildRemoteImage(ctx context.Context, remote, dockerfile string, tags []string) (container.ImageID, error)
+}
 
 // rebuildTimeout bounds one remote image build or one Compose apply. Both run
 // Dockerfile steps and pulls that can take minutes, so they are not held to the
@@ -50,7 +56,7 @@ var (
 func (s *Session) build(
 	log *zerolog.Logger,
 	ctx context.Context,
-	docker containerClient.Client,
+	docker ImageBuilder,
 	c *container.Container,
 	result git.CheckResult,
 	params updateParams.Params,

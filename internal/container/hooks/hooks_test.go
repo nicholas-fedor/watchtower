@@ -15,8 +15,8 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	mockHooks "github.com/nicholas-fedor/watchtower/internal/container/hooks/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
@@ -118,12 +118,12 @@ func assertFilterReached(t *testing.T, captured []filters.Filter, want filters.F
 func TestExecutePreChecks(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupClient    func(c *mockContainerClient.MockClient, capture func(mock.Arguments))
+		setupClient    func(c *mockHooks.MockClient, capture func(mock.Arguments))
 		expectedLogMsg string
 	}{
 		{
 			name: "successful execution",
-			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+			setupClient: func(c *mockHooks.MockClient, capture func(mock.Arguments)) {
 				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]*container.Container{
 					mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
@@ -137,7 +137,7 @@ func TestExecutePreChecks(t *testing.T) {
 		},
 		{
 			name: "listing error",
-			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+			setupClient: func(c *mockHooks.MockClient, capture func(mock.Arguments)) {
 				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return(nil, errListingFailed)
 			},
 			expectedLogMsg: "Listing containers for pre-checks",
@@ -146,7 +146,7 @@ func TestExecutePreChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
-			client := mockContainerClient.NewMockClient(t)
+			client := mockHooks.NewMockClient(t)
 
 			var captured []filters.Filter
 
@@ -172,12 +172,12 @@ func TestExecutePreChecks(t *testing.T) {
 func TestExecutePostChecks(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupClient    func(c *mockContainerClient.MockClient, capture func(mock.Arguments))
+		setupClient    func(c *mockHooks.MockClient, capture func(mock.Arguments))
 		expectedLogMsg string
 	}{
 		{
 			name: "successful execution",
-			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+			setupClient: func(c *mockHooks.MockClient, capture func(mock.Arguments)) {
 				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return([]*container.Container{
 					mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
@@ -191,7 +191,7 @@ func TestExecutePostChecks(t *testing.T) {
 		},
 		{
 			name: "listing error",
-			setupClient: func(c *mockContainerClient.MockClient, capture func(mock.Arguments)) {
+			setupClient: func(c *mockHooks.MockClient, capture func(mock.Arguments)) {
 				c.On("ListContainers", mock.Anything, mock.Anything).Run(capture).Return(nil, errListingFailed)
 			},
 			expectedLogMsg: "Listing containers for post-checks",
@@ -200,7 +200,7 @@ func TestExecutePostChecks(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
-			client := mockContainerClient.NewMockClient(t)
+			client := mockHooks.NewMockClient(t)
 
 			var captured []filters.Filter
 
@@ -220,7 +220,7 @@ func TestExecutePostChecks(t *testing.T) {
 
 func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 	log, logBuf := newDebugLog()
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 	listed := []*container.Container{
 		mockedContainer(withLabels(map[string]string{
 			"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
@@ -238,7 +238,7 @@ func TestExecutePreChecks_UsesListedContainers(t *testing.T) {
 
 func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 	log, logBuf := newDebugLog()
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 	listed := []*container.Container{
 		mockedContainer(withLabels(map[string]string{
 			"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
@@ -256,7 +256,7 @@ func TestExecutePostChecks_UsesListedContainers(t *testing.T) {
 
 func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 	log, _ := newDebugLog()
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 	listed := []*container.Container{}
 
 	ExecutePreChecks(log, context.Background(), client, func(filters.FilterableContainer) bool { return true }, 0, 0, listed)
@@ -267,7 +267,7 @@ func TestExecutePreChecks_EmptyListedDoesNotRelist(t *testing.T) {
 
 func TestExecutePostChecks_EmptyListedDoesNotRelist(t *testing.T) {
 	log, _ := newDebugLog()
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 	listed := []*container.Container{}
 
 	ExecutePostChecks(log, context.Background(), client, func(filters.FilterableContainer) bool { return true }, 0, 0, listed)
@@ -281,7 +281,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		container      *container.Container
-		setupClient    func(*mockContainerClient.MockClient)
+		setupClient    func(*mockHooks.MockClient)
 		expectedLogMsg string
 	}{
 		{
@@ -289,7 +289,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			container: mockedContainer(withLabels(map[string]string{
 				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 0, 0).
 					Return(true, nil)
 			},
@@ -301,7 +301,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.pre-check":         "pre-check",
 				"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout": "5",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 5, 0, 0).
 					Return(true, nil)
 			},
@@ -313,7 +313,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.pre-check":         "pre-check",
 				"com.centurylinklabs.watchtower.lifecycle.pre-check-timeout": "0",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 0, 0, 0).
 					Return(true, nil)
 			},
@@ -329,7 +329,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 			container: mockedContainer(withLabels(map[string]string{
 				"com.centurylinklabs.watchtower.lifecycle.pre-check": "pre-check",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 0, 0).
 					Return(false, errExecFailed)
 			},
@@ -342,7 +342,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.uid":       "1000",
 				"com.centurylinklabs.watchtower.lifecycle.gid":       "1001",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-check", 1, 1000, 1001).
 					Return(true, nil)
 			},
@@ -353,7 +353,7 @@ func TestExecutePreCheckCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockHooks.NewMockClient(t)
 			if tt.setupClient != nil {
 				tt.setupClient(client)
 			}
@@ -372,7 +372,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		container      *container.Container
-		setupClient    func(*mockContainerClient.MockClient)
+		setupClient    func(*mockHooks.MockClient)
 		expectedLogMsg string
 	}{
 		{
@@ -380,7 +380,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			container: mockedContainer(withLabels(map[string]string{
 				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 0, 0).
 					Return(true, nil)
 			},
@@ -392,7 +392,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.post-check":         "post-check",
 				"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "5",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 5, 0, 0).
 					Return(true, nil)
 			},
@@ -404,7 +404,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.post-check":         "post-check",
 				"com.centurylinklabs.watchtower.lifecycle.post-check-timeout": "0",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 0, 0, 0).
 					Return(true, nil)
 			},
@@ -420,7 +420,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 			container: mockedContainer(withLabels(map[string]string{
 				"com.centurylinklabs.watchtower.lifecycle.post-check": "post-check",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 0, 0).
 					Return(false, errExecFailed)
 			},
@@ -433,7 +433,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 				"com.centurylinklabs.watchtower.lifecycle.uid":        "2000",
 				"com.centurylinklabs.watchtower.lifecycle.gid":        "2001",
 			})),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "post-check", 1, 2000, 2001).
 					Return(true, nil)
 			},
@@ -444,7 +444,7 @@ func TestExecutePostCheckCommand(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockHooks.NewMockClient(t)
 			if tt.setupClient != nil {
 				tt.setupClient(client)
 			}
@@ -488,7 +488,7 @@ func TestExecuteCheckCommand_NoCommandSkipsLabels(t *testing.T) {
 		"com.centurylinklabs.watchtower.lifecycle.uid":                "-5",
 		"com.centurylinklabs.watchtower.lifecycle.gid":                "-5",
 	})
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 
 	executePreCheckCommand(log, context.Background(), client, c, 0, 0)
 	executePostCheckCommand(log, context.Background(), client, c, 0, 0)
@@ -534,7 +534,7 @@ func TestExecutePreUpdateCommand_SkippedHookReadsNoLabels(t *testing.T) {
 
 			log, logBuf := newDebugLog()
 			c := containerWithLabels(log, tt.running, labels)
-			client := mockContainerClient.NewMockClient(t)
+			client := mockHooks.NewMockClient(t)
 
 			skip, err := ExecutePreUpdateCommand(log, context.Background(), client, c, 0, 0)
 			require.NoError(t, err)
@@ -560,7 +560,7 @@ func TestExecutePostUpdateCommand_NoCommandReadsNoLabels(t *testing.T) {
 		"com.centurylinklabs.watchtower.lifecycle.uid":                 "-5",
 		"com.centurylinklabs.watchtower.lifecycle.gid":                 "-5",
 	})
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 	client.EXPECT().GetContainer(mock.Anything, container.ContainerID("test")).Return(c, nil).Once()
 
 	ExecutePostUpdateCommand(log, context.Background(), client, "test", 0, 0)
@@ -576,7 +576,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		container      *container.Container
-		setupClient    func(*mockContainerClient.MockClient)
+		setupClient    func(*mockHooks.MockClient)
 		expectedResult bool
 		expectedErr    bool
 		expectedLogMsg string
@@ -590,7 +590,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",
 				}),
 			),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-update", 2, 0, 0).
 					Return(true, nil)
 			},
@@ -626,7 +626,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 					"com.centurylinklabs.watchtower.lifecycle.pre-update-timeout": "2",
 				}),
 			),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-update", 2, 0, 0).
 					Return(false, errExecFailed)
 			},
@@ -645,7 +645,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 					"com.centurylinklabs.watchtower.lifecycle.gid":                "3001",
 				}),
 			),
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("ExecuteCommand", mock.Anything, mock.Anything, "pre-update", 2, 3000, 3001).
 					Return(true, nil)
 			},
@@ -664,7 +664,7 @@ func TestExecutePreUpdateCommand(t *testing.T) {
 func runPreUpdateTest(t *testing.T, tt struct {
 	name           string
 	container      *container.Container
-	setupClient    func(*mockContainerClient.MockClient)
+	setupClient    func(*mockHooks.MockClient)
 	expectedResult bool
 	expectedErr    bool
 	expectedLogMsg string
@@ -674,7 +674,7 @@ func runPreUpdateTest(t *testing.T, tt struct {
 
 	log, logBuf := newDebugLog()
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHooks.NewMockClient(t)
 	if tt.setupClient != nil {
 		tt.setupClient(client)
 	}
@@ -702,13 +702,13 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 	tests := []struct {
 		name           string
 		containerID    container.ContainerID
-		setupClient    func(*mockContainerClient.MockClient)
+		setupClient    func(*mockHooks.MockClient)
 		expectedLogMsg string
 	}{
 		{
 			name:        "command present",
 			containerID: "test",
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("GetContainer", mock.Anything, container.ContainerID("test")).
 					Return(mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
@@ -721,7 +721,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 		{
 			name:        "no command",
 			containerID: "test",
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("GetContainer", mock.Anything, container.ContainerID("test")).Return(mockedContainer(), nil)
 			},
 			expectedLogMsg: "No post-update command supplied",
@@ -729,7 +729,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 		{
 			name:        "container retrieval error",
 			containerID: "test",
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("GetContainer", mock.Anything, container.ContainerID("test")).Return(nil, errNotFound)
 			},
 			expectedLogMsg: "Failed to get container",
@@ -737,7 +737,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 		{
 			name:        "command error",
 			containerID: "test",
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("GetContainer", mock.Anything, container.ContainerID("test")).
 					Return(mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
@@ -750,7 +750,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 		{
 			name:        "container UID/GID override",
 			containerID: "test",
-			setupClient: func(c *mockContainerClient.MockClient) {
+			setupClient: func(c *mockHooks.MockClient) {
 				c.On("GetContainer", mock.Anything, container.ContainerID("test")).
 					Return(mockedContainer(withLabels(map[string]string{
 						"com.centurylinklabs.watchtower.lifecycle.post-update": "post-update",
@@ -766,7 +766,7 @@ func TestExecutePostUpdateCommand(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log, logBuf := newDebugLog()
-			client := mockContainerClient.NewMockClient(t)
+			client := mockHooks.NewMockClient(t)
 			tt.setupClient(client)
 			ExecutePostUpdateCommand(log, context.Background(), client, tt.containerID, 0, 0)
 

@@ -20,9 +20,9 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	mockCleanup "github.com/nicholas-fedor/watchtower/internal/update/cleanup/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 )
 
@@ -56,7 +56,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should return nil when only one instance exists", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockContainer := createMockContainer(
 				"watchtower",
@@ -93,7 +93,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should stop excess instances and collect image IDs when cleanup enabled", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"watchtower-old",
@@ -147,7 +147,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should only clean up instances in the same scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			scopedOldContainer := createMockContainer(
 				"watchtower-scoped",
@@ -185,7 +185,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should clean up multiple instances within the same scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"watchtower-prod-old",
@@ -237,7 +237,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should return false when only one instance exists in scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			scopedContainer := createMockContainer(
 				"watchtower-prod",
@@ -279,7 +279,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should stop excess instances but not collect image IDs", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"watchtower-old",
@@ -332,7 +332,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should not perform cleanup when currentContainer is nil", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil)
 
@@ -357,7 +357,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				oldContainer := createMockContainer(
 					"watchtower-old",
@@ -413,7 +413,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				old1Container := createMockContainer(
 					"watchtower-old1",
@@ -481,7 +481,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				old1Container := createMockContainer(
 					"watchtower-old1",
@@ -548,7 +548,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should treat 'no such container' errors as non-errors and continue cleanup", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			old1Container := createMockContainer(
 				"watchtower-old1",
@@ -618,7 +618,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should not collect image ID when excess container shares image with newest", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"watchtower-old",
@@ -667,7 +667,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 		t.Run("should skip empty image IDs", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"watchtower-old",
@@ -749,7 +749,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -807,7 +807,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -885,7 +885,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			// scope-b container appears first in the list to test that it is skipped
 			mockClient.EXPECT().
@@ -946,7 +946,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -1009,7 +1009,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -1068,7 +1068,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -1129,7 +1129,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 				},
 			)
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -1167,7 +1167,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				// Create containers in the same scope
 				container1 := createMockContainer(
@@ -1242,7 +1242,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				// Create containers with different error scenarios in same scope
 				notFoundContainer := createMockContainer(
@@ -1317,7 +1317,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				successContainer := createMockContainer(
 					"success",
@@ -1391,7 +1391,7 @@ func TestRemoveExcessWatchtowerInstances(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				// Scope A container that should fail
 				scopeAContainer := createMockContainer(
@@ -1570,7 +1570,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should do nothing when no images are provided", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleaned, err := RemoveImages(newTestLogger(t), t.Context(), mockClient, nil)
 		require.NoError(t, err)
@@ -1580,7 +1580,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should attempt to remove each image ID", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1"},
@@ -1605,7 +1605,7 @@ func TestRemoveImages(t *testing.T) {
 		t.Parallel()
 
 		log, logs := logcapture.NewJSON(zerolog.InfoLevel)
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		images := []RemovedImageInfo{
 			{ImageID: "sha256:0123456789abcdef", ImageName: "org/app:1", ContainerName: "app-a"},
@@ -1646,7 +1646,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should return error when image removal fails", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1"},
@@ -1668,7 +1668,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should treat 'not found' errors as non-errors and not add to cleaned", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1"},
@@ -1689,7 +1689,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should treat context cancellation as a non-error and not add to cleaned", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1", ImageName: "image1"},
@@ -1710,7 +1710,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should treat a canceled context cause that is not context.Canceled as a non-error", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1", ImageName: "image1"},
@@ -1731,7 +1731,7 @@ func TestRemoveImages(t *testing.T) {
 	t.Run("should treat 'conflict' errors as non-errors and not add to cleaned", func(t *testing.T) {
 		t.Parallel()
 
-		mockClient := mockContainerClient.NewMockClient(t)
+		mockClient := mockCleanup.NewMockClient(t)
 
 		cleanedImages := []RemovedImageInfo{
 			{ImageID: "image1", ImageName: "image1"},
@@ -1762,7 +1762,7 @@ func Test_removeExcessContainers(t *testing.T) {
 		t.Run("should remove the images of removed instances right away", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			excessContainer := createMockContainer(
 				"excess",
@@ -1804,7 +1804,7 @@ func Test_removeExcessContainers(t *testing.T) {
 		t.Run("should log removeImages errors and still report the removed instances", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			excessContainer1 := createMockContainer(
 				"excess1",
@@ -1863,7 +1863,7 @@ func Test_removeExcessContainers(t *testing.T) {
 		t.Run("should append to provided slice without removing the images", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			excessContainer := createMockContainer(
 				"excess",
@@ -1910,7 +1910,7 @@ func Test_removeExcessContainers(t *testing.T) {
 		t.Run("should not call removeImages", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			excessContainer := createMockContainer(
 				"excess",
@@ -1957,7 +1957,7 @@ func Test_removeExcessContainers(t *testing.T) {
 		t.Run("should return immediately when context is canceled during retry delay", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			excessContainer := createMockContainer(
 				"excess",
@@ -2006,7 +2006,7 @@ func Test_removeExcessContainers(t *testing.T) {
 		t.Run("should return immediately when context times out during retry delay", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			excessContainer := createMockContainer(
 				"excess",
@@ -2057,7 +2057,7 @@ func Test_removeExcessContainers(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				excessContainer := createMockContainer(
 					"excess",
@@ -2107,7 +2107,7 @@ func Test_removeExcessContainers(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				excessContainer := createMockContainer(
 					"excess",
@@ -2157,7 +2157,7 @@ func Test_removeExcessContainers(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				excessContainer := createMockContainer(
 					"excess",
@@ -2370,7 +2370,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should return nil when no containers exist", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -2391,7 +2391,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should return nil when only non-Watchtower containers exist", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			nonWT := createMockContainer(
 				"other-id",
@@ -2422,7 +2422,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should return nil when only current non-old Watchtower exists", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			current := createMockContainer(
 				"current-id",
@@ -2459,7 +2459,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should match unscoped old containers when scope is empty", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"old-id",
@@ -2499,7 +2499,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should skip old containers in different scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldScopedContainer := createMockContainer(
 				"old-id",
@@ -2533,7 +2533,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should skip old containers with explicit scope when current is unscoped", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldScopedContainer := createMockContainer(
 				"old-id",
@@ -2568,7 +2568,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 			t.Parallel()
 
 			// The mock fails the test on any removal.
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldUnscopedContainer := createMockContainer(
 				"old-id",
@@ -2605,7 +2605,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should remove old container in same scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"old-id",
@@ -2641,7 +2641,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should remove old container with matching explicit scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"old-id",
@@ -2678,7 +2678,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should skip old container with same ID as current container", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"current-id",
@@ -2711,7 +2711,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should remove multiple old containers in same scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			old1 := createMockContainer(
 				"old-1",
@@ -2767,7 +2767,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should remove old container and collect its image", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			currentContainer := createMockContainer(
 				"current-id",
@@ -2819,7 +2819,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			// The removal retries wait on the synctest clock.
 			synctest.Test(t, func(t *testing.T) {
-				mockClient := mockContainerClient.NewMockClient(t)
+				mockClient := mockCleanup.NewMockClient(t)
 
 				oldContainer := createMockContainer(
 					"old-id",
@@ -2861,7 +2861,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should return an error", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			mockClient.EXPECT().
 				ListContainers(mock.Anything, mock.Anything).
@@ -2888,7 +2888,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 			t.Parallel()
 
 			// The mock fails the test on any removal.
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"old-id",
@@ -2927,7 +2927,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			// The mock fails the test on any call, so a run outside a
 			// container costs no Docker request.
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2948,7 +2948,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should remove Watchtower containers stuck in created state", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			orphaned := createMockCreatedContainer(
 				"orphaned-id",
@@ -2982,7 +2982,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should skip created-state containers that are not Watchtower", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			nonWT := createMockCreatedContainer(
 				"non-wt-id",
@@ -3011,7 +3011,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should skip the current container even if it is in created state", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			current := createMockCreatedContainer(
 				"current-id",
@@ -3042,7 +3042,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should remove both old and orphaned created-state containers together", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			oldContainer := createMockContainer(
 				"old-id",
@@ -3090,7 +3090,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 		t.Run("should skip created-state containers from a different scope", func(t *testing.T) {
 			t.Parallel()
 
-			mockClient := mockContainerClient.NewMockClient(t)
+			mockClient := mockCleanup.NewMockClient(t)
 
 			differentScopeOrphaned := createMockCreatedContainer(
 				"orphaned-scoped-id",

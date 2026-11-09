@@ -18,7 +18,6 @@ import (
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -64,7 +63,7 @@ func gitTestClient(t *testing.T) *git.Client {
 //
 // Parameters:
 //   - client: Mocked container client.
-func expectGitBuild(client *mockContainerClient.MockClient) {
+func expectGitBuild(client *mockRebuild.MockImageBuilder) {
 	client.EXPECT().BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
 		func(ctx context.Context, _, _ string, tags []string) (container.ImageID, error) {
 			err := ctx.Err()
@@ -263,7 +262,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.PrepareRebuilds(
 			newTestLogger(t),
 			t.Context(),
-			mockContainerClient.NewMockClient(t),
+			mockRebuild.NewMockImageBuilder(t),
 			[]*container.Container{c},
 			updateParams.Params{},
 			nil,
@@ -275,7 +274,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.PrepareRebuilds(
 			newTestLogger(t),
 			t.Context(),
-			mockContainerClient.NewMockClient(t),
+			mockRebuild.NewMockImageBuilder(t),
 			[]*container.Container{c},
 			updateParams.Params{},
 			nil,
@@ -300,7 +299,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		failed := map[container.ContainerID]error{}
 		// The mock has no expectations, so a build or image removal fails
 		// the test.
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{fresh, staleNoResult, staleFreshResult}, updateParams.Params{}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -324,7 +323,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.store(noPull.ID(), git.CheckResult{Stale: true, Commit: "abc123abc123"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{monitor, noPull}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -341,7 +340,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: ""})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Contains(t, failed, c.ID())
@@ -358,7 +357,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.0.0"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
 
 		progress := &state.Progress{}
@@ -389,7 +388,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.NotContains(t, failed, c.ID())
@@ -419,7 +418,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		progress.AddScanned(log, c, container.ImageID("git:abc"), params)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(log, t.Context(), docker, []*container.Container{c}, params, progress, failed)
 		progress.UpdateFailed(log, failed)
 

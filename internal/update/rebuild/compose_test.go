@@ -17,7 +17,6 @@ import (
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
@@ -113,7 +112,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(worker.ID(), result)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(
 			newTestLogger(t),
 			t.Context(),
@@ -192,7 +191,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(beta.ID(), result)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{alpha, beta}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -252,7 +251,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(dependent.ID(), result)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{dependent, provider}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -319,7 +318,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(provider.ID(), result)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(
 			newTestLogger(t),
 			t.Context(),
@@ -369,7 +368,7 @@ func TestSession_applyCompose(t *testing.T) {
 			sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 			failed := map[container.ContainerID]error{}
-			docker := mockContainerClient.NewMockClient(t)
+			docker := mockRebuild.NewMockImageBuilder(t)
 			sess.PrepareRebuilds(
 				newTestLogger(t),
 				t.Context(),
@@ -413,7 +412,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(
 			newTestLogger(t),
 			parent,
@@ -459,7 +458,7 @@ func TestSession_applyCompose(t *testing.T) {
 		progress.AddScanned(newTestLogger(t), c, container.ImageID("git:"+result.Commit), params)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, params, progress, failed)
 
 		report := progress.Report(newTestLogger(t))
@@ -483,7 +482,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		require.ErrorIs(t, failed[c.ID()], errGitComposeService)
@@ -509,7 +508,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		require.ErrorIs(t, failed[c.ID()], project.ErrDirty)
@@ -542,7 +541,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -584,7 +583,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		params := updateParams.Params{Git: gitConfig.Defaults{Enable: true}}
 		progress := &state.Progress{}
 		progress.AddScanned(&log, c, container.ImageID("git:new"), params)
@@ -641,7 +640,7 @@ func TestSession_applyCompose(t *testing.T) {
 
 		log := zerolog.New(&logs)
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		params := updateParams.Params{Git: gitConfig.Defaults{Enable: true}}
 		progress := &state.Progress{}
 		progress.AddScanned(&log, api, container.ImageID("git:abc"), params)
@@ -692,7 +691,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		params := updateParams.Params{NoRestart: true, Git: gitConfig.Defaults{Enable: true}}
 		progress := &state.Progress{}
 		progress.AddScanned(newTestLogger(t), c, container.ImageID("git:abc"), params)
@@ -744,7 +743,7 @@ func TestSession_applyCompose(t *testing.T) {
 
 		log := zerolog.New(&logs)
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		params := updateParams.Params{NoRestart: true, Git: gitConfig.Defaults{Enable: true}}
 		sess.PrepareRebuilds(&log, t.Context(), docker, []*container.Container{c}, params, nil, failed)
 
@@ -784,7 +783,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(worker.ID(), git.CheckResult{Stale: true, Commit: "bbb"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{api, worker}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.False(t, checkedOut)
@@ -834,7 +833,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(worker.ID(), git.CheckResult{Stale: true, Commit: "abc", Tag: "v1.2.4"})
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{api, worker}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -886,7 +885,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(two.ID(), result)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{one, two}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.Empty(t, failed)
@@ -934,7 +933,7 @@ func TestSession_applyCompose(t *testing.T) {
 		progress.AddScanned(newTestLogger(t), fresh, fresh.ImageID(), params)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{stale}, params, progress, failed)
 
 		report := progress.Report(newTestLogger(t))
@@ -990,7 +989,7 @@ func TestSession_applyCompose(t *testing.T) {
 
 		log := zerolog.New(&logs)
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(&log, t.Context(), docker, []*container.Container{stale}, params, progress, failed)
 
 		report := progress.Report(&log)
@@ -1037,7 +1036,7 @@ func TestSession_applyCompose(t *testing.T) {
 		sess.store(two.ID(), result)
 
 		failed := map[container.ContainerID]error{}
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{one, two}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
 		assert.NotContains(t, failed, one.ID())

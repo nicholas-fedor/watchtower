@@ -9,7 +9,6 @@ import (
 	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
@@ -109,7 +108,7 @@ func (s *Session) Watching(log *zerolog.Logger, c *container.Container, params u
 func (s *Session) PrepareRebuilds(
 	log *zerolog.Logger,
 	ctx context.Context,
-	docker containerClient.Client,
+	docker ImageBuilder,
 	containers []*container.Container,
 	params updateParams.Params,
 	progress *state.Progress,
