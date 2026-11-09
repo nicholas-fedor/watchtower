@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Declare the client methods hooks, rebuild and cleanup use by @nicholas-fedor in [#3616](https://github.com/nicholas-fedor/watchtower/pull/3616)
 - Declare the client methods each API handler uses by @nicholas-fedor in [#3610](https://github.com/nicholas-fedor/watchtower/pull/3610)
 - Move the container filter types into the filters package by @nicholas-fedor in [#3608](https://github.com/nicholas-fedor/watchtower/pull/3608)
 - Move the container and image IDs into the container model by @nicholas-fedor in [#3606](https://github.com/nicholas-fedor/watchtower/pull/3606)
