@@ -12,11 +12,21 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
+
+// Client lists and removes containers and their images.
+type Client interface {
+	// ListContainers returns the containers that pass every filter.
+	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+	// StopAndRemoveContainer stops the container and removes it. The stop
+	// waits up to timeout.
+	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
+	// RemoveImageByID removes the image. The image name is used in logs.
+	RemoveImageByID(ctx context.Context, imageID container.ImageID, imageName string) error
+}
 
 // RemovedImageInfo represents information about an image that was cleaned up during update operations.
 // It tracks the image ID, container ID, image name, and the container that was using the old image before cleanup.
@@ -74,7 +84,7 @@ var (
 //   - int: Number of removed Watchtower containers.
 //   - error: Non-nil if removal fails, nil if single instance or successful removal.
 func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	cleanupImages bool,
 	scope string,
 	removeImageInfos *[]RemovedImageInfo,
@@ -158,7 +168,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 //   - int: Number of removed old Watchtower containers.
 //   - error: Non-nil if removal fails, nil if none found or successful removal.
 func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	cleanupImages bool,
 	currentContainerID container.ContainerID,
 	removeImageInfos *[]RemovedImageInfo,
@@ -556,7 +566,7 @@ func addExcessContainers(excessContainers, chainContainers []*container.Containe
 //   - int: Number of successfully removed containers.
 //   - error: Non-nil if any container removal failed or insufficient removals occurred.
 func removeExcessContainers(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	excessWatchtowerContainers []*container.Container,
 	cleanupImages bool,
 	currentContainer *container.Container,
@@ -797,7 +807,7 @@ func deduplicateByImageID(images []RemovedImageInfo) []RemovedImageInfo {
 //     container that used one.
 //   - error: Non-nil if any image removal failed, nil otherwise.
 func RemoveImages(log *zerolog.Logger, ctx context.Context,
-	client containerClient.Client,
+	client Client,
 	images []RemovedImageInfo,
 ) ([]RemovedImageInfo, error) {
 	// Return early if no images need removal.

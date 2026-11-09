@@ -11,7 +11,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	mockCleanup "github.com/nicholas-fedor/watchtower/internal/update/cleanup/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 )
 
@@ -129,8 +129,8 @@ func TestRemoveExcessWatchtowerInstances_ChainKeepsOtherContainers(t *testing.T)
 	app := chainTestContainer(chainAppID, "app", map[string]string{})
 
 	// The mock fails the test on any other stop.
-	client := mockContainerClient.NewMockClient(t)
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{current, oldA, app}, nil)
+	client := mockCleanup.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(listContainers(current, oldA, app))
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, oldA, mock.Anything).Return(nil).Once()
 
 	removed, err := RemoveExcessWatchtowerInstances(newTestLogger(t), t.Context(), client, false, "", nil, current)

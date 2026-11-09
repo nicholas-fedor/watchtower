@@ -14,13 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
@@ -35,7 +35,7 @@ func TestSession_build(t *testing.T) {
 
 		sess := NewSession(gitTestClient(t))
 		c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 
 		err := sess.build(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Commit: "abc"}, updateParams.Params{}, nil)
 		require.ErrorIs(t, err, errGitNotAssociated)
@@ -46,7 +46,7 @@ func TestSession_build(t *testing.T) {
 
 		sess := NewSession(gitTestClient(t))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 
 		err := sess.build(newTestLogger(t), t.Context(), docker, c, git.CheckResult{Stale: true}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil)
 		require.Error(t, err)
@@ -58,7 +58,7 @@ func TestSession_build(t *testing.T) {
 
 		sess := NewSession(gitTestClient(t))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -74,7 +74,7 @@ func TestSession_build(t *testing.T) {
 
 		sess := NewSession(gitTestClient(t))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
 
 		params := updateParams.Params{EnableChangelog: true, Git: gitConfig.Defaults{Enable: true}}
@@ -110,7 +110,7 @@ func TestSession_build(t *testing.T) {
 			labels.GitDockerfile: "build/docker/Dockerfile",
 			labels.GitContext:    ".",
 		})
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
 
 		err := sess.build(
@@ -140,7 +140,7 @@ func TestSession_build(t *testing.T) {
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 			labels.GitWatch: "yes",
 		})
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
 
 		err := sess.build(
@@ -168,7 +168,7 @@ func TestSession_build(t *testing.T) {
 
 		var tags []string
 
-		docker := mockContainerClient.NewMockClient(t)
+		docker := mockRebuild.NewMockImageBuilder(t)
 		docker.EXPECT().
 			BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Run(func(_ context.Context, _, _ string, got []string) {
@@ -199,7 +199,7 @@ func TestSession_build(t *testing.T) {
 			commit := "0123456789abcdef0123456789abcdef01234567"
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 
-			docker := mockContainerClient.NewMockClient(t)
+			docker := mockRebuild.NewMockImageBuilder(t)
 			docker.EXPECT().
 				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				Run(func(ctx context.Context, _, _ string, _ []string) {
@@ -230,7 +230,7 @@ func TestSession_build(t *testing.T) {
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 			commit := "0123456789abcdef0123456789abcdef01234567"
 
-			docker := mockContainerClient.NewMockClient(t)
+			docker := mockRebuild.NewMockImageBuilder(t)
 			docker.EXPECT().
 				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 				RunAndReturn(func(ctx context.Context, _, _ string, _ []string) (container.ImageID, error) {

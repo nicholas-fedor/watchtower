@@ -10,7 +10,6 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 )
 
@@ -38,7 +37,7 @@ const orphanedOrchestratorAge = 10 * time.Minute
 //   - error: Non-nil if listing or removal fails, nil on success.
 func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 	ctx context.Context,
-	client containerClient.Client,
+	client Client,
 ) (int, error) {
 	clogVal := log.With().
 		Str("function", "RemoveOrphanedOrchestrators").
