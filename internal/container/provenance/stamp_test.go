@@ -5,12 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
-	dockerImage "github.com/moby/moby/api/types/image"
-
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
-	typemocks "github.com/nicholas-fedor/watchtower/pkg/types/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
 func TestLastStamp(t *testing.T) {
@@ -27,7 +26,7 @@ func TestLastStamp(t *testing.T) {
 	t.Run("reads labels", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := LastStamp(testContainer(t, map[string]string{
+		commit, tag := LastStamp(testContainer(map[string]string{
 			labels.GitLastCommit: "  abc123  ",
 			labels.GitLastTag:    "v1.2.3",
 		}, "app:latest"))
@@ -38,7 +37,7 @@ func TestLastStamp(t *testing.T) {
 	t.Run("missing labels", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := LastStamp(testContainer(t, nil, "app:latest"))
+		commit, tag := LastStamp(testContainer(nil, "app:latest"))
 		assert.Empty(t, commit)
 		assert.Empty(t, tag)
 	})
@@ -50,7 +49,7 @@ func TestBaseline(t *testing.T) {
 	t.Run("stamp wins over image", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := Baseline(testContainer(t, map[string]string{
+		commit, tag := Baseline(testContainer(map[string]string{
 			labels.GitLastCommit: "stampsha",
 			labels.GitLastTag:    "v1.0.0",
 		}, "app:git-aaa111bbbbcc"))
@@ -61,7 +60,7 @@ func TestBaseline(t *testing.T) {
 	t.Run("image revision when no stamp", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := Baseline(imageContainer(t, "app:latest", "oci123", "v1.2.3"))
+		commit, tag := Baseline(imageContainer("app:latest", "oci123", "v1.2.3"))
 		assert.Equal(t, "oci123", commit)
 		assert.Equal(t, "v1.2.3", tag)
 	})
@@ -69,7 +68,7 @@ func TestBaseline(t *testing.T) {
 	t.Run("empty when unknown", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := Baseline(imageContainer(t, "app:latest", "", ""))
+		commit, tag := Baseline(imageContainer("app:latest", "", ""))
 		assert.Empty(t, commit)
 		assert.Empty(t, tag)
 	})
@@ -89,7 +88,7 @@ func TestImageRevision(t *testing.T) {
 	t.Run("git shortsha image name", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := imageRevision(imageContainer(t, "localhost:5000/app:git-aaa111bbbbcc", "", ""))
+		commit, tag := imageRevision(imageContainer("localhost:5000/app:git-aaa111bbbbcc", "", ""))
 		assert.Equal(t, "aaa111bbbbcc", commit)
 		assert.Empty(t, tag)
 	})
@@ -97,7 +96,7 @@ func TestImageRevision(t *testing.T) {
 	t.Run("ignores non git tags", func(t *testing.T) {
 		t.Parallel()
 
-		commit, tag := imageRevision(imageContainer(t, "app:latest", "", ""))
+		commit, tag := imageRevision(imageContainer("app:latest", "", ""))
 		assert.Empty(t, commit)
 		assert.Empty(t, tag)
 	})
@@ -114,43 +113,33 @@ func TestGitSHAFromRef(t *testing.T) {
 	assert.Empty(t, gitSHAFromRef(""))
 }
 
-// imageContainer returns a mock with an image name and optional OCI annotations.
+// imageContainer returns a container with an image name and optional OCI
+// annotations. Without annotations its image info is missing, as for an image
+// that is no longer present.
 //
 // Parameters:
-//   - t: Test handle.
-//   - imageName: ImageName() result.
+//   - imageName: Image reference the container runs.
 //   - revision: OCI revision label, or empty.
 //   - version: OCI version label, or empty.
 //
 // Returns:
-//   - *typemocks.MockContainer: Configured mock.
-func imageContainer(t *testing.T, imageName, revision, version string) *typemocks.MockContainer {
-	t.Helper()
-
-	c := typemocks.NewMockContainer(t)
-	c.EXPECT().GetLabel(labels.GitLastCommit).Return("", false).Maybe()
-	c.EXPECT().GetLabel(labels.GitLastTag).Return("", false).Maybe()
-	c.EXPECT().ImageName().Return(imageName).Maybe()
-
+//   - *container.Container: Container built from inspect data.
+func imageContainer(imageName, revision, version string) *container.Container {
 	if revision == "" && version == "" {
-		c.EXPECT().HasImageInfo().Return(false).Maybe()
-
-		return c
+		return modelfixture.ContainerWithoutImageInfo(containerfixture.WithImageName(imageName))
 	}
 
-	cfg := &dockerspec.DockerOCIImageConfig{}
-
-	cfg.Labels = map[string]string{}
+	imageLabels := map[string]string{}
 	if revision != "" {
-		cfg.Labels[oci.RevisionLabel] = revision
+		imageLabels[oci.RevisionLabel] = revision
 	}
 
 	if version != "" {
-		cfg.Labels[oci.VersionLabel] = version
+		imageLabels[oci.VersionLabel] = version
 	}
 
-	c.EXPECT().HasImageInfo().Return(true).Maybe()
-	c.EXPECT().ImageInfo().Return(&dockerImage.InspectResponse{Config: cfg}).Maybe()
-
-	return c
+	return modelfixture.Container(
+		containerfixture.WithImageName(imageName),
+		containerfixture.WithImageLabels(imageLabels),
+	)
 }
