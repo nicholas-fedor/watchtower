@@ -71,7 +71,7 @@ var withFilter = mock.MatchedBy(func([]types.Filter) bool { return true })
 type runTestState struct {
 	client    containerClient.Client
 	current   *container.Container
-	currentID types.ContainerID
+	currentID container.ContainerID
 }
 
 // setRunState sets the package variables run and runMain read, and restores
@@ -225,9 +225,9 @@ func runCalls(client *mockContainerClient.MockClient) []string {
 		case "StopAndRemoveContainer":
 			entry += fmt.Sprintf(" %s %s", containerLabel(call.Arguments.Get(1)), call.Arguments.Get(2))
 		case "RemoveImageByID":
-			entry += " " + string(call.Arguments.Get(1).(types.ImageID))
+			entry += " " + string(call.Arguments.Get(1).(container.ImageID))
 		case "GetCurrentWatchtowerContainer":
-			entry += " " + call.Arguments.Get(1).(types.ContainerID).ShortID()
+			entry += " " + call.Arguments.Get(1).(container.ContainerID).ShortID()
 		}
 
 		calls = append(calls, entry)
@@ -240,7 +240,7 @@ func runCalls(client *mockContainerClient.MockClient) []string {
 // argument by its short ID. It returns "none" for a nil container or an empty
 // ID.
 func containerLabel(arg any) string {
-	if id, ok := arg.(types.ContainerID); ok {
+	if id, ok := arg.(container.ContainerID); ok {
 		if id == "" {
 			return "none"
 		}
@@ -679,7 +679,7 @@ func TestRun_ScheduledUpdate(t *testing.T) {
 	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
-		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, container.ImageID, string, error) {
 			checks.Add(1)
 
 			return false, current.ImageID(), "", nil
@@ -873,7 +873,7 @@ func TestRun_APISharesUpdateLock(t *testing.T) {
 	// The update at startup's staleness check waits for the test. A second
 	// update, which a separate lock would let run, finds the container fresh.
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
-		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, container.ImageID, string, error) {
 			close(entered)
 			<-release
 
@@ -1037,7 +1037,7 @@ func runExitHelper(t *testing.T, helperCase string) {
 	mockClient := mockContainerClient.NewMockClient(t)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).
-		Run(func(_ context.Context, id types.ContainerID, policy dockerContainer.RestartPolicy) {
+		Run(func(_ context.Context, id container.ContainerID, policy dockerContainer.RestartPolicy) {
 			fmt.Fprintf(os.Stderr, "SetRestartPolicy %s %s\n", containerLabel(id), policy.Name)
 		}).Return(nil)
 

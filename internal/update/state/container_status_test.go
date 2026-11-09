@@ -6,15 +6,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestContainerStatus_ID(t *testing.T) {
 	tests := []struct {
 		name string
 		u    *ContainerStatus
-		want types.ContainerID
+		want container.ContainerID
 	}{
 		{
 			name: "valid container ID",
@@ -66,7 +66,7 @@ func TestContainerStatus_CurrentImageID(t *testing.T) {
 	tests := []struct {
 		name string
 		u    *ContainerStatus
-		want types.ImageID
+		want container.ImageID
 	}{
 		{
 			name: "valid current image ID",
@@ -92,7 +92,7 @@ func TestContainerStatus_LatestImageID(t *testing.T) {
 	tests := []struct {
 		name string
 		u    *ContainerStatus
-		want types.ImageID
+		want container.ImageID
 	}{
 		{
 			name: "valid latest image ID",

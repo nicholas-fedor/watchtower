@@ -6,9 +6,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestReport verifies that each state puts its container in the matching
@@ -34,7 +34,7 @@ func TestReport(t *testing.T) {
 	require.Len(t, report.Stale(), 1)
 	assert.True(t, report.Stale()[0].IsMonitorOnly())
 
-	ids := map[types.ContainerID]bool{}
+	ids := map[container.ContainerID]bool{}
 	for _, c := range report.All() {
 		assert.False(t, ids[c.ID()], "duplicate container ID %s", c.ID())
 		ids[c.ID()] = true

@@ -22,7 +22,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -45,7 +44,7 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 func TestUpdateFromContainer(t *testing.T) {
 	type args struct {
 		container *container.Container
-		newImage  types.ImageID
+		newImage  container.ImageID
 		state     State
 		params    updateParams.Params
 	}
@@ -308,7 +307,7 @@ func TestProgress_AddFailed(t *testing.T) {
 func TestProgress_AddScanned(t *testing.T) {
 	type args struct {
 		container *container.Container
-		newImage  types.ImageID
+		newImage  container.ImageID
 		params    updateParams.Params
 	}
 
@@ -431,7 +430,7 @@ func TestProgress_AddScanned(t *testing.T) {
 
 func TestProgress_UpdateFailed(t *testing.T) {
 	type args struct {
-		failures map[types.ContainerID]error
+		failures map[container.ContainerID]error
 	}
 
 	tests := []struct {
@@ -446,7 +445,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
 			},
 			args: args{
-				failures: map[types.ContainerID]error{
+				failures: map[container.ContainerID]error{
 					"cont1": errors.New("update failed"),
 				},
 			},
@@ -465,7 +464,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 				"cont2": &ContainerStatus{state: UpdatedState, containerID: "cont2"},
 			},
 			args: args{
-				failures: map[types.ContainerID]error{
+				failures: map[container.ContainerID]error{
 					"cont1": errors.New("timeout"),
 					"cont2": errors.New("permission denied"),
 				},
@@ -489,7 +488,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
 			},
 			args: args{
-				failures: map[types.ContainerID]error{},
+				failures: map[container.ContainerID]error{},
 			},
 			want: Progress{
 				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
@@ -501,7 +500,7 @@ func TestProgress_UpdateFailed(t *testing.T) {
 				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
 			},
 			args: args{
-				failures: map[types.ContainerID]error{
+				failures: map[container.ContainerID]error{
 					"cont2": errors.New("container not found"),
 				},
 			},
@@ -667,7 +666,7 @@ func TestProgress_Add(t *testing.T) {
 
 func TestProgress_MarkForUpdate(t *testing.T) {
 	type args struct {
-		containerID types.ContainerID
+		containerID container.ContainerID
 	}
 
 	tests := []struct {
@@ -828,7 +827,7 @@ func TestProgress_Report(t *testing.T) {
 
 func TestProgress_MarkRestarted(t *testing.T) {
 	type args struct {
-		containerID types.ContainerID
+		containerID container.ContainerID
 	}
 
 	tests := []struct {
@@ -976,7 +975,7 @@ func TestProgress_MarkRestarted_UpdateFailed_Integration(t *testing.T) {
 	}
 
 	// Then mark as failed
-	failures := map[types.ContainerID]error{
+	failures := map[container.ContainerID]error{
 		"cont1": errors.New("restart failed"),
 	}
 	m.UpdateFailed(newTestLogger(t), failures)
@@ -1119,7 +1118,7 @@ func TestProgress_MarkRestarted_Concurrent(t *testing.T) {
 
 func TestProgress_SetCooldownInfo(t *testing.T) {
 	type args struct {
-		containerID types.ContainerID
+		containerID container.ContainerID
 		age         string
 		delay       string
 		remaining   string
@@ -1368,16 +1367,16 @@ func TestApplyReportMeta(t *testing.T) {
 func TestProgressSetLatestImage(t *testing.T) {
 	t.Parallel()
 
-	id := types.ContainerID("cont1")
+	id := container.ContainerID("cont1")
 	progress := Progress{
 		id: &ContainerStatus{containerID: id, newImage: "old"},
 	}
 
 	progress.SetLatestImage(newTestLogger(t), id, "sha256:gitbuilt")
-	assert.Equal(t, types.ImageID("sha256:gitbuilt"), progress[id].LatestImageID())
+	assert.Equal(t, container.ImageID("sha256:gitbuilt"), progress[id].LatestImageID())
 
 	progress.SetLatestImage(newTestLogger(t), "missing", "ignored")
-	assert.NotContains(t, progress, types.ContainerID("missing"))
+	assert.NotContains(t, progress, container.ContainerID("missing"))
 }
 
 // TestProgressSetNewContainerID verifies that the new container ID is recorded
@@ -1386,14 +1385,14 @@ func TestProgressSetNewContainerID(t *testing.T) {
 	t.Parallel()
 
 	log := newTestLogger(t)
-	id := types.ContainerID("cont1")
+	id := container.ContainerID("cont1")
 	progress := Progress{id: &ContainerStatus{containerID: id}}
 
 	progress.SetNewContainerID(log, id, "newcont1")
-	assert.Equal(t, types.ContainerID("newcont1"), progress[id].NewContainerID())
+	assert.Equal(t, container.ContainerID("newcont1"), progress[id].NewContainerID())
 
 	progress.SetNewContainerID(log, "missing", "ignored")
-	assert.NotContains(t, progress, types.ContainerID("missing"))
+	assert.NotContains(t, progress, container.ContainerID("missing"))
 }
 
 // TestProgressSetReportMeta verifies that the report metadata is set on the
@@ -1402,7 +1401,7 @@ func TestProgressSetReportMeta(t *testing.T) {
 	t.Parallel()
 
 	log := newTestLogger(t)
-	id := types.ContainerID("cont1")
+	id := container.ContainerID("cont1")
 	progress := Progress{id: &ContainerStatus{containerID: id}}
 
 	progress.SetReportMeta(log, id, provenance.ReportMeta{
@@ -1413,7 +1412,7 @@ func TestProgressSetReportMeta(t *testing.T) {
 	assert.Equal(t, "https://github.com/org/app/releases", progress[id].Changelog())
 
 	progress.SetReportMeta(log, "missing", provenance.ReportMeta{GitRepo: "ignored"})
-	assert.NotContains(t, progress, types.ContainerID("missing"))
+	assert.NotContains(t, progress, container.ContainerID("missing"))
 }
 
 // TestProgressRecordRestart verifies that a recreated container gets its new
@@ -1436,14 +1435,14 @@ func TestProgressRecordRestart(t *testing.T) {
 			t.Parallel()
 
 			log := newTestLogger(t)
-			id := types.ContainerID("cont1")
+			id := container.ContainerID("cont1")
 			progress := Progress{id: &ContainerStatus{containerID: id, state: UpdatedState}}
 
 			c := modelfixture.Container(containerfixture.WithID(string(id)))
 			c.SetStale(tt.stale)
 
 			progress.RecordRestart(log, c, "newcont1")
-			assert.Equal(t, types.ContainerID("newcont1"), progress[id].NewContainerID())
+			assert.Equal(t, container.ContainerID("newcont1"), progress[id].NewContainerID())
 			assert.Equal(t, tt.wantState, progress[id].state)
 		})
 	}

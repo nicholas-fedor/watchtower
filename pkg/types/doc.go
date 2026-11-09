@@ -1,3 +1,3 @@
-// Package types defines the value types and the filterable container interface
-// shared across Watchtower's packages.
+// Package types defines the container filter types and the Docker system and
+// image disk usage values shared across Watchtower's packages.
 package types

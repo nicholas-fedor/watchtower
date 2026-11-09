@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // dependencySorter handles topological sorting by dependencies.
@@ -328,15 +327,15 @@ func identifierIndex(log *zerolog.Logger, containers []*container.Container) (ma
 //   - useComposeDependsOn: Whether Links() should include Compose depends_on labels.
 //
 // Returns:
-//   - map[types.ContainerID][]types.ContainerID: Dependent ID to dependency IDs.
+//   - map[container.ContainerID][]container.ContainerID: Dependent ID to dependency IDs.
 //   - error: Non-nil when dependency identifiers collide.
 func ContainerDependencies(
 	log *zerolog.Logger,
 	containers []*container.Container,
 	useComposeDependsOn bool,
-) (map[types.ContainerID][]types.ContainerID, error) {
+) (map[container.ContainerID][]container.ContainerID, error) {
 	if len(containers) == 0 {
-		return map[types.ContainerID][]types.ContainerID{}, nil
+		return map[container.ContainerID][]container.ContainerID{}, nil
 	}
 
 	containerMap, _, adjacency, _, err := buildDependencyGraph(log, containers, useComposeDependsOn)
@@ -344,8 +343,8 @@ func ContainerDependencies(
 		return nil, err
 	}
 
-	dependencies := make(map[types.ContainerID][]types.ContainerID, len(containers))
-	seen := make(map[types.ContainerID]map[types.ContainerID]struct{}, len(containers))
+	dependencies := make(map[container.ContainerID][]container.ContainerID, len(containers))
+	seen := make(map[container.ContainerID]map[container.ContainerID]struct{}, len(containers))
 
 	for dependencyKey, dependents := range adjacency {
 		dependency, ok := containerMap[dependencyKey]
@@ -367,7 +366,7 @@ func ContainerDependencies(
 			}
 
 			if seen[dependentID] == nil {
-				seen[dependentID] = make(map[types.ContainerID]struct{})
+				seen[dependentID] = make(map[container.ContainerID]struct{})
 			}
 
 			if _, exists := seen[dependentID][dependencyID]; exists {

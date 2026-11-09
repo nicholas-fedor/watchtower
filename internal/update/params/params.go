@@ -16,7 +16,7 @@ import (
 type Params struct {
 	Filter              types.Filter            // Container filter.
 	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
-	CurrentContainerID  types.ContainerID       // ID of the current container being updated.
+	CurrentContainerID  container.ContainerID   // ID of the current container being updated.
 	Git                 gitConfig.Defaults      // Credential-free Git association settings.
 	Registry            registryConfig.Registry // Settings for registry requests.
 	updateConfig.Policy                         // Settings that a container's labels can override.

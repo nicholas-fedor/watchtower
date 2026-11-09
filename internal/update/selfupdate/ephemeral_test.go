@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -82,7 +81,7 @@ func expectOrchestrator(t *testing.T, source *container.Container, chain string,
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().
 		CreateEphemeralOrchestrator(mock.Anything, source, "watchtower:latest", chain, cleanup).
-		Return(types.ContainerID("orchestrator-id"), err).Once()
+		Return(container.ContainerID("orchestrator-id"), err).Once()
 
 	return client
 }
@@ -231,7 +230,7 @@ func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
 			client := mockContainerClient.NewMockClient(t)
 			client.EXPECT().
 				CreateEphemeralOrchestrator(mock.Anything, source, mock.Anything, mock.Anything, mock.Anything).
-				Return(types.ContainerID("orchestrator"), tt.createErr).Once()
+				Return(container.ContainerID("orchestrator"), tt.createErr).Once()
 
 			var out bytes.Buffer
 
@@ -291,7 +290,7 @@ func TestEphemeralSelfUpdate_OutlivesCanceledUpdate(t *testing.T) {
 			}),
 			source, "watchtower:latest", "source-canceled", false,
 		).
-		Return(types.ContainerID("orchestrator-id"), nil).Once()
+		Return(container.ContainerID("orchestrator-id"), nil).Once()
 
 	_, renamed, err := StartOrchestrator(newTestLogger(t), ctx, client, source, updateParams.Params{})
 	require.NoError(t, err)

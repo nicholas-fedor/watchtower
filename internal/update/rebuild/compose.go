@@ -20,7 +20,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // composeServices is a batch's members grouped by Compose service, ready to
@@ -62,7 +61,7 @@ func (s *Session) applyCompose(
 	batch *composeBatch,
 	params updateParams.Params,
 	progress *state.Progress,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 ) {
 	if batch == nil || len(batch.members) == 0 {
 		return
@@ -132,7 +131,7 @@ func groupComposeServices(
 	log *zerolog.Logger,
 	batch *composeBatch,
 	params updateParams.Params,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 ) composeServices {
 	services := composeServices{
 		names:   make([]string, 0, len(batch.members)),
@@ -187,7 +186,7 @@ func (s *Session) checkoutCompose(
 	batch *composeBatch,
 	commit string,
 	params updateParams.Params,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 ) bool {
 	checkout := s.checkout
 	if checkout == nil {
@@ -265,7 +264,7 @@ func (s *Session) runComposeApply(
 	services composeServices,
 	params updateParams.Params,
 	progress *state.Progress,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 ) ([]composeApply.Container, bool) {
 	applier := s.apply
 	if applier == nil {
@@ -316,7 +315,7 @@ func (s *Session) recordComposeResults(
 	applied []composeApply.Container,
 	params updateParams.Params,
 	progress *state.Progress,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 ) {
 	appliedByService := make(map[string][]composeApply.Container, len(applied))
 	for _, item := range applied {
@@ -349,7 +348,7 @@ func (s *Session) recordComposeResults(
 			}
 		}
 
-		matched := make(map[types.ContainerID]struct{}, len(items))
+		matched := make(map[container.ContainerID]struct{}, len(items))
 
 		for _, member := range members {
 			c := member.container
@@ -434,7 +433,7 @@ func (s *Session) recordCompose(
 		if item.ImageID != "" {
 			s.built[c.ID()] = item.ImageID
 		} else {
-			s.built[c.ID()] = types.ImageID("git:" + result.Commit)
+			s.built[c.ID()] = container.ImageID("git:" + result.Commit)
 		}
 	} else {
 		s.applied[c.ID()] = struct{}{}
@@ -489,7 +488,7 @@ func (s *Session) recordCompose(
 func markComposeResultFailures(
 	items []composeApply.Container,
 	progress *state.Progress,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 	err error,
 ) {
 	if progress == nil {
@@ -537,14 +536,14 @@ func (s *Session) recordComposeReplicas(
 	params updateParams.Params,
 	progress *state.Progress,
 	log *zerolog.Logger,
-	matched map[types.ContainerID]struct{},
+	matched map[container.ContainerID]struct{},
 ) {
 	if len(members) == 0 {
 		return
 	}
 
 	if matched == nil {
-		matched = make(map[types.ContainerID]struct{}, len(items))
+		matched = make(map[container.ContainerID]struct{}, len(items))
 	}
 
 	statuses := make(map[string]*state.ContainerStatus)
@@ -589,7 +588,7 @@ func (s *Session) recordComposeReplicas(
 			if item.ImageID != "" {
 				s.built[status.ID()] = item.ImageID
 			} else {
-				s.built[status.ID()] = types.ImageID("git:" + representative.result.Commit)
+				s.built[status.ID()] = container.ImageID("git:" + representative.result.Commit)
 			}
 		} else {
 			s.applied[status.ID()] = struct{}{}
@@ -625,7 +624,7 @@ func (s *Session) recordComposeReplicas(
 //
 // Returns:
 //   - none.
-func (s *Session) acceptComposeApply(batch *composeBatch, failed map[types.ContainerID]error) {
+func (s *Session) acceptComposeApply(batch *composeBatch, failed map[container.ContainerID]error) {
 	if s == nil || s.client == nil || batch == nil {
 		return
 	}
@@ -701,7 +700,7 @@ func failComposeBatch(
 	log *zerolog.Logger,
 	batch *composeBatch,
 	params updateParams.Params,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 	err error,
 ) {
 	failComposeBatchWithRuntime(log, batch, params, failed, err, false)
@@ -723,7 +722,7 @@ func failComposeBatchWithRuntime(
 	log *zerolog.Logger,
 	batch *composeBatch,
 	params updateParams.Params,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 	err error,
 	runtimeMayHaveChanged bool,
 ) {

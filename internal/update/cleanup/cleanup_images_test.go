@@ -16,7 +16,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // cleanupTestWatchtower returns a running Watchtower container with the given
@@ -47,8 +46,8 @@ func imageEntries(infos []RemovedImageInfo) []string {
 }
 
 // removedImageIDs returns the image ID of each entry.
-func removedImageIDs(infos []RemovedImageInfo) []types.ImageID {
-	ids := make([]types.ImageID, 0, len(infos))
+func removedImageIDs(infos []RemovedImageInfo) []container.ImageID {
+	ids := make([]container.ImageID, 0, len(infos))
 	for _, info := range infos {
 		ids = append(ids, info.ImageID)
 	}
@@ -185,7 +184,7 @@ func TestRemoveExcessContainers_NoCallerListRemovesImages(t *testing.T) {
 
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, mock.Anything, mock.Anything).Return(nil).Times(2)
-	client.EXPECT().RemoveImageByID(mock.Anything, types.ImageID("org/watchtower:1"), mock.Anything).
+	client.EXPECT().RemoveImageByID(mock.Anything, container.ImageID("org/watchtower:1"), mock.Anything).
 		Return(nil).Once()
 
 	removed, err := removeExcessContainers(newTestLogger(t), t.Context(), client,

@@ -18,7 +18,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testGraph returns the dependency graph of the given containers, all of them
@@ -286,7 +285,7 @@ func TestMarkImplicitRestarts(t *testing.T) {
 
 			var all, monitored, unmonitored []*container.Container
 
-			excluded := map[types.ContainerID]struct{}{}
+			excluded := map[container.ContainerID]struct{}{}
 
 			for _, spec := range tt.specs {
 				c := spec.build()
@@ -426,7 +425,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 			containers,
 			updateParams.Params{NoRestart: true},
 			// The update excludes the containers Git built without a restart.
-			map[types.ContainerID]struct{}{app.ID(): {}},
+			map[container.ContainerID]struct{}{app.ID(): {}},
 		)
 
 		assert.False(t, dependent.IsLinkedToRestarting())
@@ -474,7 +473,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 			containers,
 			containers,
 			updateParams.Params{},
-			map[types.ContainerID]struct{}{excluded.ID(): {}},
+			map[container.ContainerID]struct{}{excluded.ID(): {}},
 		)
 
 		assert.False(t, dependent.IsLinkedToRestarting())

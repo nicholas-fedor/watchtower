@@ -14,11 +14,11 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerClient "github.com/moby/moby/client"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // expectInspectState expects the cleanup inspect of the target container and
@@ -139,6 +139,6 @@ func TestStartTargetContainer(t *testing.T) {
 		err := startTargetContainer(t.Context(), api, log, newRunningSource(), testTargetID, true)
 		require.NoError(t, err)
 		assert.Contains(t, logOutput.String(), "Started new container")
-		assert.Contains(t, logOutput.String(), "new_id="+types.ContainerID(testTargetID).ShortID())
+		assert.Contains(t, logOutput.String(), "new_id="+container.ContainerID(testTargetID).ShortID())
 	})
 }

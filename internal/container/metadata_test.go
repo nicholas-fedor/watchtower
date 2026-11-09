@@ -17,7 +17,6 @@ import (
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 func TestContainer_GetLifecyclePreCheckCommand(t *testing.T) {
@@ -1749,56 +1748,56 @@ func TestIsWatchtowerParent(t *testing.T) {
 	t.Run("should return false for empty chain", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("test-id"), "")
+		result := IsWatchtowerParent(ContainerID("test-id"), "")
 		assert.False(t, result)
 	})
 
 	t.Run("should return false for empty ID", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID(""), "id1,id2")
+		result := IsWatchtowerParent(ContainerID(""), "id1,id2")
 		assert.False(t, result)
 	})
 
 	t.Run("should return true when ID is at start of chain", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("test-id"), "test-id,id2,id3")
+		result := IsWatchtowerParent(ContainerID("test-id"), "test-id,id2,id3")
 		assert.True(t, result)
 	})
 
 	t.Run("should return true when ID is in middle of chain", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("id2"), "id1,id2,id3")
+		result := IsWatchtowerParent(ContainerID("id2"), "id1,id2,id3")
 		assert.True(t, result)
 	})
 
 	t.Run("should return true when ID is at end of chain", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("id3"), "id1,id2,id3")
+		result := IsWatchtowerParent(ContainerID("id3"), "id1,id2,id3")
 		assert.True(t, result)
 	})
 
 	t.Run("should return true for single ID chain", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("test-id"), "test-id")
+		result := IsWatchtowerParent(ContainerID("test-id"), "test-id")
 		assert.True(t, result)
 	})
 
 	t.Run("should return false when ID is not in chain", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("test-id"), "id1,id2,id3")
+		result := IsWatchtowerParent(ContainerID("test-id"), "id1,id2,id3")
 		assert.False(t, result)
 	})
 
 	t.Run("should handle chains with spaces around commas", func(t *testing.T) {
 		t.Parallel()
 
-		result := IsWatchtowerParent(types.ContainerID("id2"), "id1, id2 , id3")
+		result := IsWatchtowerParent(ContainerID("id2"), "id1, id2 , id3")
 		assert.True(t, result)
 	})
 }

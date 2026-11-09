@@ -10,6 +10,7 @@ import (
 	"github.com/distribution/reference"
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
@@ -92,7 +93,7 @@ func excludeOldWatchtowerFilter(c types.FilterableContainer) bool {
 // Returns:
 //   - bool: True if the container is an old Watchtower container.
 func IsOldWatchtower(c types.FilterableContainer) bool {
-	return c.IsWatchtower() && strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), types.WatchtowerOldPrefix)
+	return c.IsWatchtower() && strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), container.WatchtowerOldPrefix)
 }
 
 // excludeOldWatchtowerFilterChain wraps a base filter with old

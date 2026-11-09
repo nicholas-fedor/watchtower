@@ -13,7 +13,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdateAction_MonitorOnly verifies that monitor-only containers, set by
@@ -67,7 +66,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 
 				require.NoError(t, err)
 				require.Len(t, report.Updated(), 1)
-				assert.Contains(t, removedImageIDs(cleanupImageInfos), types.ImageID("fake-image1:latest"))
+				assert.Contains(t, removedImageIDs(cleanupImageInfos), container.ImageID("fake-image1:latest"))
 				require.Len(t, cleanupImageInfos, 1)
 				assert.Equal(t, int32(0), client.TestData.TriedToRemoveImageCount.Load(), "RemoveImageByID should not be called during Update")
 			})
@@ -149,7 +148,7 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 
 					require.NoError(t, err)
 					require.Len(t, report.Updated(), 1)
-					assert.Contains(t, removedImageIDs(cleanupImageInfos), types.ImageID("fake-image2:latest"))
+					assert.Contains(t, removedImageIDs(cleanupImageInfos), container.ImageID("fake-image2:latest"))
 					require.Len(t, cleanupImageInfos, 1)
 					assert.Equal(t, int32(0), client.TestData.TriedToRemoveImageCount.Load(), "RemoveImageByID should not be called during Update")
 				})

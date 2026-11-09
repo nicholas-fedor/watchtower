@@ -33,7 +33,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/staleness"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for update operations.
@@ -267,7 +266,7 @@ func update(
 	// kept out of the dependency sorts and implicit restarts below, so a cycle
 	// cannot fail the session or be restarted through a link to an updated
 	// container.
-	inCycle := make(map[types.ContainerID]struct{})
+	inCycle := make(map[container.ContainerID]struct{})
 
 	var cycleMembers []*container.Container
 	if graphErr == nil {
@@ -391,7 +390,7 @@ func update(
 
 			var (
 				stale       bool
-				newestImage types.ImageID
+				newestImage container.ImageID
 				newDigest   string
 				gitWatched  bool
 				checkErr    error
@@ -622,7 +621,7 @@ func update(
 		Msg("Completed container staleness check")
 
 	// Build a map for a lookup of containers by ID.
-	containerByID := make(map[types.ContainerID]*container.Container, len(allContainers))
+	containerByID := make(map[container.ContainerID]*container.Container, len(allContainers))
 	for _, ac := range allContainers {
 		containerByID[ac.ID()] = ac
 	}
@@ -704,7 +703,7 @@ func update(
 		Int("restart_count", len(allContainersToRestart)).
 		Msg("Prepared containers for restart")
 
-	gitFailed := make(map[types.ContainerID]error)
+	gitFailed := make(map[container.ContainerID]error)
 	gitSession.PrepareRebuilds(
 		log,
 		ctx,
@@ -719,7 +718,7 @@ func update(
 	// A failed Git apply cleared Stale. Recompute linked restarts so those
 	// dependencies are not stopped. Containers that are still stale stay anchors.
 	// Cycle members stay excluded, as in the first pass.
-	excluded := make(map[types.ContainerID]struct{}, len(inCycle))
+	excluded := make(map[container.ContainerID]struct{}, len(inCycle))
 	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
 	maps.Copy(excluded, inCycle)
 
@@ -850,7 +849,7 @@ func skipFailedUpdateCheck(
 // Returns:
 //   - []*container.Container: The other containers, in listed order.
 func unmonitoredContainers(allContainers, monitored []*container.Container) []*container.Container {
-	isMonitored := make(map[types.ContainerID]bool, len(monitored))
+	isMonitored := make(map[container.ContainerID]bool, len(monitored))
 	for _, c := range monitored {
 		isMonitored[c.ID()] = true
 	}

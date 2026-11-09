@@ -22,11 +22,10 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // handoffNewID is the ID of the replacement container the mocked client starts.
-const handoffNewID types.ContainerID = "wt-new-id"
+const handoffNewID container.ContainerID = "wt-new-id"
 
 // createEphemeralHandoffContainer builds a running Watchtower mock used by
 // orchestrateSelfUpdate handoff tests.
@@ -102,7 +101,7 @@ func expectHandoffStart(client *mockContainerClient.MockClient, old *container.C
 
 	return handoffCalls{
 		stop: client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil).Once(),
-		rename: client.EXPECT().RenameContainer(mock.Anything, old, types.WatchtowerOldPrefix+old.ID().ShortID()).
+		rename: client.EXPECT().RenameContainer(mock.Anything, old, container.WatchtowerOldPrefix+old.ID().ShortID()).
 			Return(nil).Once(),
 		start: client.EXPECT().StartContainer(mock.Anything, old).Return(newID, startErr).Once(),
 	}

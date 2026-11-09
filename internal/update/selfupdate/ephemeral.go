@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // orchestratorTimeout defines the maximum duration for the orchestrator to complete.
@@ -103,7 +102,7 @@ var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 //   - config: Update parameters.
 //
 // Returns:
-//   - types.ContainerID: Empty string (the new container's ID is not known to the caller).
+//   - container.ContainerID: Empty string (the new container's ID is not known to the caller).
 //   - bool: True so the dying process skips image cleanup. The orchestrator
 //     removes the old container and, when cleanup is enabled, the old image.
 //   - error: Non-nil if orchestrator creation fails.
@@ -111,7 +110,7 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	sourceContainer *container.Container,
 	config updateParams.Params,
-) (types.ContainerID, bool, error) {
+) (container.ContainerID, bool, error) {
 	clogVal := log.With().
 		Str("container", sourceContainer.Name()).
 		Str("image", sourceContainer.ImageName()).
@@ -524,7 +523,7 @@ func renameOldContainerForHandoff(
 		return false, nil
 	}
 
-	targetName := types.WatchtowerOldPrefix + oldContainer.ID().ShortID()
+	targetName := container.WatchtowerOldPrefix + oldContainer.ID().ShortID()
 	clog.Debug().
 		Str("target_name", targetName).
 		Msg("Renaming stopped Watchtower container to free original name")
@@ -645,7 +644,7 @@ func cleanupFailedNewContainer(
 	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
-	newContainerID types.ContainerID,
+	newContainerID container.ContainerID,
 ) {
 	if newContainerID == "" {
 		return
@@ -705,7 +704,7 @@ func inspectOldContainer(
 
 	oldContainer, err := client.GetContainer(
 		ctx,
-		types.ContainerID(oldID),
+		container.ContainerID(oldID),
 	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
@@ -867,7 +866,7 @@ func removeOldImage(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	imageID types.ImageID,
+	imageID container.ImageID,
 	imageName string,
 ) {
 	if imageID == "" {
@@ -933,14 +932,14 @@ func removeOldImage(
 //   - oldContainer: The old container whose config is used for the new one.
 //
 // Returns:
-//   - types.ContainerID: ID of the newly created container.
+//   - container.ContainerID: ID of the newly created container.
 //   - error: Non-nil if creation or starting fails.
 func createAndStartNewContainer(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
-) (types.ContainerID, error) {
+) (container.ContainerID, error) {
 	clog.Debug().Msg("Creating and starting new Watchtower container")
 
 	newContainerID, err := client.StartContainer(
@@ -975,7 +974,7 @@ func ensureContainerRunning(
 	ctx context.Context,
 	client containerClient.Client,
 	clog *zerolog.Logger,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 ) error {
 	clog.Debug().
 		Str("new_id", containerID.ShortID()).

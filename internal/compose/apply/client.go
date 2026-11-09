@@ -18,7 +18,7 @@ import (
 	dockerFlags "github.com/docker/cli/cli/flags"
 
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // Client applies a Compose project through docker/compose v5.
@@ -46,11 +46,11 @@ type Container struct {
 	// Name is the container name from compose ps, used to match replicas.
 	Name string
 	// ID is the container ID that compose ps reports.
-	ID types.ContainerID
+	ID container.ContainerID
 	// ImageID is the ID of the image the container runs, from compose images,
 	// or the container's image reference when that is already an image ID.
 	// It is empty when neither is known.
-	ImageID types.ImageID
+	ImageID container.ImageID
 }
 
 // NewClient returns an applier that talks to the Docker daemon on first Apply.
@@ -335,7 +335,7 @@ func listApplied(
 		out = append(out, Container{
 			Service: summary.Service,
 			Name:    summary.Name,
-			ID:      types.ContainerID(summary.ID),
+			ID:      container.ContainerID(summary.ID),
 			ImageID: appliedImageID(summary, images),
 		})
 	}
@@ -350,16 +350,16 @@ func listApplied(
 //   - images: compose images keyed by container name.
 //
 // Returns:
-//   - types.ImageID: Inspected ID, a sha256: reference, or empty.
-func appliedImageID(summary api.ContainerSummary, images map[string]api.ImageSummary) types.ImageID {
+//   - container.ImageID: Inspected ID, a sha256: reference, or empty.
+func appliedImageID(summary api.ContainerSummary, images map[string]api.ImageSummary) container.ImageID {
 	if images != nil {
 		if img, ok := images[summary.Name]; ok && img.ID != "" {
-			return types.ImageID(img.ID)
+			return container.ImageID(img.ID)
 		}
 	}
 
 	if strings.HasPrefix(summary.Image, "sha256:") {
-		return types.ImageID(summary.Image)
+		return container.ImageID(summary.Image)
 	}
 
 	return ""

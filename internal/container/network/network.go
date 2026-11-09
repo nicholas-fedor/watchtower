@@ -12,7 +12,6 @@ import (
 	dockerAPIVersion "github.com/moby/moby/client/pkg/versions"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Errors for network configuration operations.
@@ -143,7 +142,7 @@ func EmptyConfig() *dockerNetwork.NetworkingConfig {
 //   - error: Non-nil if sourceEndpoint is nil, nil otherwise.
 func processEndpoint(log *zerolog.Logger,
 	sourceEndpoint *dockerNetwork.EndpointSettings,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
 ) (*dockerNetwork.EndpointSettings, error) {
@@ -339,7 +338,7 @@ func onlyGeneratedMacs(sourceContainer *container.Container, processedConfig *do
 //     networks, legacy API versions, and other expected absences of MAC addresses.
 func validateMacAddresses(log *zerolog.Logger,
 	config *dockerNetwork.NetworkingConfig,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 	clientVersion string,
 	isHostNetwork bool,
 	sourceContainer *container.Container,

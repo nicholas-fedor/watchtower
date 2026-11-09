@@ -19,7 +19,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testContainerName is used for testing self-referencing dependency scenarios.
@@ -596,7 +595,7 @@ func TestContainerModel(t *testing.T) {
 
 				container := newMetadataContainer()
 				imageID := container.ImageID()
-				assert.Equal(t, types.ImageID("image_id"), imageID)
+				assert.Equal(t, ImageID("image_id"), imageID)
 			})
 
 			t.Run("returns empty string for ImageID when imageInfo is nil", func(t *testing.T) {
@@ -605,7 +604,7 @@ func TestContainerModel(t *testing.T) {
 				container := MockContainer(containerfixture.WithPortBindings())
 				container.imageInfo = nil
 				imageID := container.ImageID()
-				assert.Equal(t, types.ImageID(""), imageID)
+				assert.Equal(t, ImageID(""), imageID)
 			})
 		})
 

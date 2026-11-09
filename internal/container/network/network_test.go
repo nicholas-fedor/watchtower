@@ -14,10 +14,10 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // testShortID is the short ID of the container whose endpoint aliases the
@@ -388,7 +388,7 @@ func Test_processEndpoint(t *testing.T) {
 						IPv4Address: netip.MustParseAddr("172.17.0.2"),
 					},
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -415,7 +415,7 @@ func Test_processEndpoint(t *testing.T) {
 					MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -435,7 +435,7 @@ func Test_processEndpoint(t *testing.T) {
 					MacAddress: dockerNetwork.HardwareAddr("aa:bb:cc:dd:ee:ff"),
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -455,7 +455,7 @@ func Test_processEndpoint(t *testing.T) {
 					MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
 					IPAddress:  netip.Addr{},
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -475,7 +475,7 @@ func Test_processEndpoint(t *testing.T) {
 					MacAddress: mustParseMAC(t, "02:42:ac:11:00:02"),
 					IPAddress:  netip.MustParseAddr("::1"),
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -495,7 +495,7 @@ func Test_processEndpoint(t *testing.T) {
 					MacAddress: dockerNetwork.HardwareAddr{},
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -517,7 +517,7 @@ func Test_processEndpoint(t *testing.T) {
 					MacAddress: mustParseMAC(t, "02:42:de:ad:be:ef"),
 					IPAddress:  netip.MustParseAddr("172.17.0.2"),
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -535,7 +535,7 @@ func Test_processEndpoint(t *testing.T) {
 				sourceEndpoint := &dockerNetwork.EndpointSettings{
 					Aliases: []string{"container_id", "alias1", "alias2", "other_id"},
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -560,7 +560,7 @@ func Test_processEndpoint(t *testing.T) {
 						},
 					},
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -581,7 +581,7 @@ func Test_processEndpoint(t *testing.T) {
 				sourceEndpoint := &dockerNetwork.EndpointSettings{
 					Aliases: []string{},
 				}
-				containerID := types.ContainerID("test_container_id")
+				containerID := container.ContainerID("test_container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -601,7 +601,7 @@ func Test_processEndpoint(t *testing.T) {
 					Links:      []string{"other_container:alias"},
 					EndpointID: "endpoint_id",
 				}
-				containerID := types.ContainerID("test_container_id")
+				containerID := container.ContainerID("test_container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -639,7 +639,7 @@ func Test_processEndpoint(t *testing.T) {
 						IPv4Address: netip.MustParseAddr("172.17.0.2"),
 					},
 				}
-				containerID := types.ContainerID("container_id")
+				containerID := container.ContainerID("container_id")
 
 				result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 					containerID,
@@ -670,7 +670,7 @@ func Test_processEndpoint(t *testing.T) {
 			sourceEndpoint := &dockerNetwork.EndpointSettings{
 				Aliases: []string{"container_id", "test-alias"},
 			}
-			containerID := types.ContainerID("test_container_id")
+			containerID := container.ContainerID("test_container_id")
 
 			result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 				containerID,
@@ -690,7 +690,7 @@ func Test_processEndpoint(t *testing.T) {
 					IPv4Address: netip.MustParseAddr("192.168.1.100"),
 				},
 			}
-			containerID := types.ContainerID("test_container_id")
+			containerID := container.ContainerID("test_container_id")
 
 			result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 				containerID,
@@ -710,7 +710,7 @@ func Test_processEndpoint(t *testing.T) {
 				IPAddress:  netip.MustParseAddr("192.168.1.100"),
 				DNSNames:   []string{"host.example.com"},
 			}
-			containerID := types.ContainerID("test_container_id")
+			containerID := container.ContainerID("test_container_id")
 
 			result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 				containerID,
@@ -734,7 +734,7 @@ func Test_processEndpoint(t *testing.T) {
 			sourceEndpoint := &dockerNetwork.EndpointSettings{
 				IPAMConfig: nil,
 			}
-			containerID := types.ContainerID("test_container_id")
+			containerID := container.ContainerID("test_container_id")
 
 			result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 				containerID,
@@ -752,7 +752,7 @@ func Test_processEndpoint(t *testing.T) {
 			sourceEndpoint := &dockerNetwork.EndpointSettings{
 				DNSNames: []string{},
 			}
-			containerID := types.ContainerID("test_container_id")
+			containerID := container.ContainerID("test_container_id")
 
 			result, err := processEndpoint(newTestLogger(t), sourceEndpoint,
 				containerID,
@@ -770,7 +770,7 @@ func Test_processEndpoint(t *testing.T) {
 			t.Run("should return ErrNilSourceEndpoint when sourceEndpoint is nil", func(t *testing.T) {
 				t.Parallel()
 
-				containerID := types.ContainerID("test_container_id")
+				containerID := container.ContainerID("test_container_id")
 
 				result, err := processEndpoint(newTestLogger(t), nil,
 					containerID,

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // FuzzCycleMembers fuzz tests cycle membership on dependency graphs parsed
@@ -50,7 +49,7 @@ func FuzzCycleMembers(f *testing.F) {
 
 			want := selfReachable(t, containers, useComposeDependsOn)
 
-			inCycle := make(map[types.ContainerID]bool, len(members))
+			inCycle := make(map[container.ContainerID]bool, len(members))
 			for _, c := range members {
 				inCycle[c.ID()] = true
 			}
@@ -114,7 +113,7 @@ func selfReachable(
 	t *testing.T,
 	containers []*container.Container,
 	useComposeDependsOn bool,
-) map[types.ContainerID]bool {
+) map[container.ContainerID]bool {
 	t.Helper()
 
 	containerMap, _, adjacency, _, err := buildDependencyGraph(newNopLogger(), containers, useComposeDependsOn)
@@ -127,8 +126,8 @@ func selfReachable(
 
 // reachesItself reports, for each container of a graph, whether it can reach
 // itself by following the graph's edges, with a separate search per container.
-func reachesItself(containerMap map[string]*container.Container, adjacency map[string][]string) map[types.ContainerID]bool {
-	reaches := make(map[types.ContainerID]bool, len(containerMap))
+func reachesItself(containerMap map[string]*container.Container, adjacency map[string][]string) map[container.ContainerID]bool {
+	reaches := make(map[container.ContainerID]bool, len(containerMap))
 
 	for start, c := range containerMap {
 		visited := map[string]bool{}
@@ -324,7 +323,7 @@ func FuzzDeploymentGraphs(f *testing.F) {
 			assertInputOrder(t, ordered, members)
 
 			want := reachesItself(containerMap, adjacency)
-			inCycle := make(map[types.ContainerID]bool, len(members))
+			inCycle := make(map[container.ContainerID]bool, len(members))
 
 			for _, c := range members {
 				inCycle[c.ID()] = true

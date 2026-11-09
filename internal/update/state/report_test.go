@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // TestReport_Lists verifies that each list method returns its own category,
@@ -763,7 +763,7 @@ func TestCompareIDs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		a, b types.ContainerID
+		a, b container.ContainerID
 		want int
 	}{
 		{name: "first ID sorts first", a: "aaa", b: "bbb", want: -1},

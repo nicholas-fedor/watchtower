@@ -17,7 +17,6 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // recoveryContainer returns a Watchtower container for the orphan recovery
@@ -120,12 +119,12 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, orphaned, current)
-			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("orphaned-id")).Return(nil).Once()
+			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).Return(nil).Once()
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 			assert.True(t, ok)
 			require.NotNil(t, recovered)
-			assert.Equal(t, types.ContainerID("orphaned-id"), recovered.ID())
+			assert.Equal(t, container.ContainerID("orphaned-id"), recovered.ID())
 		})
 	})
 
@@ -140,7 +139,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, orphaned, current)
-			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("orphaned-id")).
+			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).
 				Return(context.DeadlineExceeded).Once()
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
@@ -157,15 +156,15 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 
 			client := mockContainerClient.NewMockClient(t)
 			expectListed(client, first, second, current)
-			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("first-orphan-id")).
+			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("first-orphan-id")).
 				Return(context.DeadlineExceeded).Once()
-			client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID("second-orphan-id")).
+			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("second-orphan-id")).
 				Return(nil).Once()
 
 			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 			assert.True(t, ok)
 			require.NotNil(t, recovered)
-			assert.Equal(t, types.ContainerID("second-orphan-id"), recovered.ID())
+			assert.Equal(t, container.ContainerID("second-orphan-id"), recovered.ID())
 		})
 	})
 

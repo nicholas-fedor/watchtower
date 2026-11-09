@@ -327,7 +327,7 @@ func ExecutePreUpdateCommand(log *zerolog.Logger,
 func ExecutePostUpdateCommand(log *zerolog.Logger,
 	ctx context.Context,
 	client containerClient.Client,
-	newContainerID types.ContainerID,
+	newContainerID container.ContainerID,
 	uid int,
 	gid int,
 ) {

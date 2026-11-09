@@ -17,7 +17,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // containerKind is how the containers of one state are numbered and named.
@@ -85,7 +84,7 @@ func Report(states ...state.State) *state.Report {
 	// Count each state's containers so their IDs and names stay unique.
 	stateNums := make(map[state.State]int)
 	progress := state.Progress{}
-	failed := make(map[types.ContainerID]error)
+	failed := make(map[container.ContainerID]error)
 
 	for _, outcome := range states {
 		index := stateNums[outcome]
@@ -138,7 +137,7 @@ func Report(states ...state.State) *state.Report {
 // Returns:
 //   - *state.Report: Report with c's status in its scanned list. The status is
 //     also in the updated list, or in the fresh list when newImage is c's image.
-func UpdatedReport(c *container.Container, newImage types.ImageID, meta provenance.ReportMeta) *state.Report {
+func UpdatedReport(c *container.Container, newImage container.ImageID, meta provenance.ReportMeta) *state.Report {
 	log := new(zerolog.Nop())
 	progress := state.Progress{}
 
@@ -160,8 +159,8 @@ func UpdatedReport(c *container.Container, newImage types.ImageID, meta provenan
 //
 // Returns:
 //   - *container.Container: Container running image mock/<name>:latest.
-//   - types.ImageID: ID of the newer image the container can move to.
-func Container(index int, outcome state.State) (*container.Container, types.ImageID) {
+//   - container.ImageID: ID of the newer image the container can move to.
+func Container(index int, outcome state.State) (*container.Container, container.ImageID) {
 	kind, ok := containerKinds[outcome]
 	if !ok {
 		panic(fmt.Sprintf("reportfixture.Container: no report ends in state %v", outcome))
@@ -198,5 +197,5 @@ func Container(index int, outcome state.State) (*container.Container, types.Imag
 		},
 	}
 
-	return container.NewContainer(nil, &inspect, &imageInfo), types.ImageID("d0a" + idSuffix)
+	return container.NewContainer(nil, &inspect, &imageInfo), container.ImageID("d0a" + idSuffix)
 }

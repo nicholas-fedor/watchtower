@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -21,7 +22,6 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestSession_build verifies a remote Git URL build of one container. It checks
@@ -174,7 +174,7 @@ func TestSession_build(t *testing.T) {
 			Run(func(_ context.Context, _, _ string, got []string) {
 				tags = append([]string(nil), got...)
 			}).
-			Return(types.ImageID("sha256:built"), nil)
+			Return(container.ImageID("sha256:built"), nil)
 
 		err := sess.build(
 			newTestLogger(t),
@@ -207,7 +207,7 @@ func TestSession_build(t *testing.T) {
 					assert.True(t, ok)
 					assert.Equal(t, rebuildTimeout, time.Until(deadline))
 				}).
-				Return(types.ImageID("sha256:built"), nil)
+				Return(container.ImageID("sha256:built"), nil)
 
 			err := sess.build(
 				newTestLogger(t),
@@ -233,7 +233,7 @@ func TestSession_build(t *testing.T) {
 			docker := mockContainerClient.NewMockClient(t)
 			docker.EXPECT().
 				BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-				RunAndReturn(func(ctx context.Context, _, _ string, _ []string) (types.ImageID, error) {
+				RunAndReturn(func(ctx context.Context, _, _ string, _ []string) (container.ImageID, error) {
 					<-ctx.Done()
 
 					return "sha256:built", nil
@@ -251,7 +251,7 @@ func TestSession_build(t *testing.T) {
 			)
 
 			require.NoError(t, err)
-			assert.Equal(t, types.ImageID("sha256:built"), sess.built[c.ID()])
+			assert.Equal(t, container.ImageID("sha256:built"), sess.built[c.ID()])
 		})
 	})
 }

@@ -2,7 +2,6 @@ package selfupdate
 
 import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Block is why a self-update cannot replace the running Watchtower container.
@@ -42,7 +41,7 @@ const (
 //
 // Returns:
 //   - Block: Why a self-update is blocked, or NotBlocked.
-func Blocked(current *container.Container, currentID types.ContainerID, ephemeral bool) Block {
+func Blocked(current *container.Container, currentID container.ContainerID, ephemeral bool) Block {
 	switch {
 	case current == nil && currentID != "":
 		return BlockedUninspected

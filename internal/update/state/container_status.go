@@ -3,8 +3,8 @@ package state
 import (
 	"time"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 const (
@@ -43,36 +43,36 @@ type State int
 //
 //nolint:errname // ContainerStatus is not an error type, it contains an error field.
 type ContainerStatus struct {
-	cooldownEligibleAt   time.Time         // Time when the container becomes eligible for update.
-	containerError       error             // Error encountered, if any.
-	containerID          types.ContainerID // Container ID.
-	oldImage             types.ImageID     // Original image ID.
-	newImage             types.ImageID     // Latest image ID.
-	containerName        string            // Container name.
-	imageName            string            // Image name with tag.
-	newContainerID       types.ContainerID // New container ID after update.
-	cooldownAge          string            // Human-readable image age (e.g., "47 days, 11 hours").
-	cooldownDelay        string            // Human-readable cooldown duration (e.g., "24 hours").
-	cooldownRemaining    string            // Human-readable remaining time (empty when the image age is unavailable).
-	gitRepo              string            // Resolved Git repository URL.
-	gitRef               string            // Resolved Git ref.
-	changelog            string            // Changelog or releases URL.
-	source               string            // OCI image source annotation.
-	imageURL             string            // OCI image URL annotation.
-	documentation        string            // OCI image documentation annotation.
-	currentImageVersion  string            // OCI version annotation of the running image.
-	latestImageVersion   string            // OCI version annotation of the new image.
-	currentImageRevision string            // OCI revision annotation of the running image.
-	latestImageRevision  string            // OCI revision annotation of the new image.
-	state                State             // Current state.
-	monitorOnly          bool              // Monitor-only flag.
+	cooldownEligibleAt   time.Time             // Time when the container becomes eligible for update.
+	containerError       error                 // Error encountered, if any.
+	containerID          container.ContainerID // Container ID.
+	oldImage             container.ImageID     // Original image ID.
+	newImage             container.ImageID     // Latest image ID.
+	containerName        string                // Container name.
+	imageName            string                // Image name with tag.
+	newContainerID       container.ContainerID // New container ID after update.
+	cooldownAge          string                // Human-readable image age (e.g., "47 days, 11 hours").
+	cooldownDelay        string                // Human-readable cooldown duration (e.g., "24 hours").
+	cooldownRemaining    string                // Human-readable remaining time (empty when the image age is unavailable).
+	gitRepo              string                // Resolved Git repository URL.
+	gitRef               string                // Resolved Git ref.
+	changelog            string                // Changelog or releases URL.
+	source               string                // OCI image source annotation.
+	imageURL             string                // OCI image URL annotation.
+	documentation        string                // OCI image documentation annotation.
+	currentImageVersion  string                // OCI version annotation of the running image.
+	latestImageVersion   string                // OCI version annotation of the new image.
+	currentImageRevision string                // OCI revision annotation of the running image.
+	latestImageRevision  string                // OCI revision annotation of the new image.
+	state                State                 // Current state.
+	monitorOnly          bool                  // Monitor-only flag.
 }
 
 // ID returns the container ID.
 //
 // Returns:
-//   - types.ContainerID: Container's unique identifier.
-func (u *ContainerStatus) ID() types.ContainerID {
+//   - container.ContainerID: Container's unique identifier.
+func (u *ContainerStatus) ID() container.ContainerID {
 	return u.containerID
 }
 
@@ -87,16 +87,16 @@ func (u *ContainerStatus) Name() string {
 // CurrentImageID returns the original image ID.
 //
 // Returns:
-//   - types.ImageID: Image ID at session start.
-func (u *ContainerStatus) CurrentImageID() types.ImageID {
+//   - container.ImageID: Image ID at session start.
+func (u *ContainerStatus) CurrentImageID() container.ImageID {
 	return u.oldImage
 }
 
 // LatestImageID returns the latest image ID.
 //
 // Returns:
-//   - types.ImageID: Newest image ID from session.
-func (u *ContainerStatus) LatestImageID() types.ImageID {
+//   - container.ImageID: Newest image ID from session.
+func (u *ContainerStatus) LatestImageID() container.ImageID {
 	return u.newImage
 }
 
@@ -158,8 +158,8 @@ func (u *ContainerStatus) IsMonitorOnly() bool {
 // NewContainerID returns the new container ID after update.
 //
 // Returns:
-//   - types.ContainerID: New container ID or empty if not updated.
-func (u *ContainerStatus) NewContainerID() types.ContainerID {
+//   - container.ContainerID: New container ID or empty if not updated.
+func (u *ContainerStatus) NewContainerID() container.ContainerID {
 	return u.newContainerID
 }
 

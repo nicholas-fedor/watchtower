@@ -11,13 +11,13 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // goldenHost is the hostname used in every golden notification fixture.
@@ -326,7 +326,7 @@ func goldenFullReport() *state.Report {
 	nop := zerolog.Nop()
 	log := &nop
 	progress := state.Progress{}
-	failures := map[types.ContainerID]error{}
+	failures := map[container.ContainerID]error{}
 
 	updated, newImage := reportfixture.Container(0, state.UpdatedState)
 	progress.AddScanned(log, updated, newImage, updateParams.Params{})

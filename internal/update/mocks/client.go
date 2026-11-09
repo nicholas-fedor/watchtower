@@ -36,37 +36,37 @@ type MockClient struct {
 // It defines container states, staleness, and mock operation results.
 // Counter fields use atomic.Int32 for thread-safe concurrent access.
 type TestData struct {
-	IsContainerStaleError     error                                      // Error to return from IsContainerStale (for testing).
-	ListContainersError       error                                      // Error to return from ListContainers (for testing).
-	StopContainerError        error                                      // Error to return from StopContainer (for testing).
-	StartContainerError       error                                      // Error to return from StartContainer (for testing).
-	StartContainerByIDError   error                                      // Error to return from StartContainerByID (for testing).
-	CreateContainerError      error                                      // Error to return from CreateContainer (for testing).
-	RemoveImageError          error                                      // Error to return from RemoveImageByID (for testing).
-	LastStartedContainer      *container.Container                       // Last container passed to StartContainer.
-	SetRestartPolicyCtx       context.Context                            // Last context passed to SetRestartPolicy.
-	CreateContainerCtx        context.Context                            // Last context passed to CreateContainer.
-	RenameContainerCtx        context.Context                            // Last context passed to RenameContainer.
-	StartContainerByIDCtx     context.Context                            // Last context passed to StartContainerByID.
-	GetContainerCtx           context.Context                            // Last context passed to GetContainer.
-	StopAndRemoveContainerCtx context.Context                            // Last context passed to StopAndRemoveContainer.
-	GetImageDiskUsageError    error                                      // Error to return from GetImageDiskUsage.
-	ContainersByID            map[types.ContainerID]*container.Container // Map of containers by ID.
-	Staleness                 map[string]bool                            // Map of container names to staleness status.
-	ImageAnnotations          map[string]oci.Annotations                 // OCI annotations returned per image reference.
-	LastStopAndRemoveID       types.ContainerID                          // ID of the last container passed to StopAndRemoveContainer.
-	LastCreatedContainerID    types.ContainerID                          // ID returned by the last successful CreateContainer call.
-	LastRenameTarget          string                                     // Last new name passed to RenameContainer.
-	NameOfContainerToKeep     string                                     // Name of the container to avoid stopping.
-	LastContainerChain        string                                     // Last container chain passed to CreateEphemeralOrchestrator.
-	LastStartedContainerID    types.ContainerID                          // ID returned by the last successful StartContainer call.
-	SetRestartPolicyID        types.ContainerID                          // Last container ID passed to SetRestartPolicy.
-	RenameTargets             []string                                   // Ordered list of rename targets.
-	Containers                []*container.Container                     // List of mock containers.
-	FailedImageIDs            []types.ImageID                            // List of image IDs that should fail removal.
-	StopOrder                 []string                                   // Order in which containers were stopped.
-	CreateOrder               []string                                   // Order in which containers were created.
-	StartOrder                []string                                   // Order in which containers were started.
+	IsContainerStaleError     error                                          // Error to return from IsContainerStale (for testing).
+	ListContainersError       error                                          // Error to return from ListContainers (for testing).
+	StopContainerError        error                                          // Error to return from StopContainer (for testing).
+	StartContainerError       error                                          // Error to return from StartContainer (for testing).
+	StartContainerByIDError   error                                          // Error to return from StartContainerByID (for testing).
+	CreateContainerError      error                                          // Error to return from CreateContainer (for testing).
+	RemoveImageError          error                                          // Error to return from RemoveImageByID (for testing).
+	LastStartedContainer      *container.Container                           // Last container passed to StartContainer.
+	SetRestartPolicyCtx       context.Context                                // Last context passed to SetRestartPolicy.
+	CreateContainerCtx        context.Context                                // Last context passed to CreateContainer.
+	RenameContainerCtx        context.Context                                // Last context passed to RenameContainer.
+	StartContainerByIDCtx     context.Context                                // Last context passed to StartContainerByID.
+	GetContainerCtx           context.Context                                // Last context passed to GetContainer.
+	StopAndRemoveContainerCtx context.Context                                // Last context passed to StopAndRemoveContainer.
+	GetImageDiskUsageError    error                                          // Error to return from GetImageDiskUsage.
+	ContainersByID            map[container.ContainerID]*container.Container // Map of containers by ID.
+	Staleness                 map[string]bool                                // Map of container names to staleness status.
+	ImageAnnotations          map[string]oci.Annotations                     // OCI annotations returned per image reference.
+	LastStopAndRemoveID       container.ContainerID                          // ID of the last container passed to StopAndRemoveContainer.
+	LastCreatedContainerID    container.ContainerID                          // ID returned by the last successful CreateContainer call.
+	LastRenameTarget          string                                         // Last new name passed to RenameContainer.
+	NameOfContainerToKeep     string                                         // Name of the container to avoid stopping.
+	LastContainerChain        string                                         // Last container chain passed to CreateEphemeralOrchestrator.
+	LastStartedContainerID    container.ContainerID                          // ID returned by the last successful StartContainer call.
+	SetRestartPolicyID        container.ContainerID                          // Last container ID passed to SetRestartPolicy.
+	RenameTargets             []string                                       // Ordered list of rename targets.
+	Containers                []*container.Container                         // List of mock containers.
+	FailedImageIDs            []container.ImageID                            // List of image IDs that should fail removal.
+	StopOrder                 []string                                       // Order in which containers were stopped.
+	CreateOrder               []string                                       // Order in which containers were created.
+	StartOrder                []string                                       // Order in which containers were started.
 	// OperationOrder records client method names in call order for handoff sequencing assertions.
 	OperationOrder               []string
 	LastRestartPolicy            dockerContainer.RestartPolicy // Last policy passed to SetRestartPolicy.
@@ -126,7 +126,7 @@ func CreateMockClientWithContext(
 	removeVolumes bool,
 ) MockClient {
 	if data.ContainersByID == nil {
-		data.ContainersByID = make(map[types.ContainerID]*container.Container)
+		data.ContainersByID = make(map[container.ContainerID]*container.Container)
 	}
 	for _, c := range data.Containers {
 		data.ContainersByID[c.ID()] = c
@@ -256,7 +256,7 @@ func (client MockClient) IsContainerRunning(c *container.Container) bool {
 // Returns the configured CreateContainerError if set.
 // On success it returns a distinct container ID so callers can distinguish the
 // new instance from the source (required for self-update failure cleanup tests).
-func (client MockClient) CreateContainer(ctx context.Context, c *container.Container) (types.ContainerID, error) {
+func (client MockClient) CreateContainer(ctx context.Context, c *container.Container) (container.ContainerID, error) {
 	client.TestData.CreateContainerCount.Add(1)
 	client.TestData.CreateContainerCtx = ctx
 
@@ -270,12 +270,12 @@ func (client MockClient) CreateContainer(ctx context.Context, c *container.Conta
 
 	client.TestData.CreateOrder = append(client.TestData.CreateOrder, c.Name())
 
-	newID := types.ContainerID(string(c.ID()) + "-recreated")
+	newID := container.ContainerID(string(c.ID()) + "-recreated")
 	client.TestData.LastCreatedContainerID = newID
 
 	// Register a lookup entry so GetContainer(newID) succeeds for cleanup paths.
 	if client.TestData.ContainersByID == nil {
-		client.TestData.ContainersByID = make(map[types.ContainerID]*container.Container)
+		client.TestData.ContainersByID = make(map[container.ContainerID]*container.Container)
 	}
 
 	if _, exists := client.TestData.ContainersByID[newID]; !exists {
@@ -293,7 +293,7 @@ func (client MockClient) CreateContainer(ctx context.Context, c *container.Conta
 // StartContainer simulates starting a container, returning the container's ID.
 // It provides a minimal implementation for testing purposes.
 // Returns the configured StartContainerError if set.
-func (client MockClient) StartContainer(ctx context.Context, c *container.Container) (types.ContainerID, error) {
+func (client MockClient) StartContainer(ctx context.Context, c *container.Container) (container.ContainerID, error) {
 	client.TestData.StartContainerCount.Add(1)
 	client.TestData.recordOperation("StartContainer")
 	client.TestData.LastStartedContainer = c
@@ -310,11 +310,11 @@ func (client MockClient) StartContainer(ctx context.Context, c *container.Contai
 
 	// Return a distinct ID so handoff verification can distinguish the replacement
 	// instance from the source, matching real Docker create+start behavior.
-	newID := types.ContainerID(string(c.ID()) + "-started")
+	newID := container.ContainerID(string(c.ID()) + "-started")
 	client.TestData.LastStartedContainerID = newID
 
 	if client.TestData.ContainersByID == nil {
-		client.TestData.ContainersByID = make(map[types.ContainerID]*container.Container)
+		client.TestData.ContainersByID = make(map[container.ContainerID]*container.Container)
 	}
 
 	if _, exists := client.TestData.ContainersByID[newID]; !exists {
@@ -346,7 +346,7 @@ func (client MockClient) StartContainer(ctx context.Context, c *container.Contai
 // StartContainerByID simulates starting a container by its ID directly.
 // It provides a minimal implementation for testing purposes.
 // Returns the configured StartContainerByIDError if set.
-func (client MockClient) StartContainerByID(ctx context.Context, containerID types.ContainerID) error {
+func (client MockClient) StartContainerByID(ctx context.Context, containerID container.ContainerID) error {
 	client.TestData.StartContainerCount.Add(1)
 	client.TestData.recordOperation("StartContainerByID")
 	client.TestData.StartContainerByIDCtx = ctx
@@ -391,7 +391,7 @@ func (client MockClient) RenameContainer(ctx context.Context, _ *container.Conta
 // always succeeds.
 func (client MockClient) SetRestartPolicy(
 	ctx context.Context,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 	policy dockerContainer.RestartPolicy,
 ) error {
 	client.TestData.SetRestartPolicyCount.Add(1)
@@ -405,7 +405,7 @@ func (client MockClient) SetRestartPolicy(
 
 // RemoveImageByID increments the count of image removal attempts in TestData.
 // It simulates image cleanup and returns configured error if set or if image ID is in FailedImageIDs, nil otherwise.
-func (client MockClient) RemoveImageByID(ctx context.Context, imageID types.ImageID, _ string) error {
+func (client MockClient) RemoveImageByID(ctx context.Context, imageID container.ImageID, _ string) error {
 	client.TestData.TriedToRemoveImageCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
@@ -421,7 +421,7 @@ func (client MockClient) RemoveImageByID(ctx context.Context, imageID types.Imag
 
 // GetContainer returns the container with the specified ID from TestData.
 // It provides a mock response for testing container retrieval.
-func (client MockClient) GetContainer(ctx context.Context, containerID types.ContainerID) (*container.Container, error) {
+func (client MockClient) GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error) {
 	client.TestData.GetContainerCtx = ctx
 	client.TestData.recordOperation("GetContainer")
 
@@ -434,7 +434,7 @@ func (client MockClient) GetContainer(ctx context.Context, containerID types.Con
 
 // GetCurrentWatchtowerContainer returns the container with the specified ID from TestData with imageInfo set to nil.
 // It provides a mock response for testing current Watchtower container retrieval.
-func (client MockClient) GetCurrentWatchtowerContainer(_ context.Context, containerID types.ContainerID) (*container.Container, error) {
+func (client MockClient) GetCurrentWatchtowerContainer(_ context.Context, containerID container.ContainerID) (*container.Container, error) {
 	if c, ok := client.TestData.ContainersByID[containerID]; ok {
 		// Return a copy with imageInfo nil
 		// Since it's a mock, just return the same container
@@ -496,7 +496,7 @@ func (client MockClient) IsContainerStale(
 	ctx context.Context,
 	c *container.Container,
 	_ updateConfig.Policy,
-) (bool, types.ImageID, string, error) {
+) (bool, container.ImageID, string, error) {
 	client.TestData.IsContainerStaleCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
@@ -521,7 +521,7 @@ func (client MockClient) CheckContainerUpdate(
 	ctx context.Context,
 	c *container.Container,
 	policy updateConfig.Policy,
-) (bool, types.ImageID, string, error) {
+) (bool, container.ImageID, string, error) {
 	return client.IsContainerStale(ctx, c, policy)
 }
 
@@ -546,7 +546,7 @@ func (client MockClient) GetImageAnnotations(
 
 // WaitForContainerHealthy simulates waiting for a container to become healthy.
 // It increments the count and returns nil to indicate success.
-func (client MockClient) WaitForContainerHealthy(ctx context.Context, _ types.ContainerID, _ time.Duration) error {
+func (client MockClient) WaitForContainerHealthy(ctx context.Context, _ container.ContainerID, _ time.Duration) error {
 	client.TestData.WaitForContainerHealthyCount.Add(1)
 
 	if err := client.checkContextCancellation(ctx); err != nil {
@@ -578,7 +578,7 @@ func (client MockClient) CreateEphemeralOrchestrator(
 	_ string,
 	containerChain string,
 	cleanup bool,
-) (types.ContainerID, error) {
+) (container.ContainerID, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return "", err
 	}
@@ -586,7 +586,7 @@ func (client MockClient) CreateEphemeralOrchestrator(
 	client.TestData.LastContainerChain = containerChain
 	client.TestData.LastCleanup = cleanup
 
-	return types.ContainerID("mock-ephemeral-orchestrator"), nil
+	return container.ContainerID("mock-ephemeral-orchestrator"), nil
 }
 
 // GetImageDiskUsage returns configured mock image usage for testing.
@@ -627,7 +627,7 @@ func (client MockClient) Ping(ctx context.Context) error {
 }
 
 // BuildRemoteImage simulates building an image from a Git URL context.
-func (client MockClient) BuildRemoteImage(ctx context.Context, _, _ string, tags []string) (types.ImageID, error) {
+func (client MockClient) BuildRemoteImage(ctx context.Context, _, _ string, tags []string) (container.ImageID, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return "", err
 	}
@@ -637,8 +637,8 @@ func (client MockClient) BuildRemoteImage(ctx context.Context, _, _ string, tags
 	}
 
 	if len(tags) > 0 {
-		return types.ImageID("sha256:gitbuild" + tags[0]), nil
+		return container.ImageID("sha256:gitbuild" + tags[0]), nil
 	}
 
-	return types.ImageID("sha256:gitbuild"), nil
+	return container.ImageID("sha256:gitbuild"), nil
 }

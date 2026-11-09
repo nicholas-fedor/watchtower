@@ -16,7 +16,7 @@ import (
 
 	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
+	"github.com/nicholas-fedor/watchtower/internal/container"
 )
 
 // TestInjectLabels verifies that labels are merged onto the named service only,
@@ -90,13 +90,13 @@ func TestAppliedImageID(t *testing.T) {
 	summary := api.ContainerSummary{Name: "webstack-api-1", Image: "webstack-api:latest"}
 	assert.Empty(t, appliedImageID(summary, nil))
 	assert.Empty(t, appliedImageID(summary, map[string]api.ImageSummary{}))
-	assert.Equal(t, types.ImageID("sha256:abc"), appliedImageID(
+	assert.Equal(t, container.ImageID("sha256:abc"), appliedImageID(
 		summary,
 		map[string]api.ImageSummary{"webstack-api-1": {ID: "sha256:abc"}},
 	))
 	assert.Equal(
 		t,
-		types.ImageID("sha256:fromps"),
+		container.ImageID("sha256:fromps"),
 		appliedImageID(api.ContainerSummary{Name: "x", Image: "sha256:fromps"}, nil),
 	)
 }
@@ -145,7 +145,7 @@ services:
 	assert.Equal(t, []Container{{
 		Service: "app",
 		Name:    "project-app-1",
-		ID:      types.ContainerID("app-id"),
+		ID:      container.ContainerID("app-id"),
 	}}, containers)
 
 	require.NotNil(t, upProject)

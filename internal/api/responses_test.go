@@ -157,10 +157,10 @@ func newFixtureClient(t *testing.T) *mockContainerClient.MockClient {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(list, nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything).Return(list, nil).Maybe()
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, types.ImageID, string, error) {
+		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
 			switch c.Name() {
 			case "web", "web-2":
-				return true, types.ImageID("sha256:" + fixtureID("7")), "sha256:" + fixtureID("8"), nil
+				return true, container.ImageID("sha256:" + fixtureID("7")), "sha256:" + fixtureID("8"), nil
 			case "cache":
 				return false, "", "", errFixtureRegistry
 			default:

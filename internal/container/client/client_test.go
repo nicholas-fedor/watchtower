@@ -734,7 +734,7 @@ func TestClient(t *testing.T) {
 				log, logOutput := logcapture.New(zerolog.WarnLevel)
 				c := &client{log: log, api: api}
 
-				got, err := c.GetContainer(t.Context(), types.ContainerID(testContainerID))
+				got, err := c.GetContainer(t.Context(), container.ContainerID(testContainerID))
 				require.NoError(t, err)
 				assert.False(t, got.HasImageInfo())
 
@@ -983,7 +983,7 @@ func TestClient(t *testing.T) {
 
 			c := &client{log: newTestLogger(t), api: api}
 
-			got, err := c.GetContainer(t.Context(), types.ContainerID(tc.containerID))
+			got, err := c.GetContainer(t.Context(), container.ContainerID(tc.containerID))
 			require.NoError(t, err)
 
 			return c.ExecuteCommand(t.Context(), got, tc.cmd, 1, uid, gid)
@@ -1341,8 +1341,8 @@ func TestClient(t *testing.T) {
 				require.NoError(t, err)
 				require.Len(t, containers, 2)
 
-				containerIDs := []types.ContainerID{containers[0].ID(), containers[1].ID()}
-				assert.ElementsMatch(t, []types.ContainerID{valid1ID, valid2ID}, containerIDs)
+				containerIDs := []container.ContainerID{containers[0].ID(), containers[1].ID()}
+				assert.ElementsMatch(t, []container.ContainerID{valid1ID, valid2ID}, containerIDs)
 				assert.Contains(t, logOutput.String(), ghostID)
 			})
 		})
@@ -1861,7 +1861,7 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 
 	newID, err := (&client{log: newTestLogger(t), api: api}).StartContainer(t.Context(), source)
 	require.NoError(t, err)
-	assert.Equal(t, types.ContainerID(createdID), newID)
+	assert.Equal(t, container.ContainerID(createdID), newID)
 }
 
 // TestClientWrappers verifies that the client methods delegating to the image
@@ -1884,7 +1884,7 @@ func TestClientWrappers(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.True(t, stale)
-		assert.Equal(t, types.ImageID(newImageID), latestID)
+		assert.Equal(t, container.ImageID(newImageID), latestID)
 	})
 
 	// The image client's error names the failure. The update session's warning
@@ -1915,7 +1915,7 @@ func TestClientWrappers(t *testing.T) {
 		)
 		require.NoError(t, err)
 		assert.False(t, available)
-		assert.Equal(t, types.ImageID(currentImageID), latestID)
+		assert.Equal(t, container.ImageID(currentImageID), latestID)
 	})
 
 	t.Run("CheckContainerUpdate reports a failed check", func(t *testing.T) {
@@ -1934,7 +1934,7 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("RemoveImageByID removes an unused image", func(t *testing.T) {
 		t.Parallel()
 
-		imageID := types.ImageID("sha256:" + containerfixture.RandomID())
+		imageID := container.ImageID("sha256:" + containerfixture.RandomID())
 
 		api := newDockerAPI(t)
 		api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{All: true}).
@@ -1949,7 +1949,7 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("RemoveImageByID reports an image still in use", func(t *testing.T) {
 		t.Parallel()
 
-		imageID := types.ImageID("sha256:" + containerfixture.RandomID())
+		imageID := container.ImageID("sha256:" + containerfixture.RandomID())
 
 		api := newDockerAPI(t)
 		api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{All: true}).
@@ -2032,7 +2032,7 @@ func TestClientWrappers(t *testing.T) {
 
 		c, err := (&client{log: newTestLogger(t), api: api}).GetCurrentWatchtowerContainer(t.Context(), testContainerID)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testContainerID), c.ID())
+		assert.Equal(t, container.ContainerID(testContainerID), c.ID())
 		assert.False(t, c.HasImageInfo())
 	})
 
@@ -2061,7 +2061,7 @@ func TestClientWrappers(t *testing.T) {
 		id, err := (&client{log: newTestLogger(t), api: api}).
 			CreateEphemeralOrchestrator(t.Context(), source, "watchtower:v2", "chain1", false)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID("orchestrator-id"), id)
+		assert.Equal(t, container.ContainerID("orchestrator-id"), id)
 	})
 
 	t.Run("CreateEphemeralOrchestrator says which step failed", func(t *testing.T) {
@@ -2151,8 +2151,8 @@ func TestClientThroughDockerSDK(t *testing.T) {
 		containers, err := newSDKClient(t, server).ListContainers(t.Context(), filters.NoFilter)
 		require.NoError(t, err)
 		require.Len(t, containers, 2)
-		assert.ElementsMatch(t, []types.ContainerID{fixtureWatchtower.id, fixtureRunning.id},
-			[]types.ContainerID{containers[0].ID(), containers[1].ID()})
+		assert.ElementsMatch(t, []container.ContainerID{fixtureWatchtower.id, fixtureRunning.id},
+			[]container.ContainerID{containers[0].ID(), containers[1].ID()})
 		assert.True(t, containers[0].HasImageInfo())
 	})
 
@@ -2554,7 +2554,7 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 				}
 
 				require.NoError(t, err)
-				assert.Equal(t, types.ContainerID(testContainerID), current.ID())
+				assert.Equal(t, container.ContainerID(testContainerID), current.ID())
 			})
 		})
 	}

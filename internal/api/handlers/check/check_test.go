@@ -32,7 +32,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -57,7 +56,7 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc", "nginx@sha256:digest123")
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-		Return(false, types.ImageID("sha256:abc"), "", nil)
+		Return(false, container.ImageID("sha256:abc"), "", nil)
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
 	require.NoError(t, err)
@@ -70,7 +69,7 @@ func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc")
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-		Return(false, types.ImageID(""), "", errors.New("registry unavailable"))
+		Return(false, container.ImageID(""), "", errors.New("registry unavailable"))
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
 	require.NoError(t, err)
@@ -85,7 +84,7 @@ func TestCheckForUpdates_ParamsPropagation(t *testing.T) {
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{running}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.MatchedBy(func(p updateConfig.Policy) bool {
 		return p.MonitorOnly && p.NoPull && p.EnableChangelog && p.LabelPrecedence && p.CooldownDelay == 5*time.Minute
-	})).Return(true, types.ImageID("sha256:new"), "sha256:newdigest", nil)
+	})).Return(true, container.ImageID("sha256:new"), "sha256:newdigest", nil)
 
 	params := updateParams.Params{
 		MonitorOnly:     true,
@@ -109,9 +108,9 @@ func TestCheckForUpdates_MixedStaleResults(t *testing.T) {
 
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{container1, container2}, nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container1, mock.Anything).
-		Return(true, types.ImageID("sha256:new1"), "sha256:digest1", nil)
+		Return(true, container.ImageID("sha256:new1"), "sha256:digest1", nil)
 	client.EXPECT().CheckContainerUpdate(mock.Anything, container2, mock.Anything).
-		Return(false, types.ImageID("sha256:def"), "", nil)
+		Return(false, container.ImageID("sha256:def"), "", nil)
 
 	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
 	require.NoError(t, err)
@@ -527,7 +526,7 @@ func TestCheckRegistrySource(t *testing.T) {
 
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-			Return(false, types.ImageID(""), "", errors.New("registry unreachable"))
+			Return(false, container.ImageID(""), "", errors.New("registry unreachable"))
 
 		c := imageContainer("/app", "app:latest", "sha256:abc")
 
@@ -546,7 +545,7 @@ func TestCheckRegistrySource(t *testing.T) {
 
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-			Return(true, types.ImageID("sha256:def"), "sha256:def", nil)
+			Return(true, container.ImageID("sha256:def"), "sha256:def", nil)
 
 		c := imageContainer("/app", "app:latest", "sha256:abc")
 
@@ -565,7 +564,7 @@ func TestCheckRegistrySource(t *testing.T) {
 
 		client := mockContainerClient.NewMockClient(t)
 		client.EXPECT().CheckContainerUpdate(mock.Anything, mock.Anything, mock.Anything).
-			Return(false, types.ImageID(""), "", nil)
+			Return(false, container.ImageID(""), "", nil)
 
 		c := imageContainer("/app", "app:latest", "sha256:abc")
 

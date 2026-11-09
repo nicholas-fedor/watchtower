@@ -25,7 +25,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestUpdateAction_Dependencies verifies that an update stops and starts
@@ -109,9 +108,15 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that all containers were updated (dependencies were handled correctly)
 			require.Len(t, cleanupImageInfos, 3)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-a:latest") }))
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-b:latest") }))
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("fake-image-c:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool {
+				return info.ImageID == container.ImageID("fake-image-a:latest")
+			}))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool {
+				return info.ImageID == container.ImageID("fake-image-b:latest")
+			}))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool {
+				return info.ImageID == container.ImageID("fake-image-c:latest")
+			}))
 		})
 	})
 
@@ -886,7 +891,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that the container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("dep-image:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("dep-image:latest") }))
 		})
 	})
 
@@ -981,7 +986,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that base container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-d:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("image-d:latest") }))
 		})
 	})
 
@@ -1070,7 +1075,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that the container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("dep-image:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("dep-image:latest") }))
 		})
 	})
 
@@ -1182,7 +1187,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that base container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-e:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("image-e:latest") }))
 		})
 	})
 
@@ -1243,7 +1248,7 @@ func TestUpdateAction_Dependencies(t *testing.T) {
 
 			// Verify that base container was updated
 			require.Len(t, cleanupImageInfos, 1)
-			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == types.ImageID("image-b:latest") }))
+			assert.True(t, slices.ContainsFunc(cleanupImageInfos, func(info cleanup.RemovedImageInfo) bool { return info.ImageID == container.ImageID("image-b:latest") }))
 		})
 	})
 
@@ -2967,7 +2972,7 @@ func TestUpdate_WarnsOnUnresolvedDependsOn(t *testing.T) {
 	client := mockContainerClient.NewMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		Return(false, types.ImageID(""), "", nil)
+		Return(false, container.ImageID(""), "", nil)
 
 	// The update logs from several goroutines, so the buffer is synchronized.
 	var output bytes.Buffer

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/client"
@@ -90,7 +91,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	ov := RunOverrides{
 		RunOnce:            true,
 		SkipSelfUpdate:     true,
-		CurrentContainerID: types.ContainerID("abc123"),
+		CurrentContainerID: container.ContainerID("abc123"),
 	}
 
 	params := cfg.UpdateParams(ov)
@@ -110,7 +111,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, 1000, params.LifecycleUID)
 	assert.Equal(t, 1000, params.LifecycleGID)
 	assert.True(t, params.RunOnce)
-	assert.Equal(t, types.ContainerID("abc123"), params.CurrentContainerID)
+	assert.Equal(t, container.ContainerID("abc123"), params.CurrentContainerID)
 	assert.True(t, params.UseComposeDependsOn)
 	assert.True(t, params.SkipSelfUpdate)
 	assert.True(t, params.EphemeralSelfUpdate)

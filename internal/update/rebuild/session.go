@@ -16,7 +16,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Applier loads a Compose project and applies selected services.
@@ -41,9 +40,9 @@ type Session struct {
 	apply    Applier
 	client   *git.Client
 	checkout func(ctx context.Context, dir, commit string, opts project.CheckoutOptions) error
-	results  map[types.ContainerID]git.CheckResult
-	built    map[types.ContainerID]types.ImageID
-	applied  map[types.ContainerID]struct{}
+	results  map[container.ContainerID]git.CheckResult
+	built    map[container.ContainerID]container.ImageID
+	applied  map[container.ContainerID]struct{}
 	mu       sync.Mutex
 }
 
@@ -59,9 +58,9 @@ func NewSession(client *git.Client) *Session {
 		client:   client,
 		apply:    composeApply.NewClient(),
 		checkout: project.Checkout,
-		results:  make(map[types.ContainerID]git.CheckResult),
-		built:    make(map[types.ContainerID]types.ImageID),
-		applied:  make(map[types.ContainerID]struct{}),
+		results:  make(map[container.ContainerID]git.CheckResult),
+		built:    make(map[container.ContainerID]container.ImageID),
+		applied:  make(map[container.ContainerID]struct{}),
 	}
 }
 
@@ -114,7 +113,7 @@ func (s *Session) PrepareRebuilds(
 	containers []*container.Container,
 	params updateParams.Params,
 	progress *state.Progress,
-	failed map[types.ContainerID]error,
+	failed map[container.ContainerID]error,
 ) {
 	if s == nil || s.client == nil {
 		return
@@ -279,8 +278,8 @@ func (s *Session) ExcludeNoRestart(
 //   - params: Update parameters.
 //
 // Returns:
-//   - map[types.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
-func (s *Session) NoRestartBuiltIDs(params updateParams.Params) map[types.ContainerID]struct{} {
+//   - map[container.ContainerID]struct{}: Built container IDs, or nil when restart is enabled.
+func (s *Session) NoRestartBuiltIDs(params updateParams.Params) map[container.ContainerID]struct{} {
 	if s == nil || !params.NoRestart {
 		return nil
 	}
@@ -288,7 +287,7 @@ func (s *Session) NoRestartBuiltIDs(params updateParams.Params) map[types.Contai
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	ids := make(map[types.ContainerID]struct{}, len(s.built))
+	ids := make(map[container.ContainerID]struct{}, len(s.built))
 	for id := range s.built {
 		ids[id] = struct{}{}
 	}
@@ -304,7 +303,7 @@ func (s *Session) NoRestartBuiltIDs(params updateParams.Params) map[types.Contai
 //
 // Returns:
 //   - none.
-func (s *Session) store(containerID types.ContainerID, result git.CheckResult) {
+func (s *Session) store(containerID container.ContainerID, result git.CheckResult) {
 	if s == nil {
 		return
 	}
@@ -323,7 +322,7 @@ func (s *Session) store(containerID types.ContainerID, result git.CheckResult) {
 // Returns:
 //   - git.CheckResult: Stored result.
 //   - bool: True when a result was stored.
-func (s *Session) result(containerID types.ContainerID) (git.CheckResult, bool) {
+func (s *Session) result(containerID container.ContainerID) (git.CheckResult, bool) {
 	if s == nil {
 		return git.CheckResult{}, false
 	}

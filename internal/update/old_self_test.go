@@ -14,7 +14,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // TestRunUpdatesWithNotifications_OldSelfDetected verifies that when the
@@ -58,7 +57,7 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 		Client:            client,
 		Notifier:          notifier,
 		EventBroadcaster:  broadcaster,
-		Update:            updateParams.Params{CurrentContainerID: types.ContainerID(oldID)},
+		Update:            updateParams.Params{CurrentContainerID: container.ContainerID(oldID)},
 		OnOldSelfDetected: func() { detected++ },
 	})
 

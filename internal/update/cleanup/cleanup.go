@@ -16,16 +16,15 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // RemovedImageInfo represents information about an image that was cleaned up during update operations.
 // It tracks the image ID, container ID, image name, and the container that was using the old image before cleanup.
 type RemovedImageInfo struct {
 	// ImageID is the ID of the image that was cleaned up.
-	ImageID types.ImageID `json:"image_id"`
+	ImageID container.ImageID `json:"image_id"`
 	// ContainerID is the ID of the container that was using this image.
-	ContainerID types.ContainerID `json:"container_id"`
+	ContainerID container.ContainerID `json:"container_id"`
 	// ImageName is the name/tag of the image that was cleaned up.
 	ImageName string `json:"image_name"`
 	// ContainerName is the name of the container that was using this image before the update.
@@ -161,7 +160,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	client containerClient.Client,
 	cleanupImages bool,
-	currentContainerID types.ContainerID,
+	currentContainerID container.ContainerID,
 	removeImageInfos *[]RemovedImageInfo,
 ) (int, error) {
 	if currentContainerID == "" {
@@ -521,7 +520,7 @@ func successorOf(old *container.Container, candidates []*container.Container) (*
 // Returns:
 //   - []*container.Container: Deduplicated slice of containers to remove.
 func addExcessContainers(excessContainers, chainContainers []*container.Container) []*container.Container {
-	containersToRemoveMap := make(map[types.ContainerID]*container.Container)
+	containersToRemoveMap := make(map[container.ContainerID]*container.Container)
 	for _, c := range excessContainers {
 		containersToRemoveMap[c.ID()] = c
 	}
@@ -707,7 +706,7 @@ func addCollectedImages(
 	collected []RemovedImageInfo,
 	remaining []*container.Container,
 ) {
-	inUse := make(map[types.ImageID]struct{}, len(remaining))
+	inUse := make(map[container.ImageID]struct{}, len(remaining))
 	for _, c := range remaining {
 		inUse[c.ImageID()] = struct{}{}
 	}
@@ -735,9 +734,9 @@ func addCollectedImages(
 //   - containerID: ID of the container (optional, pass empty string if not available).
 func AddImage(
 	cleanupImageInfos *[]RemovedImageInfo,
-	imageID types.ImageID,
+	imageID container.ImageID,
 	imageName, containerName string,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 ) {
 	for _, existing := range *cleanupImageInfos {
 		if existing.ImageID == imageID && existing.ContainerName == containerName {
@@ -763,7 +762,7 @@ func AddImage(
 // Returns:
 //   - []RemovedImageInfo: Slice with one entry per unique ImageID.
 func deduplicateByImageID(images []RemovedImageInfo) []RemovedImageInfo {
-	seen := make(map[types.ImageID]bool, len(images))
+	seen := make(map[container.ImageID]bool, len(images))
 	result := make([]RemovedImageInfo, 0, len(images))
 
 	for _, img := range images {
@@ -809,7 +808,7 @@ func RemoveImages(log *zerolog.Logger, ctx context.Context,
 	}
 
 	// Remove each image once, even when several containers used it.
-	users := make(map[types.ImageID][]RemovedImageInfo, len(images))
+	users := make(map[container.ImageID][]RemovedImageInfo, len(images))
 	for _, info := range images {
 		users[info.ImageID] = append(users[info.ImageID], info)
 	}

@@ -25,7 +25,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // WithCPUSettings configures CPU settings for the mock container.
@@ -185,7 +184,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			"1.44", true, "auto", false,
 		)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testTargetID), newID)
+		assert.Equal(t, container.ContainerID(testTargetID), newID)
 		require.NotNil(t, created.HostConfig)
 		assert.Nil(t, created.HostConfig.MemorySwappiness)
 		assert.Contains(t, logOutput.String(), "Disabled memory swappiness for Podman compatibility")
@@ -202,7 +201,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			"1.44", false, "auto", false,
 		)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testTargetID), newID)
+		assert.Equal(t, container.ContainerID(testTargetID), newID)
 		assert.Contains(t, logOutput.String(), "MAC address validation passed")
 		assert.Equal(t, 1, strings.Count(logOutput.String(), "mac_address="),
 			"the network config's MAC check runs once per recreation")
@@ -219,7 +218,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			"1.44", false, "auto", false,
 		)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testTargetID), newID)
+		assert.Equal(t, container.ContainerID(testTargetID), newID)
 		assert.Contains(t, logOutput.String(),
 			"Using full network config for API version >= 1.44 or single network")
 	})
@@ -251,7 +250,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			"1.44", false, "auto", false,
 		)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testTargetID), newID)
+		assert.Equal(t, container.ContainerID(testTargetID), newID)
 		assert.Contains(t, logOutput.String(), "Created container successfully")
 	})
 	t.Run("should handle ContainerCreate Conflict error", func(t *testing.T) {
@@ -302,7 +301,7 @@ func TestCreateTargetContainer(t *testing.T) {
 			"1.23", false, "auto", false,
 		)
 		require.NoError(t, err)
-		assert.Equal(t, types.ContainerID(testTargetID), newID)
+		assert.Equal(t, container.ContainerID(testTargetID), newID)
 		assert.Contains(t, logOutput.String(), "Selected first network for container creation")
 		assert.Contains(t, logOutput.String(), "Attaching additional network to container")
 		assert.Contains(t, logOutput.String(), "Successfully attached additional network")

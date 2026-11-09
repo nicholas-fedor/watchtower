@@ -27,7 +27,6 @@ import (
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -67,14 +66,14 @@ func gitTestClient(t *testing.T) *git.Client {
 //   - client: Mocked container client.
 func expectGitBuild(client *mockContainerClient.MockClient) {
 	client.EXPECT().BuildRemoteImage(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(
-		func(ctx context.Context, _, _ string, tags []string) (types.ImageID, error) {
+		func(ctx context.Context, _, _ string, tags []string) (container.ImageID, error) {
 			err := ctx.Err()
 			if err != nil {
 				return "", err
 			}
 
 			if len(tags) > 0 {
-				return types.ImageID("sha256:gitbuild" + tags[0]), nil
+				return container.ImageID("sha256:gitbuild" + tags[0]), nil
 			}
 
 			return "sha256:gitbuild", nil
@@ -256,7 +255,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 	t.Run("returns immediately when the session or client is nil", func(t *testing.T) {
 		t.Parallel()
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		c.SetStale(true)
 
@@ -272,7 +271,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		)
 		assert.Empty(t, failed)
 
-		sess = &Session{results: map[types.ContainerID]git.CheckResult{}}
+		sess = &Session{results: map[container.ContainerID]git.CheckResult{}}
 		sess.PrepareRebuilds(
 			newTestLogger(t),
 			t.Context(),
@@ -298,7 +297,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		staleFreshResult.SetStale(true)
 		sess.store(staleFreshResult.ID(), git.CheckResult{Stale: false})
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		// The mock has no expectations, so a build or image removal fails
 		// the test.
 		docker := mockContainerClient.NewMockClient(t)
@@ -324,7 +323,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		sess.store(monitor.ID(), git.CheckResult{Stale: true, Commit: "abc123abc123"})
 		sess.store(noPull.ID(), git.CheckResult{Stale: true, Commit: "abc123abc123"})
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{monitor, noPull}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
@@ -341,7 +340,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		c.SetStale(true)
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: ""})
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
@@ -358,7 +357,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		c.SetStale(true)
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567", Tag: "v1.0.0"})
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
 		expectGitBuild(docker)
 
@@ -389,7 +388,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		c.SetStale(true)
 		sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "abc"})
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
 		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{c}, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, nil, failed)
 
@@ -417,9 +416,9 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 		params := updateParams.Params{Git: gitConfig.Defaults{Enable: true}}
 		log := newTestLogger(t)
 		progress := &state.Progress{}
-		progress.AddScanned(log, c, types.ImageID("git:abc"), params)
+		progress.AddScanned(log, c, container.ImageID("git:abc"), params)
 
-		failed := map[types.ContainerID]error{}
+		failed := map[container.ContainerID]error{}
 		docker := mockContainerClient.NewMockClient(t)
 		sess.PrepareRebuilds(log, t.Context(), docker, []*container.Container{c}, params, progress, failed)
 		progress.UpdateFailed(log, failed)
@@ -584,7 +583,7 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 		sess.built["built"] = "sha256:git"
 
 		got := sess.NoRestartBuiltIDs(updateParams.Params{NoRestart: true})
-		assert.Equal(t, map[types.ContainerID]struct{}{"built": {}}, got)
+		assert.Equal(t, map[container.ContainerID]struct{}{"built": {}}, got)
 
 		got["other"] = struct{}{}
 

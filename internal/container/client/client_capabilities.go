@@ -8,7 +8,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/copyfile"
 	"github.com/nicholas-fedor/watchtower/internal/container/ephemeral"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // CopyFileStore captures labeled files around recreate and discards leftovers.
@@ -16,7 +15,7 @@ type CopyFileStore interface {
 	// SnapshotCopyFiles captures labeled files before the source is removed.
 	SnapshotCopyFiles(ctx context.Context, c *container.Container) error
 	// DiscardCopyFiles drops a leftover snapshot for the source container.
-	DiscardCopyFiles(containerID types.ContainerID)
+	DiscardCopyFiles(containerID container.ContainerID)
 }
 
 var _ CopyFileStore = (*client)(nil)
@@ -32,9 +31,9 @@ var _ CopyFileStore = (*client)(nil)
 //   - tags: Image tags to apply.
 //
 // Returns:
-//   - types.ImageID: Built image ID.
+//   - container.ImageID: Built image ID.
 //   - error: Non-nil when the build or inspect fails.
-func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string, tags []string) (types.ImageID, error) {
+func (c *client) BuildRemoteImage(ctx context.Context, remote, dockerfile string, tags []string) (container.ImageID, error) {
 	imageID, err := containerImage.BuildFromGit(c.logger(), ctx, c.api, remote, dockerfile, tags)
 	if err != nil {
 		return "", fmt.Errorf("build image from Git: %w", err)
@@ -81,7 +80,7 @@ func (c *client) SnapshotCopyFiles(ctx context.Context, source *container.Contai
 func (c *client) injectStoredCopyFiles(
 	ctx context.Context,
 	source *container.Container,
-	newID types.ContainerID,
+	newID container.ContainerID,
 ) error {
 	snapshot, ok := c.copyFiles.Take(source.ID())
 	if !ok {
@@ -100,7 +99,7 @@ func (c *client) injectStoredCopyFiles(
 //
 // Parameters:
 //   - containerID: Source container ID whose snapshot should be discarded.
-func (c *client) DiscardCopyFiles(containerID types.ContainerID) {
+func (c *client) DiscardCopyFiles(containerID container.ContainerID) {
 	c.copyFiles.Take(containerID)
 }
 
@@ -123,7 +122,7 @@ func (c *client) DiscardCopyFiles(containerID types.ContainerID) {
 //   - cleanup: When true, the orchestrator removes the old image after handoff.
 //
 // Returns:
-//   - types.ContainerID: ID of the ephemeral orchestrator container.
+//   - container.ContainerID: ID of the ephemeral orchestrator container.
 //   - error: Non-nil if creation or start fails, nil on success.
 func (c *client) CreateEphemeralOrchestrator(
 	ctx context.Context,
@@ -131,7 +130,7 @@ func (c *client) CreateEphemeralOrchestrator(
 	newImage string,
 	containerChain string,
 	cleanup bool,
-) (types.ContainerID, error) {
+) (container.ContainerID, error) {
 	orchestratorID, err := ephemeral.CreateOrchestrator(c.log, ctx, c.api, sourceContainer, newImage, containerChain, cleanup)
 	if err != nil {
 		return "", fmt.Errorf("create ephemeral orchestrator: %w", err)

@@ -11,7 +11,6 @@ import (
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // batchTestContainer returns a container whose name and ID are the given name.
@@ -73,9 +72,9 @@ func TestComposeBatches_add(t *testing.T) {
 	batches.add(renamed, composeMember{container: jobs})
 	batches.add(override, composeMember{container: cron})
 
-	got := make([][]types.ContainerID, 0, len(batches.firstSeen))
+	got := make([][]container.ContainerID, 0, len(batches.firstSeen))
 	for _, batch := range batches.firstSeen {
-		ids := make([]types.ContainerID, 0, len(batch.members))
+		ids := make([]container.ContainerID, 0, len(batch.members))
 		for _, member := range batch.members {
 			ids = append(ids, member.container.ID())
 		}
@@ -83,7 +82,7 @@ func TestComposeBatches_add(t *testing.T) {
 		got = append(got, ids)
 	}
 
-	assert.Equal(t, [][]types.ContainerID{{"app", "db"}, {"web"}, {"jobs"}, {"cron"}}, got)
+	assert.Equal(t, [][]container.ContainerID{{"app", "db"}, {"web"}, {"jobs"}, {"cron"}}, got)
 
 	refs := make([]composeProject.ProjectRef, 0, len(batches.firstSeen))
 	for _, batch := range batches.firstSeen {

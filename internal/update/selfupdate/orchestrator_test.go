@@ -22,7 +22,6 @@ import (
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Containers and settings used by the orchestrator tests.
@@ -70,7 +69,7 @@ func orchestratorCalls(client *mockContainerClient.MockClient) []string {
 
 		switch call.Method {
 		case "GetContainer", "StartContainerByID":
-			target = string(call.Arguments.Get(1).(types.ContainerID))[:3]
+			target = string(call.Arguments.Get(1).(container.ContainerID))[:3]
 		case "RenameContainer":
 			target = call.Arguments.Get(1).(*container.Container).ID().ShortID()[:3] + " to " + call.Arguments.String(2)
 		case "StopContainer", "RemoveContainer", "StartContainer", "StopAndRemoveContainer":
@@ -215,7 +214,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		{
 			name: "old container not found",
 			setup: func(client *mockContainerClient.MockClient, _ *container.Container) {
-				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(nil, errOrchestratorTestNotFound)
 			},
 			wantErr:   errOrchestratorOldContainerNotFound,
@@ -224,7 +223,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		{
 			name: "old container inspect fails",
 			setup: func(client *mockContainerClient.MockClient, _ *container.Container) {
-				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(nil, errOrchestratorTestDocker)
 			},
 			wantErr:   errOrchestratorInspectFailed,
@@ -236,7 +235,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, true)
 				client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
 			},
@@ -256,10 +255,10 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, true)
 				client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
-				client.EXPECT().RemoveImageByID(mock.Anything, types.ImageID(orchestratorOldImage), orchestratorOldImage).
+				client.EXPECT().RemoveImageByID(mock.Anything, container.ImageID(orchestratorOldImage), orchestratorOldImage).
 					Return(nil)
 			},
 			wantCalls: []string{
@@ -278,7 +277,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			setup: func(client *mockContainerClient.MockClient, old *container.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, true)
 				client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
 			},
@@ -295,7 +294,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			setup: func(client *mockContainerClient.MockClient, old *container.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(errOrchestratorTestNotFound)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, true)
 			},
 			wantCalls: []string{
@@ -310,10 +309,10 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			setup: func(client *mockContainerClient.MockClient, old *container.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(errOrchestratorTestDocker)
-				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(orchestratorContainer(orchestratorOldID, orchestratorOldName, false), nil).Once()
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, true)
 				client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
 			},
@@ -332,7 +331,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			setup: func(client *mockContainerClient.MockClient, old *container.Container) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(errOrchestratorTestDocker)
-				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(orchestratorContainer(orchestratorOldID, orchestratorOldName, true), nil).Once()
 			},
 			wantErr:   errOrchestratorStopFailed,
@@ -344,7 +343,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(errOrchestratorTestDocker)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 			wantErr: errOrchestratorRenameFailed,
 			wantCalls: []string{
@@ -360,7 +359,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(errOrchestratorTestDocker)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorOldID)).
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(errOrchestratorTestDocker)
 			},
 			wantErr: errOrchestratorRenameFailed,
@@ -379,7 +378,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
 				client.EXPECT().StartContainer(mock.Anything, old).Return("", errOrchestratorTestDocker)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorOriginalName).Return(nil)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 			wantErr: errOrchestratorCreateFailed,
 			wantCalls: []string{
@@ -432,9 +431,9 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, false)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorNewID)).Return(nil)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorNewID)).Return(nil)
 				expectNewRunning(client, true)
 				client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
 			},
@@ -455,13 +454,13 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, false)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorNewID)).Return(errOrchestratorTestDocker)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorNewID)).Return(errOrchestratorTestDocker)
 				newContainer := expectNewRunning(client, false)
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, newContainer, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorOriginalName).Return(nil)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 			wantErr: errOrchestratorStartFailed,
 			wantCalls: []string{
@@ -483,14 +482,14 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, false)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorNewID)).Return(nil)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorNewID)).Return(nil)
 				expectNewRunning(client, false)
 				newContainer := expectNewRunning(client, false)
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, newContainer, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorOriginalName).Return(nil)
-				client.EXPECT().StartContainerByID(mock.Anything, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 			wantErr: errNewContainerNotRunning,
 			wantCalls: []string{
@@ -513,7 +512,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 				expectNewRunning(client, true)
 				client.EXPECT().RemoveContainer(mock.Anything, old).Return(errOrchestratorTestDocker)
 			},
@@ -563,14 +562,14 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 // expectOldInspect expects the orchestrator's first inspection of the old
 // container.
 func expectOldInspect(client *mockContainerClient.MockClient, old *container.Container) {
-	client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorOldID)).Return(old, nil).Once()
+	client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).Return(old, nil).Once()
 }
 
 // expectNewRunning expects one inspection of the new container, reporting it
 // running or stopped, and returns the container it reports.
 func expectNewRunning(client *mockContainerClient.MockClient, running bool) *container.Container {
 	newContainer := orchestratorContainer(orchestratorNewID, "/watchtower", running)
-	client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
+	client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
 
 	return newContainer
 }
@@ -608,7 +607,7 @@ func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 
 						return ctx.Err()
 					})
-				client.EXPECT().StartContainerByID(liveCtx, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(liveCtx, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 		},
 		{
@@ -618,13 +617,13 @@ func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
 				client.EXPECT().StartContainer(mock.Anything, old).
-					RunAndReturn(func(ctx context.Context, _ *container.Container) (types.ContainerID, error) {
+					RunAndReturn(func(ctx context.Context, _ *container.Container) (container.ContainerID, error) {
 						<-ctx.Done()
 
 						return "", ctx.Err()
 					})
 				client.EXPECT().RenameContainer(liveCtx, old, orchestratorOriginalName).Return(nil)
-				client.EXPECT().StartContainerByID(liveCtx, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(liveCtx, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 		},
 		{
@@ -635,17 +634,17 @@ func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 				expectOldInspect(client, old)
 				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
-				client.EXPECT().GetContainer(mock.Anything, types.ContainerID(orchestratorNewID)).
-					RunAndReturn(func(ctx context.Context, _ types.ContainerID) (*container.Container, error) {
+				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorNewID)).
+					RunAndReturn(func(ctx context.Context, _ container.ContainerID) (*container.Container, error) {
 						<-ctx.Done()
 
 						return nil, ctx.Err()
 					}).Once()
-				client.EXPECT().GetContainer(liveCtx, types.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
+				client.EXPECT().GetContainer(liveCtx, container.ContainerID(orchestratorNewID)).Return(newContainer, nil).Once()
 				client.EXPECT().StopAndRemoveContainer(liveCtx, newContainer, orchestratorStopTimeout).Return(nil)
 				client.EXPECT().RenameContainer(liveCtx, old, orchestratorOriginalName).Return(nil)
-				client.EXPECT().StartContainerByID(liveCtx, types.ContainerID(orchestratorOldID)).Return(nil)
+				client.EXPECT().StartContainerByID(liveCtx, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
 		},
 	}
@@ -744,7 +743,7 @@ func runOrchestratorHelper(t *testing.T, helperCase string) {
 		expectOldInspect(client, old)
 		client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
 		client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-		client.EXPECT().StartContainer(mock.Anything, old).Return(types.ContainerID(orchestratorNewID), nil)
+		client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
 		expectNewRunning(client, true)
 		client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
 	default:

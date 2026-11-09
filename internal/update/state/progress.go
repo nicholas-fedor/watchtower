@@ -9,11 +9,10 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Progress tracks container statuses during a session.
-type Progress map[types.ContainerID]*ContainerStatus
+type Progress map[container.ContainerID]*ContainerStatus
 
 // updateFromContainer creates a status from container data.
 //
@@ -27,7 +26,7 @@ type Progress map[types.ContainerID]*ContainerStatus
 //   - *ContainerStatus: Updated status.
 func updateFromContainer(log *zerolog.Logger,
 	c *container.Container,
-	newImage types.ImageID,
+	newImage container.ImageID,
 	state State,
 	params updateParams.Params,
 ) *ContainerStatus {
@@ -95,7 +94,7 @@ func (m Progress) AddFailed(log *zerolog.Logger, c *container.Container, err err
 //   - params: Update parameters for monitor-only check.
 func (m Progress) AddScanned(log *zerolog.Logger,
 	c *container.Container,
-	newImage types.ImageID,
+	newImage container.ImageID,
 	params updateParams.Params,
 ) {
 	m.Add(log, updateFromContainer(log, c, newImage, ScannedState, params))
@@ -110,7 +109,7 @@ func (m Progress) AddScanned(log *zerolog.Logger,
 //
 // Parameters:
 //   - failures: Map of container IDs to errors.
-func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.ContainerID]error) {
+func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[container.ContainerID]error) {
 	for containerID, err := range failures {
 		update, exists := m[containerID]
 		if !exists {
@@ -138,7 +137,7 @@ func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[types.Container
 // Parameters:
 //   - log: Process logger.
 //   - skips: Map of container IDs to skip reasons.
-func (m Progress) UpdateSkipped(log *zerolog.Logger, skips map[types.ContainerID]error) {
+func (m Progress) UpdateSkipped(log *zerolog.Logger, skips map[container.ContainerID]error) {
 	for containerID, reason := range skips {
 		update, exists := m[containerID]
 		if !exists {
@@ -216,7 +215,7 @@ func applyReportMeta(status *ContainerStatus, c *container.Container, params upd
 //
 // Returns:
 //   - none.
-func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.ContainerID, image types.ImageID) {
+func (m Progress) SetLatestImage(log *zerolog.Logger, containerID container.ContainerID, image container.ImageID) {
 	update, exists := m[containerID]
 	if !exists {
 		return
@@ -237,7 +236,7 @@ func (m Progress) SetLatestImage(log *zerolog.Logger, containerID types.Containe
 //   - log: Process logger.
 //   - containerID: ID of the replaced container.
 //   - newID: ID of the new container.
-func (m Progress) SetNewContainerID(log *zerolog.Logger, containerID, newID types.ContainerID) {
+func (m Progress) SetNewContainerID(log *zerolog.Logger, containerID, newID container.ContainerID) {
 	update, exists := m[containerID]
 	if !exists {
 		return
@@ -258,7 +257,7 @@ func (m Progress) SetNewContainerID(log *zerolog.Logger, containerID, newID type
 //   - log: Process logger.
 //   - containerID: Container identity.
 //   - meta: Resolved report metadata.
-func (m Progress) SetReportMeta(log *zerolog.Logger, containerID types.ContainerID, meta provenance.ReportMeta) {
+func (m Progress) SetReportMeta(log *zerolog.Logger, containerID container.ContainerID, meta provenance.ReportMeta) {
 	update, exists := m[containerID]
 	if !exists {
 		return
@@ -283,7 +282,7 @@ func (m Progress) SetReportMeta(log *zerolog.Logger, containerID types.Container
 //   - log: Process logger.
 //   - c: The container that was recreated.
 //   - newID: ID of the new container.
-func (m Progress) RecordRestart(log *zerolog.Logger, c *container.Container, newID types.ContainerID) {
+func (m Progress) RecordRestart(log *zerolog.Logger, c *container.Container, newID container.ContainerID) {
 	if _, exists := m[c.ID()]; !exists {
 		return
 	}
@@ -350,7 +349,7 @@ func (m Progress) Add(log *zerolog.Logger, update *ContainerStatus) {
 //
 // Parameters:
 //   - containerID: ID of container to mark.
-func (m Progress) MarkForUpdate(log *zerolog.Logger, containerID types.ContainerID) {
+func (m Progress) MarkForUpdate(log *zerolog.Logger, containerID container.ContainerID) {
 	update, exists := m[containerID]
 	if !exists {
 		log.Debug().
@@ -371,7 +370,7 @@ func (m Progress) MarkForUpdate(log *zerolog.Logger, containerID types.Container
 //
 // Parameters:
 //   - containerID: ID of container to mark.
-func (m Progress) MarkRestarted(log *zerolog.Logger, containerID types.ContainerID) {
+func (m Progress) MarkRestarted(log *zerolog.Logger, containerID container.ContainerID) {
 	update, exists := m[containerID]
 	if !exists {
 		log.Debug().
@@ -397,7 +396,7 @@ func (m Progress) MarkRestarted(log *zerolog.Logger, containerID types.Container
 //   - remaining: Human-readable remaining time (empty when the image age is unavailable).
 //   - eligibleAt: Time when the container becomes eligible for update.
 func (m Progress) SetCooldownInfo(log *zerolog.Logger,
-	containerID types.ContainerID,
+	containerID container.ContainerID,
 	age,
 	delay,
 	remaining string,

@@ -13,7 +13,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
-	"github.com/nicholas-fedor/watchtower/pkg/types"
 )
 
 // Container IDs used by the chain tests.
@@ -57,8 +56,8 @@ func chainTestContainers(chain string) (*container.Container, []*container.Conta
 }
 
 // containerIDs returns the ID of each container, in order.
-func containerIDs(containers []*container.Container) []types.ContainerID {
-	ids := make([]types.ContainerID, 0, len(containers))
+func containerIDs(containers []*container.Container) []container.ContainerID {
+	ids := make([]container.ContainerID, 0, len(containers))
 	for _, c := range containers {
 		ids = append(ids, c.ID())
 	}
@@ -74,32 +73,32 @@ func TestGetChainedContainers(t *testing.T) {
 	tests := []struct {
 		name  string
 		chain string
-		want  []types.ContainerID
+		want  []container.ContainerID
 	}{
 		{
 			name:  "Watchtower containers in the chain",
 			chain: chainOldAID + "," + chainOldBID,
-			want:  []types.ContainerID{chainOldAID, chainOldBID},
+			want:  []container.ContainerID{chainOldAID, chainOldBID},
 		},
 		{
 			name:  "a container that is not Watchtower is never returned",
 			chain: chainOldAID + "," + chainAppID,
-			want:  []types.ContainerID{chainOldAID},
+			want:  []container.ContainerID{chainOldAID},
 		},
 		{
 			name:  "spaces around IDs",
 			chain: " " + chainOldAID + " , " + chainOldBID + " ",
-			want:  []types.ContainerID{chainOldAID, chainOldBID},
+			want:  []container.ContainerID{chainOldAID, chainOldBID},
 		},
 		{
 			name:  "empty entries",
 			chain: "," + chainOldAID + ",, ," + chainOldBID + ",",
-			want:  []types.ContainerID{chainOldAID, chainOldBID},
+			want:  []container.ContainerID{chainOldAID, chainOldBID},
 		},
 		{
 			name:  "the current container is never returned",
 			chain: chainOldAID + "," + chainCurrentID,
-			want:  []types.ContainerID{chainOldAID},
+			want:  []container.ContainerID{chainOldAID},
 		},
 	}
 
@@ -171,12 +170,12 @@ func TestGetChainedContainers_OldCurrent(t *testing.T) {
 	tests := []struct {
 		name       string
 		candidates []*container.Container
-		want       []types.ContainerID
+		want       []container.ContainerID
 	}{
 		{
 			name:       "successor whose chain lists the old container",
 			candidates: []*container.Container{watchtower(successorID, "watchtower", "", oldID+","+chainOldAID)},
-			want:       []types.ContainerID{oldID, chainOldAID},
+			want:       []container.ContainerID{oldID, chainOldAID},
 		},
 		{
 			name: "chain match wins over an earlier container without a chain label",
@@ -184,27 +183,27 @@ func TestGetChainedContainers_OldCurrent(t *testing.T) {
 				watchtower(chainOldBID, "watchtower-b", "", ""),
 				watchtower(successorID, "watchtower", "", oldID+","+chainOldAID),
 			},
-			want: []types.ContainerID{oldID, chainOldAID},
+			want: []container.ContainerID{oldID, chainOldAID},
 		},
 		{
 			name:       "container without a chain label",
 			candidates: []*container.Container{watchtower(successorID, "watchtower", "", "")},
-			want:       []types.ContainerID{},
+			want:       []container.ContainerID{},
 		},
 		{
 			name:       "chain that does not list the old container",
 			candidates: []*container.Container{watchtower(successorID, "watchtower", "", chainOldAID)},
-			want:       []types.ContainerID{},
+			want:       []container.ContainerID{},
 		},
 		{
 			name:       "chain match in another scope",
 			candidates: []*container.Container{watchtower(successorID, "watchtower", "other", oldID+","+chainOldAID)},
-			want:       []types.ContainerID{},
+			want:       []container.ContainerID{},
 		},
 		{
 			name:       "chain match on another old container",
 			candidates: []*container.Container{watchtower(successorID, "watchtower-old-f00000000000", "", oldID+","+chainOldAID)},
-			want:       []types.ContainerID{},
+			want:       []container.ContainerID{},
 		},
 	}
 

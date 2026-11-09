@@ -463,7 +463,7 @@ func TestRunUpdates(t *testing.T) {
 				)
 
 				update := defaultTestUpdateParams(filters.NoFilter)
-				update.CurrentContainerID = types.ContainerID("container1-id")
+				update.CurrentContainerID = container.ContainerID("container1-id")
 
 				params := RunUpdatesWithNotificationsParams{
 					Logger:                       newTestLogger(t),
@@ -691,7 +691,7 @@ func TestRunUpdates(t *testing.T) {
 				{
 					ContainerName: "test-container",
 					ImageName:     "test-image:v1.0",
-					ImageID:       types.ImageID("sha256:123"),
+					ImageID:       container.ImageID("sha256:123"),
 				},
 			}, time.Minute)
 			// The function should return the cleaned images when cleanup is enabled
@@ -719,7 +719,7 @@ func TestRunUpdates(t *testing.T) {
 				{
 					ContainerName: "test-container",
 					ImageName:     "test-image:v1.0",
-					ImageID:       types.ImageID("sha256:123"),
+					ImageID:       container.ImageID("sha256:123"),
 				},
 			}, time.Minute)
 			require.Len(t, cleanedImages, 1)
@@ -1390,8 +1390,8 @@ func TestRunUpdates(t *testing.T) {
 						"cleanup-app-b": false,
 					},
 					RemoveImageError: errors.New("cleanup failed in scope-a"),
-					FailedImageIDs: []types.ImageID{
-						types.ImageID("app:v1"),
+					FailedImageIDs: []container.ImageID{
+						container.ImageID("app:v1"),
 					}, // Fail cleanup for scope-a
 				}
 
