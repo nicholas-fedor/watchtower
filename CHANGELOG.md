@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Try every endpoint's HEAD before falling back to GET by @nicholas-fedor in [#3589](https://github.com/nicholas-fedor/watchtower/pull/3589)
 - Stop retrying manifests on the registry's token host by @nicholas-fedor in [#3584](https://github.com/nicholas-fedor/watchtower/pull/3584)
 - Keep mirror tokens off the canonical registry host by @nicholas-fedor in [#3580](https://github.com/nicholas-fedor/watchtower/pull/3580)
 - Judge local-only images by the probed image name by @nicholas-fedor in [#3578](https://github.com/nicholas-fedor/watchtower/pull/3578)
