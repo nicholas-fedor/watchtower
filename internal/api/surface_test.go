@@ -17,8 +17,8 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api/auth"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	mockRoutes "github.com/nicholas-fedor/watchtower/internal/api/routes/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/golden"
@@ -38,7 +38,7 @@ var routeParamPattern = regexp.MustCompile(`:[A-Za-z0-9_]+`)
 func newFullSurfaceApp(t *testing.T) *fiber.App {
 	t.Helper()
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockRoutes.NewMockClient(t)
 	client.EXPECT().Ping(mock.Anything).Return(nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{}, nil).Maybe()
 	client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{}, nil).Maybe()

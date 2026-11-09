@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	mockHealth "github.com/nicholas-fedor/watchtower/internal/api/handlers/health/mocks"
 )
 
 func TestNewLivenessHandler(t *testing.T) {
@@ -37,11 +37,11 @@ func TestLivenessHandler_Handle(t *testing.T) {
 func TestNewReadinessHandler(t *testing.T) {
 	tests := []struct {
 		name   string
-		client *mockContainerClient.MockClient
+		client *mockHealth.MockPinger
 	}{
 		{
 			name:   "with mock client",
-			client: mockContainerClient.NewMockClient(t),
+			client: mockHealth.NewMockPinger(t),
 		},
 	}
 
@@ -69,7 +69,7 @@ func TestReadinessHandler_Handle_NilClient(t *testing.T) {
 }
 
 func TestReadinessHandler_Handle_HealthyClient(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHealth.NewMockPinger(t)
 	client.EXPECT().Ping(mock.Anything).Return(nil)
 
 	h := NewReadinessHandler(client)
@@ -86,7 +86,7 @@ func TestReadinessHandler_Handle_HealthyClient(t *testing.T) {
 }
 
 func TestReadinessHandler_Handle_UnhealthyClient(t *testing.T) {
-	client := mockContainerClient.NewMockClient(t)
+	client := mockHealth.NewMockPinger(t)
 	client.EXPECT().Ping(mock.Anything).Return(errors.New("connection refused"))
 
 	h := NewReadinessHandler(client)

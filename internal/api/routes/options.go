@@ -10,7 +10,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/api/handlers/check"
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/containers/details"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/health"
+	"github.com/nicholas-fedor/watchtower/internal/api/handlers/images"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
@@ -57,10 +60,20 @@ const (
 	DefaultUpdateTimeout = 10 * time.Minute
 )
 
+// Client is what the HTTP API needs from the Docker client.
+type Client interface {
+	health.Pinger
+	containers.ContainerLister
+	details.ContainerLister
+	images.ContainerLister
+	check.UpdateChecker
+	logging.APIVersionProvider
+}
+
 // Options holds transport and runtime configuration for SetupAndStartAPI.
 type Options struct {
-	// Client is the Docker client used by API handlers.
-	Client containerClient.Client
+	// Client is the Docker client the handlers and the startup message use.
+	Client Client
 	// Notifier holds back the notifications of a check request and sends them
 	// when it ends.
 	Notifier check.Notifier

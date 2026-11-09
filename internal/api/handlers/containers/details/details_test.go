@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockDetails "github.com/nicholas-fedor/watchtower/internal/api/handlers/containers/details/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
@@ -135,7 +135,7 @@ func TestGetContainerDetails(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockDetails.NewMockContainerLister(t)
 			client.EXPECT().ListContainers(mock.Anything).Return(tt.containers, tt.listErr)
 
 			details, err := GetContainerDetails(t.Context(), client, nil, "", "", tt.params)

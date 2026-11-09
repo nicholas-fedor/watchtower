@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	mockImages "github.com/nicholas-fedor/watchtower/internal/api/handlers/images/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
@@ -69,7 +69,7 @@ func TestListImageStatuses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockImages.NewMockContainerLister(t)
 			client.EXPECT().ListContainers(mock.Anything).Return(tt.containers, tt.listErr)
 
 			statuses, err := ListImageStatuses(t.Context(), client, nil)
@@ -98,7 +98,7 @@ func TestListImageStatuses(t *testing.T) {
 func TestListImageStatuses_SortsByNameThenImageID(t *testing.T) {
 	t.Parallel()
 
-	client := mockContainerClient.NewMockClient(t)
+	client := mockImages.NewMockContainerLister(t)
 	client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{
 		imageContainer("redis:7", "sha256:bbb"),
 		imageContainer("nginx:1.27", "sha256:zzz"),
@@ -146,7 +146,7 @@ func TestListImageStatuses_NameForSeveralTags(t *testing.T) {
 				containers = append(containers, imageContainer(name, "sha256:abc123"))
 			}
 
-			client := mockContainerClient.NewMockClient(t)
+			client := mockImages.NewMockContainerLister(t)
 			client.EXPECT().ListContainers(mock.Anything).Return(containers, nil)
 
 			statuses, err := ListImageStatuses(t.Context(), client, nil)

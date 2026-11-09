@@ -6,11 +6,15 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/healthcheck"
-
-	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 )
 
 const readinessProbeTimeout = 5 * time.Second
+
+// Pinger checks that the Docker daemon answers.
+type Pinger interface {
+	// Ping returns an error when the daemon does not answer.
+	Ping(ctx context.Context) error
+}
 
 // LivenessHandler serves the /livez endpoint.
 type LivenessHandler struct {
@@ -48,7 +52,7 @@ type ReadinessHandler struct {
 // Parameters:
 //   - client: Docker client for the readiness probe. May be nil, in which case
 //     the readiness probe will report unhealthy.
-func NewReadinessHandler(client containerClient.Client) *ReadinessHandler {
+func NewReadinessHandler(client Pinger) *ReadinessHandler {
 	return &ReadinessHandler{
 		Path: healthcheck.ReadinessEndpoint,
 		Probe: func(ctx context.Context) bool {
