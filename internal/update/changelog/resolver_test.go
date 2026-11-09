@@ -240,18 +240,36 @@ func TestResolveTagEmptyRegistry(t *testing.T) {
 	assert.Equal(t, []string{"v1.2.3", "1.2.3"}, fetcher.calls)
 }
 
-// A clean sweep that found nothing is a final answer, so it is cached.
+// A clean sweep that found nothing is cached for an hour, so siblings share it.
+// Once the hour lapses, a release tag pushed after the image is found.
 func TestResolveTagCachesDefinitiveMiss(t *testing.T) {
 	t.Parallel()
 
 	fetcher := &spyFetcher{digests: map[string]string{}}
 
 	r := NewResolver(fetcher)
+	now := time.Now()
+	r.now = func() time.Time { return now }
+
 	ctx := context.Background()
 
 	assert.Empty(t, r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
 	assert.Empty(t, r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
 	assert.Len(t, fetcher.calls, 2, "only the first attempt should reach the registry")
+
+	fetcher.mu.Lock()
+	fetcher.digests["v1.2.3"] = testDigest
+	fetcher.mu.Unlock()
+
+	now = now.Add(missCacheTTL - time.Second)
+
+	assert.Empty(t, r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
+	assert.Len(t, fetcher.calls, 2, "the miss must hold until the TTL lapses")
+
+	now = now.Add(2 * time.Second)
+
+	assert.Equal(t, "v1.2.3", r.ResolveTag(newTestLogger(t), ctx, testContainer(), "", "1.2.3", testDigest))
+	assert.Equal(t, []string{"v1.2.3", "1.2.3", "v1.2.3"}, fetcher.calls)
 }
 
 // A transient failure must not deny every sibling container its own attempt.
@@ -568,7 +586,9 @@ func TestResolveTagConcurrentDistinctDigests(t *testing.T) {
 
 // TestDigestFetcherUsesItsSettings verifies that a DigestFetcher makes its
 // registry requests with the settings it was built with, so a registry served
-// over plain HTTP is reachable only when the settings skip TLS.
+// over plain HTTP is reachable only when the settings skip TLS. The stub
+// answers 404 only for a HEAD of the v9.9.9 manifest and 500 for any other
+// request, so the miss comes from that tag's request.
 func TestDigestFetcherUsesItsSettings(t *testing.T) {
 	t.Parallel()
 
@@ -579,8 +599,10 @@ func TestDigestFetcherUsesItsSettings(t *testing.T) {
 		case r.Method == http.MethodHead && r.URL.Path == "/v2/org/app/manifests/v1.2.3":
 			w.Header().Set("Docker-Content-Digest", testDigest)
 			w.WriteHeader(http.StatusOK)
-		default:
+		case r.Method == http.MethodHead && r.URL.Path == "/v2/org/app/manifests/v9.9.9":
 			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 	}))
 	t.Cleanup(server.Close)

@@ -25,6 +25,12 @@ import (
 // It is short so a later session still gets a real attempt.
 const rateLimitCacheTTL = time.Minute
 
+// missCacheTTL is how long a sweep that found no matching tag is remembered.
+//
+// It covers the sibling containers of one session and the sessions that follow
+// soon after. It lapses so a release tag pushed after the image is still found.
+const missCacheTTL = time.Hour
+
 // maxSweepAttempts bounds how many sweeps a lookup waits for. A lookup that
 // only joined another caller's sweep tries again once when that sweep fails,
 // since the failure may be the other caller's canceled or expired context.
@@ -68,10 +74,11 @@ type Fetcher interface {
 
 // Resolver confirms the release tag spelling for a pulled image.
 //
-// Results are cached for the life of the Resolver, keyed by registry,
-// repository, and the new image digest, because several containers commonly
-// share one upstream image. A definitive miss is cached too, so a mirror that
-// publishes no versioned tags is not asked twice. Concurrent lookups for one
+// Results are keyed by registry, repository, and the new image digest,
+// because several containers commonly share one upstream image. A confirmed
+// tag is kept for the life of the Resolver. A definitive miss is kept for an
+// hour. A mirror that publishes no versioned tags is then asked once an hour
+// rather than once per container. Concurrent lookups for one
 // key share a single sweep, since containers that share an image are checked
 // in parallel.
 //
@@ -292,11 +299,13 @@ func (r *Resolver) sweep(
 	outcome := r.probe(log, ctx, container, registryAuth, version, newDigest, endpoints...)
 
 	switch outcome.outcome {
-	case outcomeMatched, outcomeNoMatch:
-		// A match and a clean sweep that found nothing are both final answers, so
-		// cache them indefinitely. That keeps a latest-only mirror from being
-		// asked again for every sibling container.
+	case outcomeMatched:
+		// The tag pointed at this exact digest, so the answer cannot go stale.
 		r.storeAnswer(key, cachedAnswer{tag: outcome.tag})
+	case outcomeNoMatch:
+		// Every candidate answered, so siblings would get the same answer. A
+		// maintainer can still push the release tag later, so the miss lapses.
+		r.storeAnswer(key, cachedAnswer{expires: r.clock()().Add(missCacheTTL)})
 	case outcomeRateLimited:
 		// Every sibling on this host would be refused too, so remember the
 		// refusal briefly rather than spend one doomed request each.
