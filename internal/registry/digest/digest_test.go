@@ -1350,10 +1350,11 @@ func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 }
 
 // TestFetchDigestForTag verifies that a release tag probe returns the tag's
-// digest and fails for a HEAD response that gives none.
+// digest, an empty digest for a tag the registry does not have, and an error
+// for a HEAD response that answers neither.
 //
 // A failed probe stays inconclusive for the caller, which retries it later. An
-// empty digest would read as a tag that does not exist.
+// empty digest is a definite miss the caller can cache.
 func TestFetchDigestForTag(t *testing.T) {
 	t.Parallel()
 
@@ -1370,6 +1371,11 @@ func TestFetchDigestForTag(t *testing.T) {
 			name:     "digest of the tag",
 			manifest: httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
 			want:     NormalizeDigest(newNopLogger(), testDigestHash),
+		},
+		{
+			name:     "a missing tag",
+			manifest: httpstub.RespondWith(http.StatusNotFound, "", nil),
+			want:     "",
 		},
 		{
 			name:     "a 401 without a refused scope",

@@ -31,7 +31,8 @@ type spyFetcher struct {
 	// mu guards calls.
 	mu sync.Mutex
 	// digests maps a tag to the digest returned for it. A missing tag yields
-	// empty with no error, which is how a registry reports an unknown tag.
+	// empty with no error, as the digest fetcher reports a tag the registry
+	// answers 404 for.
 	digests map[string]string
 	// errs maps a tag to the error returned for it.
 	errs map[string]error
@@ -590,6 +591,12 @@ func TestDigestFetcherUsesItsSettings(t *testing.T) {
 		FetchDigestForTag(newTestLogger(t), t.Context(), container, "", "v1.2.3")
 	require.NoError(t, err)
 	assert.Equal(t, strings.TrimPrefix(testDigest, "sha256:"), got)
+
+	// The registry answers 404 for a tag it does not have, which is a miss.
+	got, err = NewDigestFetcher(registryConfig.Registry{TLSSkip: true}, ratelimit.New()).
+		FetchDigestForTag(newTestLogger(t), t.Context(), container, "", "v9.9.9")
+	require.NoError(t, err)
+	assert.Empty(t, got)
 
 	_, err = NewDigestFetcher(registryConfig.Registry{}, ratelimit.New()).
 		FetchDigestForTag(newTestLogger(t), t.Context(), container, "", "v1.2.3")

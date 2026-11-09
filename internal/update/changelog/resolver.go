@@ -53,8 +53,9 @@ var errFetchTagDigest = errors.New("failed to fetch candidate tag digest")
 // It is an interface so callers can substitute a spy and assert that a default
 // session never reaches the registry.
 type Fetcher interface {
-	// FetchDigestForTag returns the normalized digest of tag, or empty when the
-	// tag does not exist.
+	// FetchDigestForTag returns the normalized digest of tag. It returns empty
+	// with no error when the registry reports that the tag does not exist. It
+	// returns an error when the lookup cannot tell.
 	FetchDigestForTag(
 		log *zerolog.Logger,
 		ctx context.Context,
@@ -358,7 +359,8 @@ func tagCandidates(version string) []string {
 //   - endpoints: Optional registry mirror host overrides to try before the canonical host.
 //
 // Returns:
-//   - string: The normalized digest.
+//   - string: The normalized digest, or empty when the registry answers 404
+//     for the tag.
 //   - error: Non-nil if the request fails or the registry gives no digest.
 func (f DigestFetcher) FetchDigestForTag(
 	log *zerolog.Logger,

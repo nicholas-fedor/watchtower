@@ -473,7 +473,8 @@ func fetchDigestWithGet(
 //   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
-//   - string: The normalized digest.
+//   - string: The normalized digest, or empty when the registry answers 404
+//     for the tag.
 //   - error: Non-nil if the request fails or the HEAD response gives no digest.
 func FetchDigestForTag(
 	log *zerolog.Logger,
@@ -486,6 +487,11 @@ func FetchDigestForTag(
 	endpoints ...string,
 ) (string, error) {
 	remote, err := fetchDigest(log, ctx, container, authToken, settings, limiter, http.MethodHead, tag, endpoints...)
+	if errors.Is(err, errManifestNotFound) {
+		// The registry has the repository but not this tag.
+		return "", nil
+	}
+
 	if err != nil {
 		return "", err
 	}
