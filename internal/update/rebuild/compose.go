@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
+	"maps"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -839,42 +839,6 @@ func containerLabels(c *container.Container) map[string]string {
 	return info.Config.Labels
 }
 
-// safeComposeAPIOrigin returns a credential-free API origin or an empty string for invalid input.
-//
-// Parameters:
-//   - raw: API origin to normalize and redact.
-//
-// Returns:
-//   - string: Normalized origin without credentials, query parameters, or a fragment.
-func safeComposeAPIOrigin(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ""
-	}
-
-	parseRaw := raw
-	if !strings.Contains(parseRaw, "://") {
-		parseRaw = "https://" + parseRaw
-	}
-
-	parsed, err := url.Parse(parseRaw)
-	if err != nil || parsed.Hostname() == "" {
-		return ""
-	}
-
-	parsed.User = nil
-	parsed.RawQuery = ""
-	parsed.ForceQuery = false
-	parsed.Fragment = ""
-
-	origin, err := provenance.ParseAPIOrigin(parsed.String())
-	if err != nil {
-		return ""
-	}
-
-	return strings.TrimRight(origin.String(), "/")
-}
-
 // composeServiceLabels is the stamp and association labels written onto new Compose containers.
 //
 // Parameters:
@@ -896,41 +860,8 @@ func composeServiceLabels(c *container.Container, params updateParams.Params, re
 		out[labels.GitLastTag] = result.Tag
 	}
 
-	assoc, ok := provenance.ResolveAssociation(c, params.Git)
-	if ok && assoc.Repo != "" {
-		meta := provenance.ResolveReportMeta(c, params.Git, provenance.ChangelogVars{
-			Tag:    result.Tag,
-			Commit: result.Commit,
-		}, oci.Annotations{})
-		if meta.GitRepo != "" {
-			out[labels.GitRepo] = meta.GitRepo
-		}
-
-		if assoc.Ref != "" {
-			out[labels.GitRef] = assoc.Ref
-		}
-
-		if assoc.Policy != "" {
-			out[labels.GitSemverPolicy] = assoc.Policy
-		}
-
-		if assoc.Host != "" {
-			if origin := safeComposeAPIOrigin(assoc.Host); origin != "" {
-				out[labels.GitHost] = origin
-			}
-		}
-
-		if assoc.Dockerfile != "" {
-			out[labels.GitDockerfile] = assoc.Dockerfile
-		}
-
-		if assoc.Context != "" {
-			out[labels.GitContext] = assoc.Context
-		}
-
-		if provenance.PersistWatch(c) {
-			out[labels.GitWatch] = "true"
-		}
+	if assoc, ok := provenance.ResolveAssociation(c, params.Git); ok {
+		maps.Copy(out, assoc.Labels())
 	}
 
 	if dir, present := c.GetLabel(labels.ComposeDir); present && dir != "" {

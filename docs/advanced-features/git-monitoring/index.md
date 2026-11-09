@@ -386,7 +386,12 @@ Watchtower stays on the registry path and logs at debug.
 
 Enabling values are `true`, `yes`, `1`, and `t`.
 Disabling values are `false`, `no`, `0`, and `f`.
-Those are the same loose booleans as other Watchtower labels.
+Case and surrounding spaces are ignored.
+An empty or unrecognized value counts as absent.
+The [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option then decides.
+Watchtower does not warn about an unrecognized value.
+Watchtower's other boolean labels do not accept `yes` or `no`.
+They warn about a value they cannot read.
 
 ### How Watchtower Chooses a Running Revision
 
@@ -692,9 +697,25 @@ Override that default with `com.centurylinklabs.watchtower.git-watch`.
 
 #### What Is Written After a Rebuild
 
+A rebuilt container, whether Watchtower recreated it or Compose applied it, carries the association labels it needs on its next check.
+
+- `com.centurylinklabs.watchtower.git-repo` is written without credentials.
+- `com.centurylinklabs.watchtower.git-host` is written as the API origin, without credentials or a query.
+- `com.centurylinklabs.watchtower.git-ref`, `com.centurylinklabs.watchtower.git-semver-policy`, `com.centurylinklabs.watchtower.git-dockerfile`, and `com.centurylinklabs.watchtower.git-context` are written only when a label or a [Git Image](../../configuration/git-monitoring/index.md#git_image) mapping supplied them.
+- Values that came from the [Git Dockerfile](../../configuration/git-monitoring/index.md#git_dockerfile) or [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration options are not written.
+    A later change to those options still applies to the rebuilt container.
+- The built-in defaults, the `main` ref and the `none` semver policy, are not written either.
+
 `git-watch=true` is written only when the source container already had an explicit enabling watch label.
 When the watcher was on only because of the [Git Enable](../../configuration/git-monitoring/index.md#git_enable) configuration option, the replacement has no `git-watch` label.
 Setting [Git Enable](../../configuration/git-monitoring/index.md#git_enable) to `false` later still applies.
+
+!!! Note "Containers rebuilt through Compose by v1.24.0 or earlier"
+    Those releases also wrote the default ref, semver policy, Dockerfile, and context onto containers rebuilt through Compose.
+    A container rebuilt that way treats them as its own labels.
+    A later change to [Git Dockerfile](../../configuration/git-monitoring/index.md#git_dockerfile) or [Git Context](../../configuration/git-monitoring/index.md#git_context) does not reach it.
+    To check a container, run `docker inspect -f '{{json .Config.Labels}}' <container>` and look for `com.centurylinklabs.watchtower.git-dockerfile` and `com.centurylinklabs.watchtower.git-context`.
+    If you did not set them, recreate the container with `docker compose up -d --force-recreate <service>` so it starts from the labels in your Compose file.
 
 ### Where Settings Come From
 

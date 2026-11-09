@@ -51,6 +51,7 @@ func ParseAPIOrigin(raw string) (url.URL, error) {
 
 	parsed.User = nil
 	parsed.RawQuery = ""
+	parsed.ForceQuery = false
 	parsed.Fragment = ""
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	parsed.Host = canonicalAPIHost(strings.ToLower(parsed.Hostname()), parsed.Port())

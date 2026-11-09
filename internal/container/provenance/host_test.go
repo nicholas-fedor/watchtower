@@ -18,6 +18,7 @@ func TestParseAPIOrigin(t *testing.T) {
 		secrets         []string
 	}{
 		{name: "https", raw: "https://git.example.com:3000", want: "https://git.example.com:3000"},
+		{name: "empty query", raw: "https://git.example.com:3000?", want: "https://git.example.com:3000"},
 		{name: "trailing slash", raw: "https://git.example.com/", want: "https://git.example.com"},
 		{name: "hostname only", raw: "gitlab.internal", want: "https://gitlab.internal"},
 		{name: "path prefix", raw: "https://git.example.com/gitlab", want: "https://git.example.com/gitlab"},
