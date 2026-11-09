@@ -325,21 +325,28 @@ func TestImageMapping(t *testing.T) {
 	assert.Equal(t, gitConfig.Image{}, imageMapping("", images))
 }
 
-func TestPersistWatch(t *testing.T) {
+// TestWatchLabel covers which git-watch values count as set and which of
+// those turn the watcher on.
+func TestWatchLabel(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		label   string
-		present bool
-		want    bool
+		name        string
+		label       string
+		present     bool
+		wantEnabled bool
+		wantSet     bool
 	}{
 		{name: "absent"},
 		{name: "blank", label: "  ", present: true},
-		{name: "true", label: "true", present: true, want: true},
-		{name: "yes", label: "YES", present: true, want: true},
-		{name: "one", label: "1", present: true, want: true},
-		{name: "false", label: "false", present: true},
+		{name: "true", label: "true", present: true, wantEnabled: true, wantSet: true},
+		{name: "yes", label: " YES ", present: true, wantEnabled: true, wantSet: true},
+		{name: "one", label: "1", present: true, wantEnabled: true, wantSet: true},
+		{name: "t", label: "t", present: true, wantEnabled: true, wantSet: true},
+		{name: "false", label: "false", present: true, wantSet: true},
+		{name: "no", label: "No", present: true, wantSet: true},
+		{name: "zero", label: "0", present: true, wantSet: true},
+		{name: "f", label: "f", present: true, wantSet: true},
 		{name: "unknown", label: "maybe", present: true},
 	}
 
@@ -352,11 +359,15 @@ func TestPersistWatch(t *testing.T) {
 				containerLabels[labels.GitWatch] = tt.label
 			}
 
-			assert.Equal(t, tt.want, PersistWatch(testContainer(containerLabels, "app:latest")))
+			enabled, set := watchLabel(testContainer(containerLabels, "app:latest"))
+			assert.Equal(t, tt.wantEnabled, enabled)
+			assert.Equal(t, tt.wantSet, set)
 		})
 	}
 
-	assert.False(t, PersistWatch(nil))
+	enabled, set := watchLabel(nil)
+	assert.False(t, enabled)
+	assert.False(t, set)
 }
 
 func TestIsWatch(t *testing.T) {

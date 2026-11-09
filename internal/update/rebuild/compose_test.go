@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
+	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
@@ -1076,7 +1077,7 @@ func Test_composeServiceLabels(t *testing.T) {
 		t.Parallel()
 
 		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
-			labels.GitHost: "https://user:secret@git.example.com:8443/git/api?token=secret",
+			labels.GitHost: "https://user:secret@git.example.com:8443/git/api",
 		})
 		got := composeServiceLabels(c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, git.CheckResult{Commit: "abc"})
 		assert.Equal(t, "https://git.example.com:8443/git/api", got[labels.GitHost])
@@ -1091,6 +1092,71 @@ func Test_composeServiceLabels(t *testing.T) {
 		})
 		got := composeServiceLabels(c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, git.CheckResult{Commit: "abc"})
 		assert.NotContains(t, got, labels.GitHost)
+	})
+
+	// Defaults written as labels would count as the container's own settings
+	// on the next check. A later change to the git-dockerfile or git-context
+	// configuration option would then no longer reach the container.
+	t.Run("leaves process defaults off", func(t *testing.T) {
+		t.Parallel()
+
+		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", nil)
+		c.DeleteLabel(labels.GitRef)
+
+		got := composeServiceLabels(c, updateParams.Params{Git: gitConfig.Defaults{
+			DefaultRef:   gitConfig.DefaultRef,
+			SemverPolicy: gitConfig.DefaultPolicy,
+			Dockerfile:   "build/Dockerfile",
+			Context:      "app",
+			Enable:       true,
+		}}, git.CheckResult{Commit: "abc"})
+
+		assert.Equal(t, map[string]string{
+			labels.GitLastCommit: "abc",
+			labels.GitRepo:       "https://github.com/org/app.git",
+		}, got)
+	})
+
+	t.Run("keeps values a git-image mapping supplied", func(t *testing.T) {
+		t.Parallel()
+
+		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", nil)
+		c.DeleteLabel(labels.GitRepo)
+		c.DeleteLabel(labels.GitRef)
+
+		got := composeServiceLabels(c, updateParams.Params{Git: gitConfig.Defaults{
+			Images: map[string]gitConfig.Image{
+				"webstack-api:latest": {
+					Repo:       "https://github.com/org/app.git",
+					Ref:        "release",
+					Policy:     semver.PolicyMinor,
+					Dockerfile: "build/Dockerfile",
+					Context:    "app",
+				},
+			},
+			DefaultRef: gitConfig.DefaultRef,
+			Enable:     true,
+		}}, git.CheckResult{Commit: "abc"})
+
+		assert.Equal(t, map[string]string{
+			labels.GitLastCommit:   "abc",
+			labels.GitRepo:         "https://github.com/org/app.git",
+			labels.GitRef:          "release",
+			labels.GitSemverPolicy: semver.PolicyMinor,
+			labels.GitDockerfile:   "build/Dockerfile",
+			labels.GitContext:      "app",
+		}, got)
+	})
+
+	t.Run("writes no association when the repository cannot be redacted", func(t *testing.T) {
+		t.Parallel()
+
+		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
+			labels.GitRepo: "://invalid",
+		})
+		got := composeServiceLabels(c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}, git.CheckResult{Commit: "abc"})
+
+		assert.Equal(t, map[string]string{labels.GitLastCommit: "abc"}, got)
 	})
 
 	t.Run("writes git-watch when the source label enabled it", func(t *testing.T) {
