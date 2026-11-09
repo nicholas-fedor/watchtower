@@ -168,8 +168,10 @@ type DockerClient interface {
 	selfupdate.HandoffClient
 
 	// GetCurrentWatchtowerContainer returns the container with the given ID
-	// without inspecting its image. A transient inspect failure is tried again
-	// until ctx ends.
+	// without inspecting its image.
+	//
+	// A transient inspect failure is tried again, up to three attempts 2
+	// seconds apart, or until ctx ends.
 	GetCurrentWatchtowerContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
 }
 
