@@ -92,13 +92,22 @@ func parseChallenge(header string) challengeValues {
 // IsInsufficientScope reports whether a response's Bearer challenge says the
 // token lacks the requested scope, the RFC 6750 insufficient_scope error.
 //
+// Every WWW-Authenticate header line is checked, since a response can carry a
+// Bearer challenge after another scheme's.
+//
 // Parameters:
-//   - header: Response headers holding the WWW-Authenticate challenge.
+//   - header: Response headers holding the WWW-Authenticate challenges.
 //
 // Returns:
-//   - bool: True when the challenge's error is insufficient_scope.
+//   - bool: True when a Bearer challenge's error is insufficient_scope.
 func IsInsufficientScope(header http.Header) bool {
-	return parseChallenge(header.Get(challengeHeaderName)).errorCode == "insufficient_scope"
+	for _, challenge := range header.Values(challengeHeaderName) {
+		if parseChallenge(challenge).errorCode == "insufficient_scope" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // splitQuoted splits a string by a delimiter rune without splitting on

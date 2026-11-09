@@ -143,6 +143,15 @@ func TestIsInsufficientScope(t *testing.T) {
 			want:   true,
 		},
 		{
+			// A response can carry several challenges, one per header line.
+			name: "insufficient scope after a basic challenge",
+			header: http.Header{"Www-Authenticate": {
+				`Basic realm="registry"`,
+				`Bearer ` + realm + `,error="insufficient_scope"`,
+			}},
+			want: true,
+		},
+		{
 			name:   "unquoted error value",
 			header: http.Header{"Www-Authenticate": {`Bearer ` + realm + `,error=insufficient_scope`}},
 			want:   true,

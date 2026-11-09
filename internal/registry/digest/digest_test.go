@@ -1349,6 +1349,70 @@ func TestCompareDigestWithRemote_HeadRejectedFallsBackToGet(t *testing.T) {
 	assert.Equal(t, remote, remoteDigest)
 }
 
+// TestFetchDigestForTag verifies that a release tag probe returns the tag's
+// digest and fails for a HEAD response that gives none.
+//
+// A failed probe stays inconclusive for the caller, which retries it later. An
+// empty digest would read as a tag that does not exist.
+func TestFetchDigestForTag(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/v1.2.3"
+
+	tests := []struct {
+		name string
+		// manifest answers the HEAD request for the tag.
+		manifest http.HandlerFunc
+		want     string
+		wantErr  error
+	}{
+		{
+			name:     "digest of the tag",
+			manifest: httpstub.RespondWith(http.StatusOK, "", digestHeader(testDigestHash)),
+			want:     NormalizeDigest(newNopLogger(), testDigestHash),
+		},
+		{
+			name:     "a 401 without a refused scope",
+			manifest: httpstub.RespondWith(http.StatusUnauthorized, "", unauthorizedChallenge("invalid_token")),
+			wantErr:  errInvalidRegistryResponse,
+		},
+		{
+			name:     "a server error",
+			manifest: httpstub.RespondWith(http.StatusInternalServerError, "", nil),
+			wantErr:  errInvalidRegistryResponse,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := httpstub.New(t)
+			registry.AppendHandlers(
+				anonymousRegistryHandler(t),
+				httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodHead, httpstub.Path(manifestPath)),
+					tt.manifest,
+				),
+			)
+
+			container := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			got, err := FetchDigestForTag(newTestLogger(t), t.Context(),
+				container, "", "v1.2.3", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, got)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // TestCompareDigestWithRemote_MirrorRefusalIsNotLocalOnly verifies that a
 // mirror's refusal of a single-component name does not make the image
 // local-only.

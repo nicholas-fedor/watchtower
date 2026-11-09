@@ -358,8 +358,8 @@ func tagCandidates(version string) []string {
 //   - endpoints: Optional registry mirror host overrides to try before the canonical host.
 //
 // Returns:
-//   - string: The normalized digest, or empty when the tag does not exist.
-//   - error: Non-nil if the request fails, nil on success.
+//   - string: The normalized digest.
+//   - error: Non-nil if the request fails or the registry gives no digest.
 func (f DigestFetcher) FetchDigestForTag(
 	log *zerolog.Logger,
 	ctx context.Context,

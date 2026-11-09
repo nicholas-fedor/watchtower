@@ -473,8 +473,8 @@ func fetchDigestWithGet(
 //   - endpoints: Optional list of registry mirror host overrides to try before the canonical host.
 //
 // Returns:
-//   - string: The normalized digest, or empty when the tag does not exist.
-//   - error: Non-nil if the request fails, nil on success.
+//   - string: The normalized digest.
+//   - error: Non-nil if the request fails or the HEAD response gives no digest.
 func FetchDigestForTag(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -485,7 +485,18 @@ func FetchDigestForTag(
 	limiter *ratelimit.Limiter,
 	endpoints ...string,
 ) (string, error) {
-	return fetchDigest(log, ctx, container, authToken, settings, limiter, http.MethodHead, tag, endpoints...)
+	remote, err := fetchDigest(log, ctx, container, authToken, settings, limiter, http.MethodHead, tag, endpoints...)
+	if err != nil {
+		return "", err
+	}
+
+	// An empty digest means the HEAD request failed or carried no hash. That
+	// answers nothing about the tag, so the caller must not read it as missing.
+	if remote == "" {
+		return "", fmt.Errorf("%w: no digest for tag %s", errInvalidRegistryResponse, tag)
+	}
+
+	return remote, nil
 }
 
 // buildManifestURL constructs and validates a manifest URL for a container.

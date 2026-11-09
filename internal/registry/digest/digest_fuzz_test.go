@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/registry/auth"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 )
@@ -331,6 +332,13 @@ func FuzzHandleManifestResponse(f *testing.F) {
 				errors.Is(err, errInvalidRegistryResponse) || errors.Is(err, errRepositoryDenied) ||
 					errors.Is(err, ratelimit.ErrRateLimited),
 				"unexpected error: %v", err)
+
+			// Only a 401 whose challenge refuses the scope is a refusal.
+			if errors.Is(err, errRepositoryDenied) {
+				assert.Equal(t, http.StatusUnauthorized, statusCode)
+				assert.True(t, auth.IsInsufficientScope(resp.Header), "a refusal without insufficient_scope")
+			}
+
 			assert.Empty(t, digest)
 			assert.Empty(t, manifestURL)
 		default:
