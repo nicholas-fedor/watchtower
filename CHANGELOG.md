@@ -96,6 +96,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/oauth2 to v0.38.0 by @renovate[bot] in [#3612](https://github.com/nicholas-fedor/watchtower/pull/3612)
 - Update peter-evans/create-pull-request action to v8.1.2 by @renovate[bot] in [#3599](https://github.com/nicholas-fedor/watchtower/pull/3599)
 - Update module github.com/valyala/fasthttp to v1.78.0 by @renovate[bot] in [#3585](https://github.com/nicholas-fedor/watchtower/pull/3585)
 - Update alpine:3.24.4 docker digest to f59abe6 by @renovate[bot] in [#3581](https://github.com/nicholas-fedor/watchtower/pull/3581)
