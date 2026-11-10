@@ -316,10 +316,6 @@ linters:
         linters:
           - dupword
       # Functions above the gocyclo threshold today. Remove an entry when its function is split up.
-      - path: "internal/update/update.go"
-        linters:
-          - gocyclo
-        text: "of func `update` is high"
       - path: "internal/git/project/checkout.go"
         linters:
           - gocyclo

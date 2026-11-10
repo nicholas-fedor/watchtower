@@ -88,6 +88,66 @@ func staleGitTestContainer(
 	return app, session, gitClient, commit
 }
 
+// TestCurrentOldInstance verifies that the current container is returned
+// only when it is a listed Watchtower container with the watchtower-old- name
+// prefix.
+func TestCurrentOldInstance(t *testing.T) {
+	t.Parallel()
+
+	const (
+		oldID     = "01d0000000000000000000000000000000000000000000000000000000000000"
+		currentID = "c000000000000000000000000000000000000000000000000000000000000000"
+	)
+
+	old := cleanupTestWatchtower(oldID, "watchtower-old-01d000000000", "nickfedor/watchtower:latest")
+
+	tests := []struct {
+		name       string
+		currentID  container.ContainerID
+		containers []*container.Container
+		want       *container.Container
+	}{
+		{
+			name:       "an old Watchtower instance",
+			currentID:  oldID,
+			containers: []*container.Container{old},
+			want:       old,
+		},
+		{
+			name:       "no current container",
+			currentID:  "",
+			containers: []*container.Container{old},
+			want:       nil,
+		},
+		{
+			name:       "a current container that is not listed",
+			currentID:  currentID,
+			containers: []*container.Container{old},
+			want:       nil,
+		},
+		{
+			name:       "a current container that is not old",
+			currentID:  currentID,
+			containers: []*container.Container{cleanupTestWatchtower(currentID, "watchtower", "nickfedor/watchtower:latest")},
+			want:       nil,
+		},
+		{
+			name:       "an old name on a container that is not Watchtower",
+			currentID:  oldID,
+			containers: []*container.Container{skipTestContainer(oldID, "watchtower-old-01d000000000", nil)},
+			want:       nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Same(t, tt.want, currentOldInstance(tt.containers, tt.currentID))
+		})
+	}
+}
+
 // TestCheckDependencies verifies the dependency phase. It skips containers
 // that name themselves and the members of a cycle. It warns about a
 // depends-on entry that names no container but not about one that names an
