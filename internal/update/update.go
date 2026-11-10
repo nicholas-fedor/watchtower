@@ -555,8 +555,9 @@ func update(
 // Returns:
 //   - bool: True when a check of Watchtower's own image failed. A cooldown
 //     deferral does not count.
-//   - error: Non-nil when ctx ends before every check is recorded. The
-//     containers without a result are then reported as skipped.
+//   - error: Non-nil when ctx ends before every check is recorded. It wraps
+//     the context's error as "update canceled". The containers without a
+//     result are reported as skipped with the context's error.
 func checkStaleness(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -574,19 +575,22 @@ func checkStaleness(
 		tally    stalenessTally
 	)
 
+	// A canceled session ends with one error wherever the cancellation lands.
+	// The containers not yet checked are reported as skipped. The partial
+	// report then does not read as a complete scan.
+	canceled := func() (bool, error) {
+		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
+
+		return false, fmt.Errorf("update canceled: %w", ctx.Err())
+	}
+
 	// Prepare containers for staleness checks, skipping already-processed ones.
 	var candidates []*container.Container
 
 	for _, sourceContainer := range filteredContainers {
 		// Check for context cancellation to enable faster shutdown during long update cycles.
-		// The containers not yet checked are reported as skipped, so the
-		// partial report does not read as a complete scan.
-		select {
-		case <-ctx.Done():
-			progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
-
-			return false, ctx.Err() //nolint:wrapcheck // The session ends with its context's own error.
-		default:
+		if ctx.Err() != nil {
+			return canceled()
 		}
 
 		// Skip containers already processed (e.g., skipped due to circular dependencies).
@@ -626,12 +630,8 @@ func checkStaleness(
 	}
 
 	// Check for context cancellation before launching parallel staleness checks.
-	select {
-	case <-ctx.Done():
-		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
-
-		return false, ctx.Err() //nolint:wrapcheck // The session ends with its context's own error.
-	default:
+	if ctx.Err() != nil {
+		return canceled()
 	}
 
 	// Parallelize staleness checks with bounded concurrency.
@@ -682,9 +682,7 @@ func checkStaleness(
 		// A worker returns an error only when the session is canceled. A
 		// canceled check records nothing, so its container and those whose
 		// check never ran are reported as skipped.
-		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", err), config)
-
-		return false, fmt.Errorf("update canceled: %w", err)
+		return canceled()
 	}
 
 	// Log the summary of staleness checks, including total, stale, and failed counts.
