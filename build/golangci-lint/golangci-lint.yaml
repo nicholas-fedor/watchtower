@@ -324,18 +324,10 @@ linters:
         linters:
           - gocyclo
         text: "of func `restartStaleContainer` is high"
-      - path: "internal/container/filters/filters.go"
-        linters:
-          - gocyclo
-        text: "of func `BuildFilter` is high"
       - path: "internal/registry/digest/digest.go"
         linters:
           - gocyclo
         text: "of func `fetchDigest` is high"
-      - path: "internal/update/schedule/scheduling.go"
-        linters:
-          - gocyclo
-        text: "of func `RunUpgradesOnSchedule` is high"
     paths:
       - ".*/mocks/.*"
       - "^internal/api/swagger/"
