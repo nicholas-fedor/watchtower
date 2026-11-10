@@ -355,125 +355,22 @@ func update(
 		return progress.Report(log), cleanupImageInfos, err
 	}
 
-	// Sort containers by dependencies to ensure correct update and restart order.
-	// Cycle members cannot be ordered, so they are placed after the others.
-	// Every sort keeps only the graph's dependencies between the containers it
-	// sorts, so leaving a container out cannot redirect a link to a different
-	// container and form a cycle that the graph does not have.
-	sortable := make([]*container.Container, 0, len(filteredContainers))
-	unsortable := make([]*container.Container, 0, len(inCycle))
-
-	for _, c := range filteredContainers {
-		if _, skip := inCycle[c.ID()]; skip {
-			unsortable = append(unsortable, c)
-		} else {
-			sortable = append(sortable, c)
-		}
-	}
-
-	err = graphErr
-	if err == nil {
-		err = graph.Sort(log, sortable)
-	}
-
-	if err != nil {
-		// Log and return an error if dependency sorting fails.
-		log.Debug().
-			Err(err).
-			Msg("Failed to sort containers by dependencies")
-
-		return nil, cleanupImageInfos, fmt.Errorf(
-			"%w: %w",
-			errSortDependenciesFailed,
-			err,
-		)
-	}
-
-	// Write the order back, with cycle members last.
-	copy(filteredContainers, sortable)
-	copy(filteredContainers[len(sortable):], unsortable)
-
-	// Collect all containers to restart: updates, and containers linked to
-	// restarting ones, which restart without updating.
-	allContainersToRestart := implicitrestart.Reconcile(log,
-		graph,
-		allContainers,
-		filteredContainers,
-		config,
-		inCycle,
-	)
-
-	// Sort containers to restart by dependencies to ensure correct update and restart order.
-	err = graph.Sort(log, allContainersToRestart)
-	if err != nil {
-		log.Debug().
-			Err(err).
-			Msg("Failed to sort all containers to restart by dependencies")
-
-		return nil, cleanupImageInfos, fmt.Errorf(
-			"%w: %w",
-			errSortDependenciesFailed,
-			err,
-		)
-	}
-
-	// Log the number of containers prepared for restart.
-	log.Debug().
-		Int("restart_count", len(allContainersToRestart)).
-		Msg("Prepared containers for restart")
-
-	gitFailed := make(map[container.ContainerID]error)
-	gitSession.PrepareRebuilds(
+	allContainersToRestart, err := planRestarts(
 		log,
 		ctx,
 		client,
-		allContainersToRestart,
 		config,
+		gitSession,
 		progress,
-		gitFailed,
-	)
-	progress.UpdateFailed(log, gitFailed)
-
-	// A failed Git apply cleared Stale. Recompute linked restarts so those
-	// dependencies are not stopped. Containers that are still stale stay anchors.
-	// Cycle members stay excluded, as in the first pass.
-	excluded := make(map[container.ContainerID]struct{}, len(inCycle))
-	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
-	maps.Copy(excluded, inCycle)
-
-	allContainersToRestart = implicitrestart.Reconcile(
-		log,
 		graph,
+		graphErr,
 		allContainers,
 		filteredContainers,
-		config,
-		excluded,
+		inCycle,
 	)
-
-	err = graph.Sort(log, allContainersToRestart)
 	if err != nil {
-		log.Debug().
-			Err(err).
-			Msg("Failed to sort all containers to restart by dependencies")
-
-		return nil, cleanupImageInfos, fmt.Errorf(
-			"%w: %w",
-			errSortDependenciesFailed,
-			err,
-		)
+		return nil, cleanupImageInfos, err
 	}
-
-	// Compose apply already recreated those services. Do not inspect-recreate.
-	allContainersToRestart = gitSession.ExcludeApplied(allContainersToRestart)
-
-	// Git no-restart builds must not enter stop/create.
-	// The default non-rolling path stops first.
-	// Skipping their recreation only after the stop would leave the running
-	// container deleted.
-	allContainersToRestart = gitSession.ExcludeNoRestart(
-		allContainersToRestart,
-		config,
-	)
 
 	// Perform updates and restarts, either with rolling restarts or in batches.
 	err = restart.Run(
@@ -968,6 +865,151 @@ func skipFailedUpdateCheck(
 	clog.WithLevel(scanProblems.Level("failed update check", string(c.ID()), err.Error())).
 		Err(err).
 		Msg(logging.UpdateCheckFailed)
+}
+
+// planRestarts orders the monitored containers by dependency and decides
+// which containers the session restarts, in restart order.
+//
+// The restart list holds the containers to update and those that restart
+// because a container they depend on restarts. planRestarts runs the Git
+// rebuilds of the stale Git-watched containers on that list. A container whose
+// rebuild failed is no longer stale. The list is then worked out again without
+// it. The list leaves out the containers that Compose already recreated and
+// the no-restart Git builds. Cycle members are kept out of the sorts and the
+// implicit restarts. They are placed after the other monitored containers.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for the Git image builds.
+//   - config: Update parameters.
+//   - gitSession: The session's Git monitor.
+//   - progress: Session progress that receives the rebuild results.
+//   - graph: The session's dependency graph.
+//   - graphErr: The error from building the graph, which fails the first sort.
+//   - allContainers: Every listed container.
+//   - filteredContainers: The monitored containers, sorted in place.
+//   - inCycle: IDs of the containers in a circular dependency.
+//
+// Returns:
+//   - []*container.Container: The containers to restart, in restart order.
+//   - error: Non-nil when a dependency sort fails.
+func planRestarts(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	config updateParams.Params,
+	gitSession *rebuild.Session,
+	progress *state.Progress,
+	graph *sorter.DependencyGraph,
+	graphErr error,
+	allContainers, filteredContainers []*container.Container,
+	inCycle map[container.ContainerID]struct{},
+) ([]*container.Container, error) {
+	// Each failed sort is logged at debug and ends the session with the same
+	// error.
+	sortFailed := func(msg string, err error) error {
+		log.Debug().
+			Err(err).
+			Msg(msg)
+
+		return fmt.Errorf("%w: %w", errSortDependenciesFailed, err)
+	}
+
+	// Sort containers by dependencies to ensure correct update and restart order.
+	// Cycle members cannot be ordered, so they are placed after the others.
+	// Every sort keeps only the graph's dependencies between the containers it
+	// sorts, so leaving a container out cannot redirect a link to a different
+	// container and form a cycle that the graph does not have.
+	sortable := make([]*container.Container, 0, len(filteredContainers))
+	unsortable := make([]*container.Container, 0, len(inCycle))
+
+	for _, c := range filteredContainers {
+		if _, skip := inCycle[c.ID()]; skip {
+			unsortable = append(unsortable, c)
+		} else {
+			sortable = append(sortable, c)
+		}
+	}
+
+	err := graphErr
+	if err == nil {
+		err = graph.Sort(log, sortable)
+	}
+
+	if err != nil {
+		return nil, sortFailed("Failed to sort containers by dependencies", err)
+	}
+
+	// Write the order back, with cycle members last.
+	copy(filteredContainers, sortable)
+	copy(filteredContainers[len(sortable):], unsortable)
+
+	// Collect all containers to restart: updates, and containers linked to
+	// restarting ones, which restart without updating.
+	allContainersToRestart := implicitrestart.Reconcile(log,
+		graph,
+		allContainers,
+		filteredContainers,
+		config,
+		inCycle,
+	)
+
+	// Sort containers to restart by dependencies to ensure correct update and restart order.
+	err = graph.Sort(log, allContainersToRestart)
+	if err != nil {
+		return nil, sortFailed("Failed to sort all containers to restart by dependencies", err)
+	}
+
+	// Log the number of containers prepared for restart.
+	log.Debug().
+		Int("restart_count", len(allContainersToRestart)).
+		Msg("Prepared containers for restart")
+
+	gitFailed := make(map[container.ContainerID]error)
+	gitSession.PrepareRebuilds(
+		log,
+		ctx,
+		client,
+		allContainersToRestart,
+		config,
+		progress,
+		gitFailed,
+	)
+	progress.UpdateFailed(log, gitFailed)
+
+	// A failed Git rebuild marks its container as no longer stale. Work out the
+	// implicit restarts again without it. The containers that depend on it then
+	// stay running. Containers that are still stale keep restarting their
+	// dependents. No-restart builds stay running and are excluded. Cycle
+	// members stay excluded, as in the first pass.
+	excluded := make(map[container.ContainerID]struct{}, len(inCycle))
+	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
+	maps.Copy(excluded, inCycle)
+
+	allContainersToRestart = implicitrestart.Reconcile(
+		log,
+		graph,
+		allContainers,
+		filteredContainers,
+		config,
+		excluded,
+	)
+
+	err = graph.Sort(log, allContainersToRestart)
+	if err != nil {
+		return nil, sortFailed("Failed to sort all containers to restart by dependencies", err)
+	}
+
+	// Compose already recreated the containers it applied. Do not recreate
+	// them again from their inspect data.
+	allContainersToRestart = gitSession.ExcludeApplied(allContainersToRestart)
+
+	// Git no-restart builds must not enter stop/create.
+	// The default non-rolling path stops first.
+	// Skipping their recreation only after the stop would leave the running
+	// container deleted.
+	return gitSession.ExcludeNoRestart(allContainersToRestart, config), nil
 }
 
 // unmonitoredContainers returns the containers of allContainers that are not

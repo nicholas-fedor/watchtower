@@ -1,18 +1,26 @@
 package update
 
 import (
+	"maps"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
+	goGit "github.com/go-git/go-git/v5"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -568,4 +576,71 @@ func expectSessionBatch(t *testing.T, notifier *mockUpdate.MockNotifier) *sessio
 	).Once()
 
 	return batch
+}
+
+// gitWatchedTestContainer returns a container named app that is associated
+// with a local Git repository whose tip is newer than the container's stamp,
+// and a Git client that checks it without a network.
+//
+// Parameters:
+//   - t: Test that owns the repository.
+//   - extra: Labels added to the Git association labels.
+//
+// Returns:
+//   - *container.Container: The container.
+//   - *git.Client: Git client for the check.
+//   - string: The repository's tip commit.
+func gitWatchedTestContainer(t *testing.T, extra map[string]string) (*container.Container, *git.Client, string) {
+	t.Helper()
+
+	repoDir, branch, commit := initGitRepoWithCommit(t)
+
+	containerLabels := map[string]string{
+		labels.GitRepo: repoDir,
+		labels.GitRef:  branch,
+		// The running revision is older than the remote's tip.
+		labels.GitLastCommit: "0123456789abcdef0123456789abcdef01234567",
+	}
+	maps.Copy(containerLabels, extra)
+
+	app := skipTestContainer("app-id", "app", containerLabels)
+
+	return app, git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Second}), commit
+}
+
+// initGitRepoWithCommit creates a Git repository with one commit in a
+// temporary directory, so a Git check can list its refs without a network.
+//
+// Parameters:
+//   - t: Test that owns the directory.
+//
+// Returns:
+//   - dir: The repository directory.
+//   - branch: The branch the commit is on.
+//   - commit: The commit's hash.
+//
+//nolint:nonamedreturns // Same-type returns need names.
+func initGitRepoWithCommit(t *testing.T) (dir, branch, commit string) {
+	t.Helper()
+
+	dir = t.TempDir()
+	repo, err := goGit.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("hello\n"), 0o600))
+
+	_, err = worktree.Add("README")
+	require.NoError(t, err)
+
+	hash, err := worktree.Commit("init", &goGit.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
+	})
+	require.NoError(t, err)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	return dir, head.Name().Short(), hash.String()
 }

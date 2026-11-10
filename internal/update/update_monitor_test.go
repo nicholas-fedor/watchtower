@@ -1,23 +1,17 @@
 package update
 
 import (
-	"maps"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	goGit "github.com/go-git/go-git/v5"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
-	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
@@ -264,22 +258,10 @@ func TestUpdate_GitWatchedNoPullIsNotRebuilt(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			repoDir, branch := initGitRepoWithCommit(t)
-
-			containerLabels := map[string]string{
-				labels.GitRepo: repoDir,
-				labels.GitRef:  branch,
-				// The running revision is older than the remote's tip.
-				labels.GitLastCommit: "0123456789abcdef0123456789abcdef01234567",
-			}
-			maps.Copy(containerLabels, tt.labels)
-
-			app := skipTestContainer("app-id", "app", containerLabels)
+			app, gitClient, _ := gitWatchedTestContainer(t, tt.labels)
 
 			client := newMockClient(t)
 			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
-
-			gitClient := git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Second})
 
 			report, _, err := update(newTestLogger(t), t.Context(), client,
 				updateParams.Params{Git: gitConfig.Defaults{Enable: true}, Policy: tt.policy},
@@ -293,38 +275,4 @@ func TestUpdate_GitWatchedNoPullIsNotRebuilt(t *testing.T) {
 			assert.False(t, app.IsStale())
 		})
 	}
-}
-
-// initGitRepoWithCommit creates a Git repository with one commit in a
-// temporary directory, so a Git check can list its refs without a network.
-//
-// Parameters:
-//   - t: Test that owns the directory.
-//
-// Returns:
-//   - string: The repository directory.
-//   - string: The branch the commit is on.
-func initGitRepoWithCommit(t *testing.T) (string, string) {
-	t.Helper()
-
-	dir := t.TempDir()
-	repo, err := goGit.PlainInit(dir, false)
-	require.NoError(t, err)
-
-	worktree, err := repo.Worktree()
-	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("hello\n"), 0o600))
-
-	_, err = worktree.Add("README")
-	require.NoError(t, err)
-
-	_, err = worktree.Commit("init", &goGit.CommitOptions{
-		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
-	})
-	require.NoError(t, err)
-
-	head, err := repo.Head()
-	require.NoError(t, err)
-
-	return dir, head.Name().Short()
 }
