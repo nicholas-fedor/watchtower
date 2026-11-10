@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- End a session that cannot order its containers before it touches them by @nicholas-fedor in [#3675](https://github.com/nicholas-fedor/watchtower/pull/3675)
 - End a canceled staleness check with one error by @nicholas-fedor in [#3669](https://github.com/nicholas-fedor/watchtower/pull/3669)
 - Tell exec'd health check probes from the main process by @nicholas-fedor in [#3657](https://github.com/nicholas-fedor/watchtower/pull/3657)
 - Stop rebuilding the same git commit with no-restart by @nicholas-fedor in [#3653](https://github.com/nicholas-fedor/watchtower/pull/3653)
