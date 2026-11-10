@@ -9,12 +9,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -674,6 +677,65 @@ func TestUpdateAction_ParallelStalenessCheckCancellationPropagation(t *testing.T
 			t.Fatalf("expected context canceled error, got: %s", err.Error())
 		}
 	})
+}
+
+// TestUpdate_CanceledStalenessPhaseEndsWithOneError verifies that a session
+// canceled during its staleness phase ends with the same error wherever the
+// cancellation lands, and reports its unchecked container as skipped with the
+// context's error.
+func TestUpdate_CanceledStalenessPhaseEndsWithOneError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// expect sets the client calls, given the session's cancel function.
+		expect func(client *mockUpdate.MockClient, app *container.Container, cancel context.CancelFunc)
+	}{
+		{
+			name: "before the checks start",
+			expect: func(client *mockUpdate.MockClient, app *container.Container, cancel context.CancelFunc) {
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(
+					func(context.Context, ...filters.Filter) ([]*container.Container, error) {
+						cancel()
+
+						return []*container.Container{app}, nil
+					},
+				).Once()
+			},
+		},
+		{
+			name: "during a check",
+			expect: func(client *mockUpdate.MockClient, app *container.Container, cancel context.CancelFunc) {
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+				client.EXPECT().IsContainerStale(mock.Anything, app, mock.Anything).RunAndReturn(
+					func(ctx context.Context, _ *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
+						cancel()
+
+						return false, "", "", ctx.Err()
+					},
+				).Once()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			app := skipTestContainer("app-id", "app", nil)
+			client := newMockClient(t)
+			tt.expect(client, app, cancel)
+
+			report, _, err := update(newTestLogger(t), ctx, client, updateParams.Params{}, ratelimit.New())
+
+			require.ErrorIs(t, err, context.Canceled)
+			require.EqualError(t, err, "update canceled: context canceled")
+			assert.Equal(t, map[string]string{"app": "update skipped: context canceled"}, reportErrors(report.Skipped()))
+		})
+	}
 }
 
 // TestEarlyCancellationStopContainers tests that context cancellation is properly handled
