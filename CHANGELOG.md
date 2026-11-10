@@ -110,6 +110,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update google.golang.org/genproto/googleapis/rpc digest to 09e21b2 by @renovate[bot] in [#3665](https://github.com/nicholas-fedor/watchtower/pull/3665)
 - Update google.golang.org/genproto/googleapis/api digest to 09e21b2 by @renovate[bot] in [#3660](https://github.com/nicholas-fedor/watchtower/pull/3660)
 - Update golang.org/x/tools digest to 588ada3 by @renovate[bot] in [#3659](https://github.com/nicholas-fedor/watchtower/pull/3659)
 - Update golang.org/x/tools digest to d40593d by @renovate[bot] in [#3655](https://github.com/nicholas-fedor/watchtower/pull/3655)
