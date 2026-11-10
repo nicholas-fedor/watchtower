@@ -59,6 +59,42 @@ type Client interface {
 	GetImageDiskUsage(ctx context.Context) (containerClient.ImageDiskUsage, error)
 }
 
+// stalenessCheck is the outcome of one container's staleness check, before
+// it is recorded in the session's progress.
+type stalenessCheck struct {
+	// checkErr is the error of the staleness check itself.
+	checkErr error
+	// verifyErr is the error of checking that a container to update can be
+	// recreated.
+	verifyErr error
+	// newestImage is the latest image ID the check found, or the current
+	// image ID of a fresh container.
+	newestImage container.ImageID
+	// latestAnns holds the OCI annotations of the latest image.
+	latestAnns oci.Annotations
+	// changelogVars holds the release tag and commit for the changelog URL.
+	changelogVars provenance.ChangelogVars
+	// stale reports whether the container's image is outdated.
+	stale bool
+	// willUpdate reports whether the container is stale and will be updated.
+	willUpdate bool
+	// resolveLatest reports whether the latest image's metadata was resolved
+	// for the report.
+	resolveLatest bool
+}
+
+// stalenessTally counts the results of one session's parallel staleness checks.
+type stalenessTally struct {
+	// failed counts the failed checks. A cooldown deferral is not counted.
+	failed int
+	// stale counts the containers whose image is outdated, whether or not
+	// they will be updated.
+	stale int
+	// watchtowerPullFailed reports whether a check of Watchtower's own image
+	// failed. A cooldown deferral does not count.
+	watchtowerPullFailed bool
+}
+
 // Errors for update operations.
 var (
 	// errSortDependenciesFailed indicates a failure to sort containers by dependencies.
@@ -213,10 +249,6 @@ func update(
 
 	// Create a progress tracker for reporting scanned, updated, and skipped containers.
 	progress := &state.Progress{}
-	// Track the number of stale containers for logging.
-	var staleCount int
-	// Track if Watchtower self-update pull failed to add safeguard delay.
-	var watchtowerPullFailed bool
 
 	// Filter containers based on the provided filter (e.g., all, specific names).
 	// Use a non-nil empty slice so lifecycle hooks can distinguish a valid empty
@@ -307,357 +339,20 @@ func update(
 			Msg(logging.CircularDependency)
 	}
 
-	// Track containers that fail staleness checks for reporting.
-	staleCheckFailed := 0
-
-	// Prepare containers for staleness checks, skipping already-processed ones.
-	type checkTask struct {
-		container *container.Container
-		index     int
-	}
-
-	var checkTasks []checkTask
-
-	// Iterate through containers to check staleness and prepare for updates or restarts.
-	for i, sourceContainer := range filteredContainers {
-		// Check for context cancellation to enable faster shutdown during long update cycles.
-		// The containers not yet checked are reported as skipped, so the
-		// partial report does not read as a complete scan.
-		select {
-		case <-ctx.Done():
-			progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
-
-			return progress.Report(log), cleanupImageInfos, ctx.Err()
-		default:
-		}
-
-		// Skip containers already processed (e.g., skipped due to circular dependencies).
-		_, exists := (*progress)[sourceContainer.ID()]
-		if exists {
-			continue
-		}
-
-		// Set up logging fields for the current container.
-		clogVal := log.With().
-			Str("container", sourceContainer.Name()).
-			Str("image", sourceContainer.ImageName()).
-			Logger()
-		clog := &clogVal
-
-		// Check if the container uses a pinned (digest-based) image to skip updates.
-		isPinnedVal, err := staleness.IsPinned(log, sourceContainer, progress, config, gitSession)
-		if err != nil {
-			// A container whose image reference cannot be parsed is reported
-			// as a failed update check.
-			skipFailedUpdateCheck(log, clog, progress, sourceContainer,
-				fmt.Errorf("%w: %w", errParseImageReference, err), config)
-
-			staleCheckFailed++
-
-			continue
-		}
-
-		if isPinnedVal {
-			// Skip staleness checks for pinned images and mark as scanned.
-			clog.Debug().Msg("Skipping staleness check for pinned image")
-
-			continue
-		}
-
-		checkTasks = append(checkTasks, checkTask{
-			index:     i,
-			container: sourceContainer,
-		})
-	}
-
-	// Check for context cancellation before launching parallel staleness checks.
-	select {
-	case <-ctx.Done():
-		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
-
-		return progress.Report(log), cleanupImageInfos, ctx.Err()
-	default:
-	}
-
-	// Parallelize staleness checks with bounded concurrency.
-	const maxConcurrentChecks = 20
-
-	var checkGroup errgroup.Group
-	checkGroup.SetLimit(maxConcurrentChecks)
-
-	var (
-		resultMu                     sync.Mutex
-		parallelStaleCheckFailed     int
-		parallelWatchtowerPullFailed bool
-		parallelStaleCount           int
+	// A failed check of Watchtower's own image delays the end of a run-once
+	// session.
+	watchtowerPullFailed, err := checkStaleness(
+		log,
+		ctx,
+		client,
+		config,
+		rateLimiter,
+		gitSession,
+		progress,
+		filteredContainers,
 	)
-
-	// One resolver per session so sibling containers on the same upstream image
-	// share a single release tag lookup.
-	tagResolver := changelog.NewResolver(changelog.NewDigestFetcher(config.Registry, rateLimiter))
-
-	for _, task := range checkTasks {
-		checkGroup.Go(func() error {
-			// Check for context cancellation to enable faster shutdown during long update cycles.
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			sourceContainer := task.container
-			clogVal := log.With().
-				Str("container", sourceContainer.Name()).
-				Str("image", sourceContainer.ImageName()).
-				Logger()
-			clog := &clogVal
-
-			var (
-				stale       bool
-				newestImage container.ImageID
-				newDigest   string
-				gitWatched  bool
-				checkErr    error
-				verifyErr   error
-			)
-
-			// Determine if the container is stale and needs updating.
-			// If the container is Watchtower and SkipSelfUpdate is enabled, skip the update
-			// by setting stale to false and using the current image. Otherwise, check staleness.
-			switch {
-			case sourceContainer.IsWatchtower() && config.SkipSelfUpdate:
-				stale = false
-				newestImage = sourceContainer.ImageID()
-			case gitSession.Watching(log, sourceContainer, config):
-				gitWatched = true
-
-				stale, newestImage, checkErr = gitSession.Check(ctx, sourceContainer, config)
-			default:
-				stale, newestImage, newDigest, checkErr = client.IsContainerStale(
-					ctx,
-					sourceContainer,
-					config.Policy,
-				)
-			}
-
-			// Only the session's own cancellation ends the scan. A check that
-			// fails with a timeout of its own, such as a registry request
-			// reaching its client timeout, is that container's check error.
-			if checkErr != nil && ctx.Err() != nil {
-				return fmt.Errorf("staleness check canceled: %w", ctx.Err())
-			}
-
-			// Determine if the container should be updated based on staleness and config.
-			shouldUpdate := staleness.ShouldUpdate(sourceContainer, stale, config)
-			if gitSession.Watching(log, sourceContainer, config) && sourceContainer.IsNoPull(config.Policy) {
-				shouldUpdate = false
-			}
-
-			// Log when skipping Watchtower self-update in run-once mode.
-			if stale && sourceContainer.IsWatchtower() && config.RunOnce {
-				clog.Info().Msg(logging.SelfUpdateSkippedRunOnce)
-			}
-
-			// Verify the container's configuration if it's slated for update to
-			// ensure recreation is possible.
-			if checkErr == nil && shouldUpdate {
-				verifyErr = sourceContainer.VerifyConfiguration()
-			}
-
-			// Record the new image's OCI metadata so a notification can describe
-			// what the container is moving to. This runs only for a container
-			// that will actually be updated. The inspect and the optional
-			// release tag lookup happen before resultMu is taken, because a
-			// registry round trip under that lock would serialize every
-			// parallel check behind one container's request.
-			// A Git-watched container is excluded because the build path resolves
-			// and logs its own changelog from the resolved tag afterwards.
-			resolveLatest := stale && shouldUpdate && !gitWatched && checkErr == nil && verifyErr == nil
-
-			var (
-				changelogVars provenance.ChangelogVars
-				latestAnns    oci.Annotations
-			)
-
-			if resolveLatest {
-				latest := staleness.LatestImage{
-					Annotations: client.GetImageAnnotations(ctx, sourceContainer.ImageName()),
-					Digest:      newDigest,
-				}
-
-				changelogVars, latestAnns = staleness.ResolveLatestImageMeta(
-					log,
-					ctx,
-					tagResolver,
-					sourceContainer,
-					config,
-					latest,
-				)
-			}
-
-			resultMu.Lock()
-			defer resultMu.Unlock()
-
-			// Handle staleness check results, logging skips or adding to the progress report.
-			switch {
-			case checkErr != nil:
-				// Skip containers with staleness check errors, marking them as
-				// skipped. Every error except a cooldown deferral counts as a failed
-				// check. A failed cooldown age lookup counts too.
-				deferred := errors.Is(checkErr, containerImage.ErrImageCooldown)
-				if !deferred {
-					parallelStaleCheckFailed++
-				}
-
-				cooldownErr, isCooldownError := errors.AsType[*containerImage.CooldownError](checkErr)
-
-				// Each failure gets at most one line that reaches notifications.
-				// A failure that its own check already logged in such a line gets
-				// no second one.
-				switch {
-				case ratelimit.Is(checkErr):
-					// One line per container per cycle. Log-based notifications
-					// carry it, and the report template lists the container under
-					// Failed instead. A Retry-After beyond the honor window was
-					// already logged at warn by the retry loop.
-					if !ratelimit.ExceedsHonorWindow(checkErr) {
-						clog.Warn().
-							Err(checkErr).
-							Msg(logging.RateLimitRetriesExhausted)
-					}
-
-					progress.AddFailed(log, sourceContainer, checkErr, config)
-				case isCooldownError:
-					// The cooldown check logged the deferral or the failed lookup.
-					// The *image.CooldownError carries the details for reports and
-					// notifications.
-					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					progress.SetCooldownInfo(log,
-						sourceContainer.ID(),
-						cooldownErr.Age,
-						cooldownErr.Delay,
-						cooldownErr.Remaining,
-						cooldownErr.EligibleAt,
-					)
-				case errors.Is(checkErr, semver.ErrInvalidPolicy):
-					// A container's labels cannot change, so the container ID
-					// identifies an invalid label problem.
-					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					clog.WithLevel(scanProblems.Level("invalid git semver policy", string(sourceContainer.ID()))).
-						Msg(logging.InvalidGitSemverPolicy)
-				case errors.Is(checkErr, provenance.ErrInvalidHost):
-					// The container ID identifies the problem, as for an invalid
-					// policy. The line carries no error field, so a credential in
-					// the label stays out of log-based notifications.
-					progress.AddSkipped(log, sourceContainer, checkErr, config)
-					clog.WithLevel(scanProblems.Level("invalid git-host", string(sourceContainer.ID()))).
-						Msg(logging.InvalidGitHost)
-				default:
-					skipFailedUpdateCheck(log, clog, progress, sourceContainer, checkErr, config)
-				}
-
-				// A failed check of Watchtower's own image counts as a failed
-				// self-update pull when a self-update was attempted.
-				if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate && !deferred {
-					parallelWatchtowerPullFailed = true
-				}
-			case verifyErr != nil:
-				parallelStaleCheckFailed++
-
-				progress.AddSkipped(log, sourceContainer, verifyErr, config)
-				clog.WithLevel(scanProblems.Level("unrecreatable configuration", string(sourceContainer.ID()), verifyErr.Error())).
-					Err(verifyErr).
-					Msg(logging.ConfigNotRecreatable)
-
-				if sourceContainer.IsWatchtower() && !config.SkipSelfUpdate {
-					parallelWatchtowerPullFailed = true
-				}
-			default:
-				// For fresh containers, set newestImage to current image ID for proper categorization.
-				// (The cooldown decision happens in the image client's PullImage, after the
-				// digest staleness check and before any layer is pulled.)
-				if !stale {
-					newestImage = sourceContainer.ImageID()
-				}
-
-				// Log successful staleness check and add to scanned containers.
-				clog.Debug().
-					Bool("stale", stale).
-					Str("newest_image", string(newestImage)).
-					Msg("Checked container staleness")
-				progress.AddScanned(log,
-					sourceContainer,
-					newestImage,
-					config,
-				)
-			}
-
-			// Write the pre-resolved metadata now that the session state is locked.
-			if resolveLatest {
-				staleness.ApplyLatestImageMeta(
-					clog,
-					progress,
-					sourceContainer,
-					config,
-					changelogVars,
-					latestAnns,
-				)
-			}
-
-			// Update the container's stale status for dependency sorting.
-			// Only mark as stale if the container should actually be updated.
-			filteredContainers[task.index].SetStale(stale && shouldUpdate && checkErr == nil && verifyErr == nil)
-
-			// Increment stale count for logging summary.
-			if stale {
-				parallelStaleCount++
-			}
-
-			return nil
-		})
-	}
-
-	err = checkGroup.Wait()
 	if err != nil {
-		log.Debug().
-			Err(err).
-			Msg("Parallel staleness checks completed with error")
-
-		// A worker returns an error only when the session is canceled. A
-		// canceled check records nothing, so its container and those whose
-		// check never ran are reported as skipped.
-		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", err), config)
-
-		return progress.Report(log), cleanupImageInfos, fmt.Errorf("update canceled: %w", err)
-	}
-
-	// Accumulate parallel results with pre-parallel sequential counts so failures
-	// from pinned-image parsing and other pre-filter checks are preserved.
-	staleCheckFailed += parallelStaleCheckFailed
-	watchtowerPullFailed = watchtowerPullFailed || parallelWatchtowerPullFailed
-	staleCount += parallelStaleCount
-
-	// Log the summary of staleness checks, including total, stale, and failed counts.
-	log.Debug().
-		Int("total", len(filteredContainers)).
-		Int("stale", staleCount).
-		Int("failed", staleCheckFailed).
-		Msg("Completed container staleness check")
-
-	// Build a map for a lookup of containers by ID.
-	containerByID := make(map[container.ContainerID]*container.Container, len(allContainers))
-	for _, ac := range allContainers {
-		containerByID[ac.ID()] = ac
-	}
-
-	// Propagate stale status to allContainers since they are different instances.
-	for _, c := range filteredContainers {
-		if c.IsStale() {
-			ac, ok := containerByID[c.ID()]
-			if ok {
-				ac.SetStale(true)
-			}
-		}
+		return progress.Report(log), cleanupImageInfos, err
 	}
 
 	// Sort containers by dependencies to ensure correct update and restart order.
@@ -837,6 +532,421 @@ func update(
 
 	// Return the final report summarizing the session and the cleanup image infos.
 	return progress.Report(log), cleanupImageInfos, nil
+}
+
+// checkStaleness checks which monitored containers are stale and records each
+// result in the session's progress.
+//
+// It skips a container already in progress, such as a cycle member. It also
+// skips a container pinned by digest. The others are checked in parallel, up
+// to 20 at a time. Containers on the same upstream image share one release
+// tag lookup. A container that will be updated is marked stale.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for the registry staleness checks.
+//   - config: Update parameters.
+//   - rateLimiter: Rate limiter shared by registry requests.
+//   - gitSession: The session's Git monitor.
+//   - progress: Session progress that receives each result.
+//   - filteredContainers: The monitored containers to check.
+//
+// Returns:
+//   - bool: True when a check of Watchtower's own image failed. A cooldown
+//     deferral does not count.
+//   - error: Non-nil when ctx ends before every check is recorded. The
+//     containers without a result are then reported as skipped.
+func checkStaleness(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	config updateParams.Params,
+	rateLimiter *ratelimit.Limiter,
+	gitSession *rebuild.Session,
+	progress *state.Progress,
+	filteredContainers []*container.Container,
+) (bool, error) {
+	// Count the session's results for the summary. Workers update it under
+	// resultMu, and the candidate loop runs before any worker starts.
+	var (
+		resultMu sync.Mutex
+		tally    stalenessTally
+	)
+
+	// Prepare containers for staleness checks, skipping already-processed ones.
+	var candidates []*container.Container
+
+	for _, sourceContainer := range filteredContainers {
+		// Check for context cancellation to enable faster shutdown during long update cycles.
+		// The containers not yet checked are reported as skipped, so the
+		// partial report does not read as a complete scan.
+		select {
+		case <-ctx.Done():
+			progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
+
+			return false, ctx.Err() //nolint:wrapcheck // The session ends with its context's own error.
+		default:
+		}
+
+		// Skip containers already processed (e.g., skipped due to circular dependencies).
+		_, exists := (*progress)[sourceContainer.ID()]
+		if exists {
+			continue
+		}
+
+		// Set up logging fields for the current container.
+		clogVal := log.With().
+			Str("container", sourceContainer.Name()).
+			Str("image", sourceContainer.ImageName()).
+			Logger()
+		clog := &clogVal
+
+		// Check if the container uses a pinned (digest-based) image to skip updates.
+		isPinnedVal, err := staleness.IsPinned(log, sourceContainer, progress, config, gitSession)
+		if err != nil {
+			// A container whose image reference cannot be parsed is reported
+			// as a failed update check.
+			skipFailedUpdateCheck(log, clog, progress, sourceContainer,
+				fmt.Errorf("%w: %w", errParseImageReference, err), config)
+
+			tally.failed++
+
+			continue
+		}
+
+		if isPinnedVal {
+			// Skip staleness checks for pinned images and mark as scanned.
+			clog.Debug().Msg("Skipping staleness check for pinned image")
+
+			continue
+		}
+
+		candidates = append(candidates, sourceContainer)
+	}
+
+	// Check for context cancellation before launching parallel staleness checks.
+	select {
+	case <-ctx.Done():
+		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", ctx.Err()), config)
+
+		return false, ctx.Err() //nolint:wrapcheck // The session ends with its context's own error.
+	default:
+	}
+
+	// Parallelize staleness checks with bounded concurrency.
+	const maxConcurrentChecks = 20
+
+	var checkGroup errgroup.Group
+	checkGroup.SetLimit(maxConcurrentChecks)
+
+	// One resolver per session so sibling containers on the same upstream image
+	// share a single release tag lookup.
+	tagResolver := changelog.NewResolver(changelog.NewDigestFetcher(config.Registry, rateLimiter))
+
+	for _, sourceContainer := range candidates {
+		checkGroup.Go(func() error {
+			// Check for context cancellation to enable faster shutdown during long update cycles.
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
+			clogVal := log.With().
+				Str("container", sourceContainer.Name()).
+				Str("image", sourceContainer.ImageName()).
+				Logger()
+			clog := &clogVal
+
+			result, err := checkContainerStaleness(log, clog, ctx, client, config, gitSession, tagResolver, sourceContainer)
+			if err != nil {
+				return err
+			}
+
+			resultMu.Lock()
+			defer resultMu.Unlock()
+
+			recordStalenessCheck(log, clog, progress, config, sourceContainer, result, &tally)
+
+			return nil
+		})
+	}
+
+	err := checkGroup.Wait()
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Msg("Parallel staleness checks completed with error")
+
+		// A worker returns an error only when the session is canceled. A
+		// canceled check records nothing, so its container and those whose
+		// check never ran are reported as skipped.
+		progress.SkipUnrecorded(log, filteredContainers, fmt.Errorf("update skipped: %w", err), config)
+
+		return false, fmt.Errorf("update canceled: %w", err)
+	}
+
+	// Log the summary of staleness checks, including total, stale, and failed counts.
+	log.Debug().
+		Int("total", len(filteredContainers)).
+		Int("stale", tally.stale).
+		Int("failed", tally.failed).
+		Msg("Completed container staleness check")
+
+	return tally.watchtowerPullFailed, nil
+}
+
+// checkContainerStaleness checks whether one container is stale and will be
+// updated, without recording the result.
+//
+// A Watchtower container is not checked when self-updates are skipped. A
+// Git-watched container is checked against its remote. Any other container is
+// checked against its registry. For a container that will be updated, it also
+// checks that the container can be recreated. It then resolves the latest
+// image's metadata for the report.
+//
+// Parameters:
+//   - log: Process logger.
+//   - clog: Logger with the container's fields.
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for the registry staleness check.
+//   - config: Update parameters.
+//   - gitSession: The session's Git monitor.
+//   - tagResolver: The session's release tag lookup.
+//   - sourceContainer: Container to check.
+//
+// Returns:
+//   - stalenessCheck: The check's outcome.
+//   - error: Non-nil only when ctx ends. A failed check is returned in the
+//     outcome instead.
+func checkContainerStaleness(
+	log, clog *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	config updateParams.Params,
+	gitSession *rebuild.Session,
+	tagResolver *changelog.Resolver,
+	sourceContainer *container.Container,
+) (stalenessCheck, error) {
+	var (
+		result     stalenessCheck
+		newDigest  string
+		gitWatched bool
+	)
+
+	// Determine if the container is stale and needs updating.
+	switch {
+	case sourceContainer.IsWatchtower() && config.SkipSelfUpdate:
+		// Self-updates are skipped, so Watchtower's own container is not
+		// checked and stays fresh.
+	case gitSession.Watching(log, sourceContainer, config):
+		// A Git-watched container is stale when its remote ref has advanced
+		// past the revision it runs. The check returns a Git image ID for the
+		// rebuild instead of a registry image.
+		gitWatched = true
+
+		result.stale, result.newestImage, result.checkErr = gitSession.Check(ctx, sourceContainer, config)
+	default:
+		// Any other container is checked against its registry. Unless no-pull
+		// is set, the latest image is pulled and compared with the running
+		// one. A cooldown holds a newer image back with a cooldown error. The
+		// latest manifest digest feeds the report's release tag lookup.
+		result.stale, result.newestImage, newDigest, result.checkErr = client.IsContainerStale(
+			ctx,
+			sourceContainer,
+			config.Policy,
+		)
+	}
+
+	// Only the session's own cancellation ends the scan. A check that
+	// fails with a timeout of its own, such as a registry request
+	// reaching its client timeout, is that container's check error.
+	if result.checkErr != nil && ctx.Err() != nil {
+		return stalenessCheck{}, fmt.Errorf("staleness check canceled: %w", ctx.Err())
+	}
+
+	// For fresh containers, set newestImage to current image ID for proper categorization.
+	// (The cooldown decision happens in the image client's PullImage, after the
+	// digest staleness check and before any layer is pulled.)
+	if !result.stale {
+		result.newestImage = sourceContainer.ImageID()
+	}
+
+	// Determine if the container should be updated based on staleness and config.
+	shouldUpdate := staleness.ShouldUpdate(sourceContainer, result.stale, config)
+	if gitWatched && sourceContainer.IsNoPull(config.Policy) {
+		shouldUpdate = false
+	}
+
+	// Log when skipping Watchtower self-update in run-once mode.
+	if result.stale && sourceContainer.IsWatchtower() && config.RunOnce {
+		clog.Info().Msg(logging.SelfUpdateSkippedRunOnce)
+	}
+
+	// Verify the container's configuration if it's slated for update to
+	// ensure recreation is possible.
+	if result.checkErr == nil && shouldUpdate {
+		result.verifyErr = sourceContainer.VerifyConfiguration()
+	}
+
+	result.willUpdate = result.stale && shouldUpdate && result.checkErr == nil && result.verifyErr == nil
+
+	// Record the new image's OCI metadata so a notification can describe
+	// what the container is moving to. This runs only for a container
+	// that will actually be updated. The inspect and the optional
+	// release tag lookup happen before the result is recorded, because a
+	// registry round trip under the session's result lock would serialize
+	// every parallel check behind one container's request.
+	// A Git-watched container is excluded because the build path resolves
+	// and logs its own changelog from the resolved tag afterwards.
+	result.resolveLatest = result.willUpdate && !gitWatched
+
+	if result.resolveLatest {
+		latest := staleness.LatestImage{
+			Annotations: client.GetImageAnnotations(ctx, sourceContainer.ImageName()),
+			Digest:      newDigest,
+		}
+
+		result.changelogVars, result.latestAnns = staleness.ResolveLatestImageMeta(
+			log,
+			ctx,
+			tagResolver,
+			sourceContainer,
+			config,
+			latest,
+		)
+	}
+
+	return result, nil
+}
+
+// recordStalenessCheck records one container's staleness check in the
+// session's progress and tally.
+//
+// It marks the container stale when it will be updated. Callers hold the
+// session's result lock.
+//
+// Parameters:
+//   - log: Process logger.
+//   - clog: Logger with the container's fields.
+//   - progress: Session progress.
+//   - config: Update parameters.
+//   - sourceContainer: Container that was checked.
+//   - result: The check's outcome.
+//   - tally: The session's check counts.
+func recordStalenessCheck(
+	log, clog *zerolog.Logger,
+	progress *state.Progress,
+	config updateParams.Params,
+	sourceContainer *container.Container,
+	result stalenessCheck,
+	tally *stalenessTally,
+) {
+	// Handle staleness check results, logging skips or adding to the progress report.
+	switch {
+	case result.checkErr != nil:
+		// Skip containers with staleness check errors, marking them as
+		// skipped. Every error except a cooldown deferral counts as a failed
+		// check. A failed cooldown age lookup counts too.
+		deferred := errors.Is(result.checkErr, containerImage.ErrImageCooldown)
+		if !deferred {
+			tally.failed++
+		}
+
+		cooldownErr, isCooldownError := errors.AsType[*containerImage.CooldownError](result.checkErr)
+
+		// Each failure gets at most one line that reaches notifications.
+		// A failure that its own check already logged in such a line gets
+		// no second one.
+		switch {
+		case ratelimit.Is(result.checkErr):
+			// One line per container per cycle. Log-based notifications
+			// carry it, and the report template lists the container under
+			// Failed instead. A Retry-After beyond the honor window was
+			// already logged at warn by the retry loop.
+			if !ratelimit.ExceedsHonorWindow(result.checkErr) {
+				clog.Warn().
+					Err(result.checkErr).
+					Msg(logging.RateLimitRetriesExhausted)
+			}
+
+			progress.AddFailed(log, sourceContainer, result.checkErr, config)
+		case isCooldownError:
+			// The cooldown check logged the deferral or the failed lookup.
+			// The *image.CooldownError carries the details for reports and
+			// notifications.
+			progress.AddSkipped(log, sourceContainer, result.checkErr, config)
+			progress.SetCooldownInfo(log,
+				sourceContainer.ID(),
+				cooldownErr.Age,
+				cooldownErr.Delay,
+				cooldownErr.Remaining,
+				cooldownErr.EligibleAt,
+			)
+		case errors.Is(result.checkErr, semver.ErrInvalidPolicy):
+			// A container's labels cannot change, so the container ID
+			// identifies an invalid label problem.
+			progress.AddSkipped(log, sourceContainer, result.checkErr, config)
+			clog.WithLevel(scanProblems.Level("invalid git semver policy", string(sourceContainer.ID()))).
+				Msg(logging.InvalidGitSemverPolicy)
+		case errors.Is(result.checkErr, provenance.ErrInvalidHost):
+			// The container ID identifies the problem, as for an invalid
+			// policy. The line carries no error field, so a credential in
+			// the label stays out of log-based notifications.
+			progress.AddSkipped(log, sourceContainer, result.checkErr, config)
+			clog.WithLevel(scanProblems.Level("invalid git-host", string(sourceContainer.ID()))).
+				Msg(logging.InvalidGitHost)
+		default:
+			skipFailedUpdateCheck(log, clog, progress, sourceContainer, result.checkErr, config)
+		}
+
+		// Watchtower's own image is checked only when the session does not
+		// skip self-updates, so a failed check of it is a failed self-update
+		// pull.
+		if sourceContainer.IsWatchtower() && !deferred {
+			tally.watchtowerPullFailed = true
+		}
+	case result.verifyErr != nil:
+		tally.failed++
+
+		progress.AddSkipped(log, sourceContainer, result.verifyErr, config)
+		clog.WithLevel(scanProblems.Level("unrecreatable configuration", string(sourceContainer.ID()), result.verifyErr.Error())).
+			Err(result.verifyErr).
+			Msg(logging.ConfigNotRecreatable)
+	default:
+		// Log successful staleness check and add to scanned containers.
+		clog.Debug().
+			Bool("stale", result.stale).
+			Str("newest_image", string(result.newestImage)).
+			Msg("Checked container staleness")
+		progress.AddScanned(log,
+			sourceContainer,
+			result.newestImage,
+			config,
+		)
+	}
+
+	// Write the pre-resolved metadata now that the session state is locked.
+	if result.resolveLatest {
+		staleness.ApplyLatestImageMeta(
+			clog,
+			progress,
+			sourceContainer,
+			config,
+			result.changelogVars,
+			result.latestAnns,
+		)
+	}
+
+	// Update the container's stale status for dependency sorting.
+	// Only mark as stale if the container should actually be updated.
+	sourceContainer.SetStale(result.willUpdate)
+
+	// Increment stale count for logging summary.
+	if result.stale {
+		tally.stale++
+	}
 }
 
 // skipFailedUpdateCheck records a container whose update check failed as
