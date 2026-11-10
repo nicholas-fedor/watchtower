@@ -1836,6 +1836,31 @@ func TestContainer_Links_HostConfigAlwaysCounts(t *testing.T) {
 	}
 }
 
+// TestIsOldContainer verifies that only a name with the watchtower-old- prefix,
+// with or without Docker's leading slash, marks a renamed predecessor.
+func TestIsOldContainer(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		containerName string
+		want          bool
+	}{
+		{name: "empty name", containerName: "", want: false},
+		{name: "current container", containerName: "/watchtower", want: false},
+		{name: "renamed predecessor", containerName: "watchtower-old-abc123", want: true},
+		{name: "renamed predecessor with a leading slash", containerName: "/watchtower-old-def456", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, IsOldContainer(tt.containerName))
+		})
+	}
+}
+
 // TestNormalizeContainerName_WithLeadingSlash verifies that NormalizeContainerName removes leading slash.
 func TestNormalizeContainerName_WithLeadingSlash(t *testing.T) {
 	t.Parallel()

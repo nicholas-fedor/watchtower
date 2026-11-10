@@ -368,7 +368,7 @@ func currentOldInstance(containers []*container.Container, currentID container.C
 	}
 
 	current := containers[i]
-	if !current.IsWatchtower() || !container.IsOldContainer(current.Name()) {
+	if !current.IsWatchtower() || !container.IsSuperseded(current) {
 		return nil
 	}
 

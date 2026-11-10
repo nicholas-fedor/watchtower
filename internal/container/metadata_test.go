@@ -1802,18 +1802,10 @@ func TestIsWatchtowerParent(t *testing.T) {
 	})
 }
 
-// TestIsSuperseded verifies which running Watchtower containers a self-update
-// has replaced: a predecessor renamed with the "watchtower-old-" prefix, with
-// or without the leading slash Docker reports, and a container whose chain
-// label lists it as a parent.
+// TestIsSuperseded verifies that a Watchtower container counts as replaced by
+// a self-update only when it carries the watchtower-old- name prefix.
 func TestIsSuperseded(t *testing.T) {
 	t.Parallel()
-
-	const id = "test-container-id"
-
-	withChain := func(chain string) containerfixture.Update {
-		return containerfixture.WithLabels(map[string]string{labels.ContainerChain: chain})
-	}
 
 	tests := []struct {
 		name      string
@@ -1821,31 +1813,10 @@ func TestIsSuperseded(t *testing.T) {
 		want      bool
 	}{
 		{name: "no container", container: nil, want: false},
-		{
-			name:      "current container",
-			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower")),
-			want:      false,
-		},
-		{
-			name: "chain without the container",
-			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower"),
-				withChain("other-id")),
-			want: false,
-		},
-		{
-			name: "parent in the chain",
-			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower"),
-				withChain(id+",parent-id")),
-			want: true,
-		},
+		{name: "current container", container: MockContainer(containerfixture.WithName("/watchtower")), want: false},
 		{
 			name:      "renamed predecessor",
-			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("watchtower-old-abc123")),
-			want:      true,
-		},
-		{
-			name:      "renamed predecessor with a leading slash",
-			container: MockContainer(containerfixture.WithID(id), containerfixture.WithName("/watchtower-old-def456")),
+			container: MockContainer(containerfixture.WithName("/watchtower-old-def456")),
 			want:      true,
 		},
 	}

@@ -25,7 +25,6 @@ import (
 	mockCmd "github.com/nicholas-fedor/watchtower/cmd/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
-	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 )
@@ -640,11 +639,6 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
 		},
 		{
-			helperCase:   "invalid-restart-of-chain-parent",
-			wantExitCode: 0,
-			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
-		},
-		{
 			// A notification URL that Shoutrrr rejects fails on every start,
 			// so the main process disables its restarts before it exits.
 			helperCase:   "rejected-notification-url",
@@ -793,15 +787,6 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
 		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{old}, nil).Maybe()
-	case "invalid-restart-of-chain-parent":
-		// The container's chain lists its own ID, which marks it as the parent
-		// of a newer instance.
-		parent := selfContainer("/watchtower", "")
-		parent.ContainerInfo().Config.Labels[labels.ContainerChain] = strings.Repeat("a", 64) + "," + string(selfID)
-		detection = selfDetection{mountinfo: mountinfoWithSelf()}
-
-		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(parent, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{parent}, nil).Maybe()
 	case "rejected-notification-url":
 		args = []string{"--notification-url", "discord://secrettoken@notanumber"}
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
