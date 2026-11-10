@@ -24,6 +24,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
@@ -729,4 +730,33 @@ func TestSession_reuseUnrestartedBuild(t *testing.T) {
 		assert.NotEqual(t, container.ImageID("sha256:older"), sess.built[c.ID()])
 		assert.Equal(t, container.ImageID("sha256:older"), client.UnrestartedBuild("app", commit))
 	})
+}
+
+// TestAllowed verifies that a Git-watched container may be rebuilt unless
+// no-pull or monitor-only applies, by label or by policy.
+func TestAllowed(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		labels map[string]string
+		policy updateConfig.Policy
+		want   bool
+	}{
+		{name: "neither applies", want: true},
+		{name: "no-pull label", labels: map[string]string{labels.NoPull: "true"}, want: false},
+		{name: "no-pull policy", policy: updateConfig.Policy{NoPull: true}, want: false},
+		{name: "monitor-only label", labels: map[string]string{labels.MonitorOnly: "true"}, want: false},
+		{name: "monitor-only policy", policy: updateConfig.Policy{MonitorOnly: true}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := gitAssociatedContainer("app", "/app", "myapp:latest", tt.labels)
+
+			assert.Equal(t, tt.want, Allowed(c, tt.policy))
+		})
+	}
 }

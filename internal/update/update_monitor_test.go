@@ -1,16 +1,26 @@
 package update
 
 import (
+	"maps"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	goGit "github.com/go-git/go-git/v5"
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 )
@@ -226,4 +236,95 @@ func TestUpdateAction_MonitorOnly(t *testing.T) {
 			})
 		})
 	})
+}
+
+// TestUpdate_GitWatchedNoPullIsNotRebuilt verifies that a Git-watched
+// container with no-pull, set by label or globally, is reported stale when
+// its remote advances, but is neither rebuilt nor recreated. The client mock
+// expects only the listing, so a stop, build or recreate fails the test.
+func TestUpdate_GitWatchedNoPullIsNotRebuilt(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		labels map[string]string
+		policy updateConfig.Policy
+	}{
+		{
+			name:   "no-pull label",
+			labels: map[string]string{labels.NoPull: "true"},
+		},
+		{
+			name:   "no-pull configuration option",
+			policy: updateConfig.Policy{NoPull: true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			repoDir, branch := initGitRepoWithCommit(t)
+
+			containerLabels := map[string]string{
+				labels.GitRepo: repoDir,
+				labels.GitRef:  branch,
+				// The running revision is older than the remote's tip.
+				labels.GitLastCommit: "0123456789abcdef0123456789abcdef01234567",
+			}
+			maps.Copy(containerLabels, tt.labels)
+
+			app := skipTestContainer("app-id", "app", containerLabels)
+
+			client := newMockClient(t)
+			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+
+			gitClient := git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Second})
+
+			report, _, err := update(newTestLogger(t), t.Context(), client,
+				updateParams.Params{Git: gitConfig.Defaults{Enable: true}, Policy: tt.policy},
+				ratelimit.New(), gitClient)
+			require.NoError(t, err)
+
+			require.Len(t, report.Stale(), 1)
+			assert.Equal(t, app.ID(), report.Stale()[0].ID())
+			assert.Empty(t, report.Updated())
+			assert.Empty(t, report.Failed())
+			assert.False(t, app.IsStale())
+		})
+	}
+}
+
+// initGitRepoWithCommit creates a Git repository with one commit in a
+// temporary directory, so a Git check can list its refs without a network.
+//
+// Parameters:
+//   - t: Test that owns the directory.
+//
+// Returns:
+//   - string: The repository directory.
+//   - string: The branch the commit is on.
+func initGitRepoWithCommit(t *testing.T) (string, string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	repo, err := goGit.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("hello\n"), 0o600))
+
+	_, err = worktree.Add("README")
+	require.NoError(t, err)
+
+	_, err = worktree.Commit("init", &goGit.CommitOptions{
+		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},
+	})
+	require.NoError(t, err)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+
+	return dir, head.Name().Short()
 }

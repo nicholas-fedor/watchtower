@@ -773,11 +773,10 @@ func checkContainerStaleness(
 		result.newestImage = sourceContainer.ImageID()
 	}
 
-	// Determine if the container should be updated based on staleness and config.
-	shouldUpdate := staleness.ShouldUpdate(sourceContainer, result.stale, config)
-	if gitWatched && sourceContainer.IsNoPull(config.Policy) {
-		shouldUpdate = false
-	}
+	// Determine if the container should be updated based on staleness and
+	// config. A Git-watched container is updated only through a rebuild.
+	shouldUpdate := staleness.ShouldUpdate(sourceContainer, result.stale, config) &&
+		(!gitWatched || rebuild.Allowed(sourceContainer, config.Policy))
 
 	// Log when skipping Watchtower self-update in run-once mode.
 	if result.stale && sourceContainer.IsWatchtower() && config.RunOnce {
