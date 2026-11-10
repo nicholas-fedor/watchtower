@@ -244,26 +244,14 @@ func TestUpdate_SortFailureKeepsOldInstanceImage(t *testing.T) {
 		"watchtower-old-a", "org/watchtower:1")
 
 	// Two containers with one name make the dependency graph fail.
-	app1 := mockUpdate.CreateMockContainerWithConfig(
-		"d000000000000000000000000000000000000000000000000000000000000000",
-		"/app", "org/app:1", true, false, time.Now(),
-		&dockerContainer.Config{Image: "org/app:1", Labels: map[string]string{}},
-	)
-	app2 := mockUpdate.CreateMockContainerWithConfig(
-		"e000000000000000000000000000000000000000000000000000000000000000",
-		"/app", "org/app:1", true, false, time.Now(),
-		&dockerContainer.Config{Image: "org/app:1", Labels: map[string]string{}},
-	)
+	app1 := skipTestContainer("d000000000000000000000000000000000000000000000000000000000000000", "app", nil)
+	app2 := skipTestContainer("e000000000000000000000000000000000000000000000000000000000000000", "app", nil)
 
 	// The mock fails the test on any image removal.
 	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{current, old, app1, app2}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
-	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
-		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
-			return false, c.ImageID(), "", nil
-		}).Maybe()
 
 	_, cleanup, err := update(newTestLogger(t), t.Context(), client,
 		updateParams.Params{Cleanup: true, CurrentContainerID: currentID}, ratelimit.New())

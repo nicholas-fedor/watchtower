@@ -47,10 +47,11 @@ func planTestRestarts(
 	t.Helper()
 
 	log := newTestLogger(t)
-	graph, graphErr := sorter.NewDependencyGraph(log, filtered, nil, config.UseComposeDependsOn)
+	graph, err := sorter.NewDependencyGraph(log, filtered, nil, config.UseComposeDependsOn)
+	require.NoError(t, err)
 
 	restarts, err := planRestarts(log, t.Context(), newMockClient(t), config, session, progress,
-		graph, graphErr, filtered, filtered, inCycle)
+		graph, filtered, filtered, inCycle)
 	require.NoError(t, err)
 
 	return restarts
@@ -335,5 +336,25 @@ func TestPlanRestarts(t *testing.T) {
 		restarts := planTestRestarts(t, session, config, progress, []*container.Container{app}, nil)
 
 		assert.Empty(t, restarts)
+	})
+
+	t.Run("ends with the sort error when the containers cannot be ordered", func(t *testing.T) {
+		t.Parallel()
+
+		// The session passes every cycle member in inCycle. Leaving this
+		// cycle out of it makes the first sort fail.
+		a := skipTestContainer("a-id", "a", map[string]string{labels.DependsOn: "b"})
+		b := skipTestContainer("b-id", "b", map[string]string{labels.DependsOn: "a"})
+		monitored := []*container.Container{a, b}
+
+		log := newTestLogger(t)
+		graph, err := sorter.NewDependencyGraph(log, monitored, nil, false)
+		require.NoError(t, err)
+
+		restarts, err := planRestarts(log, t.Context(), newMockClient(t), updateParams.Params{},
+			rebuild.NewSession(nil), &state.Progress{}, graph, monitored, monitored, nil)
+
+		require.ErrorIs(t, err, errSortDependenciesFailed)
+		assert.Nil(t, restarts)
 	})
 }
