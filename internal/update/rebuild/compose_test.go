@@ -133,7 +133,7 @@ func TestSession_applyCompose(t *testing.T) {
 		assert.Equal(t, result.Commit, got.Labels["api"][labels.GitLastCommit])
 		assert.Contains(t, sess.applied, api.ID())
 		assert.Contains(t, sess.applied, worker.ID())
-		assert.True(t, sess.SkipRecreate(api, updateParams.Params{}))
+		assert.Empty(t, sess.ExcludeApplied([]*container.Container{api, worker}))
 	})
 
 	t.Run("separates projects that share a directory and config identity", func(t *testing.T) {
@@ -713,7 +713,7 @@ func TestSession_applyCompose(t *testing.T) {
 		assert.True(t, got.BuildOnly)
 		assert.Empty(t, sess.applied)
 		assert.Equal(t, container.ImageID("sha256:built"), sess.built[c.ID()])
-		assert.True(t, sess.SkipRecreate(c, params))
+		assert.Contains(t, sess.NoRestartBuiltIDs(params), c.ID())
 		assert.Empty(t, report.Updated())
 		require.Len(t, report.Stale(), 1)
 	})

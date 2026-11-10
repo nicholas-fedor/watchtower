@@ -18,7 +18,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
-	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
@@ -98,8 +97,6 @@ const (
 //   - cleanupImageInfos: Images to remove after the session, extended with the
 //     old images of replaced containers.
 //   - progress: Session progress to update.
-//   - gitSession: Git rebuild session that supplies the images built for
-//     Git-watched containers.
 //
 // Returns:
 //   - error: Non-nil when the context is canceled during rolling restarts.
@@ -111,7 +108,6 @@ func Run(
 	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
-	gitSession *rebuild.Session,
 ) error {
 	if config.RollingRestart {
 		failed, err := performRollingRestart(
@@ -122,7 +118,6 @@ func Run(
 			config,
 			cleanupImageInfos,
 			progress,
-			gitSession,
 		)
 		recordRestartOutcomes(log, progress, failed)
 
@@ -153,7 +148,6 @@ func Run(
 		stoppedImages,
 		cleanupImageInfos,
 		progress,
-		gitSession,
 	)
 	recordRestartOutcomes(log, progress, failedStart)
 
@@ -186,7 +180,6 @@ func performRollingRestart(
 	config updateParams.Params,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
-	gitSession *rebuild.Session,
 ) (map[container.ContainerID]error, error) {
 	failed := make(map[container.ContainerID]error, len(containers))
 
@@ -230,10 +223,6 @@ func performRollingRestart(
 
 		c := containers[i]
 		if !c.ToRestart() {
-			continue
-		}
-
-		if gitSession.SkipRecreate(c, config) {
 			continue
 		}
 
@@ -595,7 +584,6 @@ func restartContainersInSortedOrder(
 	stoppedImages []cleanup.RemovedImageInfo,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
-	gitSession *rebuild.Session,
 ) map[container.ContainerID]error {
 	failed := make(map[container.ContainerID]error, len(containers))
 	// Track renamed containers to skip cleanup.
@@ -606,10 +594,6 @@ func restartContainersInSortedOrder(
 		c := containers[i]
 
 		if !c.ToRestart() {
-			continue
-		}
-
-		if gitSession.SkipRecreate(c, config) {
 			continue
 		}
 

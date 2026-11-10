@@ -1360,7 +1360,6 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 			stoppedImages,
 			&cleanup,
 			&progress,
-			nil,
 		)
 
 		assert.Empty(t, failed, "stopped containers must still be recreated after cancel")
@@ -1505,7 +1504,6 @@ func Test_performRollingRestart(t *testing.T) {
 					updateParams.Params{},
 					&cleanupImageInfos,
 					nil, // progress is not needed for this test
-					nil,
 				)
 
 				// Verify the number of failed containers.
@@ -1600,7 +1598,6 @@ func Test_performRollingRestart(t *testing.T) {
 				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
-				nil,
 			)
 
 			// All 4 containers should be in failed map (containers 0, 1, 2, 3).
@@ -1681,7 +1678,6 @@ func Test_performRollingRestart(t *testing.T) {
 				client,
 				updateParams.Params{},
 				&cleanupImageInfos,
-				nil,
 				nil,
 			)
 
@@ -1764,7 +1760,6 @@ func Test_performRollingRestart(t *testing.T) {
 				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
-				nil,
 			)
 
 			// All containers should be processed, none failed due to cancellation.
@@ -1830,7 +1825,6 @@ func Test_performRollingRestart(t *testing.T) {
 				updateParams.Params{},
 				&cleanupImageInfos,
 				nil,
-				nil,
 			)
 
 			// Verify create order is forward (container-0, container-1, container-2).
@@ -1883,7 +1877,6 @@ func Test_performRollingRestart(t *testing.T) {
 				client,
 				updateParams.Params{RollingRestart: true, EphemeralSelfUpdate: true},
 				&cleanupImageInfos,
-				nil,
 				nil,
 			)
 
@@ -1942,7 +1935,6 @@ func Test_performRollingRestart(t *testing.T) {
 				client,
 				updateParams.Params{},
 				&cleanupImageInfos,
-				nil,
 				nil,
 			)
 
@@ -2004,7 +1996,6 @@ func Test_performRollingRestart(t *testing.T) {
 				client,
 				updateParams.Params{},
 				&cleanupImageInfos,
-				nil,
 				nil,
 			)
 
@@ -2079,7 +2070,7 @@ func TestRun(t *testing.T) {
 
 			var cleanupImageInfos []cleanup.RemovedImageInfo
 
-			err := Run(log, ctx, []*container.Container{c}, client, config, &cleanupImageInfos, &progress, nil)
+			err := Run(log, ctx, []*container.Container{c}, client, config, &cleanupImageInfos, &progress)
 			if tt.wantErr {
 				require.ErrorIs(t, err, context.Canceled)
 			} else {

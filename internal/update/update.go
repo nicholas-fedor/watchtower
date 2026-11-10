@@ -381,7 +381,6 @@ func update(
 		config,
 		&cleanupImageInfos,
 		progress,
-		gitSession,
 	)
 	if err != nil {
 		return progress.Report(log), cleanupImageInfos, err
@@ -978,11 +977,9 @@ func planRestarts(
 	)
 	progress.UpdateFailed(log, gitFailed)
 
-	// A failed Git rebuild marks its container as no longer stale. Work out the
-	// implicit restarts again without it. The containers that depend on it then
-	// stay running. Containers that are still stale keep restarting their
-	// dependents. No-restart builds stay running and are excluded. Cycle
-	// members stay excluded, as in the first pass.
+	// Work out the implicit restarts again without the failed rebuilds, which are no longer stale.
+	// Their dependents then stay running. Cycle members stay out because they cannot be ordered.
+	// No-restart builds stay out because every container in the plan is stopped.
 	excluded := make(map[container.ContainerID]struct{}, len(inCycle))
 	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
 	maps.Copy(excluded, inCycle)
@@ -1003,13 +1000,7 @@ func planRestarts(
 
 	// Compose already recreated the containers it applied. Do not recreate
 	// them again from their inspect data.
-	allContainersToRestart = gitSession.ExcludeApplied(allContainersToRestart)
-
-	// Git no-restart builds must not enter stop/create.
-	// The default non-rolling path stops first.
-	// Skipping their recreation only after the stop would leave the running
-	// container deleted.
-	return gitSession.ExcludeNoRestart(allContainersToRestart, config), nil
+	return gitSession.ExcludeApplied(allContainersToRestart), nil
 }
 
 // unmonitoredContainers returns the containers of allContainers that are not

@@ -194,38 +194,6 @@ func (s *Session) PrepareRebuilds(
 	}
 }
 
-// SkipRecreate reports whether recreating a container from its inspect data should be skipped.
-//
-// Compose-applied containers are always skipped. Git URL context builds are
-// skipped only when no-restart is set. Watchtower itself still uses the inspect path.
-//
-// Parameters:
-//   - c: Container to inspect.
-//   - params: Update parameters.
-//
-// Returns:
-//   - bool: True when this session already replaced or must not replace c.
-func (s *Session) SkipRecreate(c *container.Container, params updateParams.Params) bool {
-	if s == nil || c.IsWatchtower() {
-		return false
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, ok := s.applied[c.ID()]; ok {
-		return true
-	}
-
-	if !params.NoRestart {
-		return false
-	}
-
-	_, built := s.built[c.ID()]
-
-	return built
-}
-
 // ExcludeApplied drops containers already recreated by Compose apply.
 //
 // Parameters:
@@ -249,35 +217,6 @@ func (s *Session) ExcludeApplied(containers []*container.Container) []*container
 
 	for _, c := range containers {
 		if _, ok := s.applied[c.ID()]; ok {
-			continue
-		}
-
-		kept = append(kept, c)
-	}
-
-	return kept
-}
-
-// ExcludeNoRestart drops Git-built containers from the recreate list when no-restart is set.
-//
-// Parameters:
-//   - containers: Full candidate list.
-//   - params: Update parameters.
-//
-// Returns:
-//   - []*container.Container: Containers that may still be recreated.
-func (s *Session) ExcludeNoRestart(
-	containers []*container.Container,
-	params updateParams.Params,
-) []*container.Container {
-	if s == nil || !params.NoRestart {
-		return containers
-	}
-
-	kept := make([]*container.Container, 0, len(containers))
-
-	for _, c := range containers {
-		if s.SkipRecreate(c, params) {
 			continue
 		}
 

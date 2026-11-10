@@ -439,97 +439,6 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 	})
 }
 
-// TestSession_SkipRecreate verifies when recreating a container from its inspect
-// data is skipped after a Git rebuild.
-func TestSession_SkipRecreate(t *testing.T) {
-	t.Parallel()
-
-	t.Run("is false when the session is nil", func(t *testing.T) {
-		t.Parallel()
-
-		var sess *Session
-
-		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-
-		assert.False(t, sess.SkipRecreate(c, updateParams.Params{NoRestart: true}))
-	})
-
-	t.Run("is false when no-restart is off", func(t *testing.T) {
-		t.Parallel()
-
-		sess := NewSession(gitTestClient(t))
-		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		sess.built[c.ID()] = "sha256:git"
-
-		assert.False(t, sess.SkipRecreate(c, updateParams.Params{}))
-	})
-
-	t.Run("is false for Watchtower even when an image was built", func(t *testing.T) {
-		t.Parallel()
-
-		sess := NewSession(gitTestClient(t))
-		c := mockUpdate.CreateMockContainerWithConfig(
-			"wt",
-			"/watchtower",
-			"nickfedor/watchtower:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Image: "nickfedor/watchtower:latest",
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower": "true",
-				},
-			},
-		)
-		sess.built[c.ID()] = "sha256:git"
-
-		assert.False(t, sess.SkipRecreate(c, updateParams.Params{NoRestart: true}))
-	})
-
-	t.Run("is true when no-restart is on and this session built the image", func(t *testing.T) {
-		t.Parallel()
-
-		sess := NewSession(gitTestClient(t))
-		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		sess.built[c.ID()] = "sha256:git"
-
-		assert.True(t, sess.SkipRecreate(c, updateParams.Params{NoRestart: true}))
-	})
-}
-
-// TestSession_ExcludeNoRestart verifies that containers built during a
-// no-restart update are left out of recreation.
-func TestSession_ExcludeNoRestart(t *testing.T) {
-	t.Parallel()
-
-	t.Run("returns the original list when the session is nil or no-restart is off", func(t *testing.T) {
-		t.Parallel()
-
-		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
-		list := []*container.Container{c}
-
-		var sess *Session
-		assert.Equal(t, list, sess.ExcludeNoRestart(list, updateParams.Params{NoRestart: true}))
-
-		sess = NewSession(gitTestClient(t))
-		assert.Equal(t, list, sess.ExcludeNoRestart(list, updateParams.Params{}))
-	})
-
-	t.Run("drops containers this session built when no-restart is on", func(t *testing.T) {
-		t.Parallel()
-
-		sess := NewSession(gitTestClient(t))
-		built := gitAssociatedContainer("built", "/built", "myapp:latest", nil)
-		kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
-		sess.built[built.ID()] = "sha256:git"
-
-		got := sess.ExcludeNoRestart([]*container.Container{built, kept}, updateParams.Params{NoRestart: true})
-		require.Len(t, got, 1)
-		assert.Equal(t, kept.ID(), got[0].ID())
-	})
-}
-
 // TestSession_ExcludeApplied verifies that containers Compose apply already
 // recreated are left out of recreation.
 func TestSession_ExcludeApplied(t *testing.T) {
@@ -655,7 +564,7 @@ func TestSession_reuseUnrestartedBuild(t *testing.T) {
 
 		assert.Empty(t, failed)
 		assert.Equal(t, built, second.built[c.ID()])
-		assert.True(t, second.SkipRecreate(c, noRestart), "the container stays out of the restart phase")
+		assert.Contains(t, second.NoRestartBuiltIDs(noRestart), c.ID(), "the container stays out of the restart phase")
 		require.Len(t, report.Stale(), 1)
 		assert.Equal(t, built, report.Stale()[0].LatestImageID())
 		assert.Equal(t, "https://github.com/org/app/releases/tag/v1.0.0", report.Stale()[0].Changelog())
@@ -693,7 +602,7 @@ func TestSession_reuseUnrestartedBuild(t *testing.T) {
 
 			assert.Empty(t, failed)
 			assert.Equal(t, container.ImageID("sha256:built"), sess.built[c.ID()])
-			assert.True(t, sess.SkipRecreate(c, noRestart))
+			assert.Contains(t, sess.NoRestartBuiltIDs(noRestart), c.ID())
 		}
 	})
 
