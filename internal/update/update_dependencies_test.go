@@ -3004,23 +3004,10 @@ func composeServiceLabels(project, service string) map[string]string {
 func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.T) {
 	t.Parallel()
 
-	// collidingContainer returns a running container named /app with the given ID.
-	collidingContainer := func(id string) *container.Container {
-		return mockUpdate.CreateMockContainerWithConfig(
-			id,
-			"/app",
-			"org/app:1",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{Image: "org/app:1"},
-		)
-	}
-
 	client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
 		Containers: []*container.Container{
-			collidingContainer("a000000000000000000000000000000000000000000000000000000000000000"),
-			collidingContainer("b000000000000000000000000000000000000000000000000000000000000000"),
+			skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app", nil),
+			skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "app", nil),
 		},
 	}, false, false)
 
@@ -3060,4 +3047,27 @@ func TestRunUpdatesWithNotifications_IdentifierCollisionNotifiesOnce(t *testing.
 	require.True(t, ok, "the error field should be a string")
 	assert.Contains(t, errText, "app (a00000000000)")
 	assert.Contains(t, errText, "app (b00000000000)")
+}
+
+// TestUpdate_GraphFailureEndsBeforeChecksAndHooks verifies that a session
+// whose dependency graph cannot be built ends before it runs a pre-check hook
+// or checks any container for updates. Two containers named /app make the
+// graph fail. The client mock expects only the listing, so a hook command or a
+// staleness check fails the test.
+func TestUpdate_GraphFailureEndsBeforeChecksAndHooks(t *testing.T) {
+	t.Parallel()
+
+	preCheck := map[string]string{labels.LifecyclePreCheck: "echo checking"}
+
+	client := newMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{
+		skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app", preCheck),
+		skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "app", preCheck),
+	}, nil).Once()
+
+	report, _, err := update(newTestLogger(t), t.Context(), client,
+		updateParams.Params{LifecycleHooks: true}, ratelimit.New())
+
+	require.ErrorIs(t, err, errSortDependenciesFailed)
+	assert.Nil(t, report)
 }

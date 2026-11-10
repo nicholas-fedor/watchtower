@@ -23,6 +23,8 @@ Watchtower supports four distinct lifecycle hook types that execute at different
 | **Post-update** | Executed after starting the new container                             | Per container, immediately after starting  |
 | **Post-check**  | Executed for each filtered container after the update cycle completes | Per container, after all updates           |
 
+An update cycle that ends before it checks any container runs no check hooks. This happens when the monitored containers cannot be ordered by their dependencies, for example when two of them share a name.
+
 ## Configuration
 
 ### Enabling Lifecycle Hooks

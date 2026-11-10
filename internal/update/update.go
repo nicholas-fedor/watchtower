@@ -261,12 +261,6 @@ func update(
 		}
 	}
 
-	// Run pre-check lifecycle hooks if enabled to validate the environment before updates.
-	if config.LifecycleHooks {
-		log.Debug().Msg("Executing pre-check lifecycle hooks")
-		hooks.ExecutePreChecks(log, ctx, client, config.Filter, config.LifecycleUID, config.LifecycleGID, filteredContainers)
-	}
-
 	// Prepare a list of container names and images for detailed debugging output.
 	filteredContainerNames := make([]string, len(filteredContainers))
 	for i, c := range filteredContainers {
@@ -301,21 +295,25 @@ func update(
 
 	// Build the dependency graph once. The cycle check, every dependency sort,
 	// and the implicit restarts below use it, so each link resolves to the same
-	// container throughout the scan. A graph that cannot be built fails the
-	// first sort. Unmonitored containers are passed so that a link naming one
-	// resolves to it, and is left alone, rather than to a monitored container.
-	graph, graphErr := sorter.NewDependencyGraph(log,
+	// container throughout the scan. Unmonitored containers are passed so that
+	// a link naming one resolves to it, and is left alone, rather than to a
+	// monitored container.
+	graph, err := sorter.NewDependencyGraph(log,
 		filteredContainers,
 		unmonitoredContainers(allContainers, filteredContainers),
 		config.UseComposeDependsOn,
 	)
-	if graphErr == nil {
-		for _, link := range graph.UnresolvedDependsOn() {
-			log.WithLevel(scanProblems.Level("unresolved depends-on", string(link.Container.ID()), link.Link)).
-				Str("container", link.Container.Name()).
-				Str("depends_on", link.Link).
-				Msg(logging.UnresolvedDependsOn)
-		}
+	if err != nil {
+		// Containers that cannot be ordered cannot be updated. The session
+		// ends before it runs a hook or checks any image.
+		return nil, cleanupImageInfos, sortFailed(log, "Failed to build the dependency graph", err)
+	}
+
+	for _, link := range graph.UnresolvedDependsOn() {
+		log.WithLevel(scanProblems.Level("unresolved depends-on", string(link.Container.ID()), link.Link)).
+			Str("container", link.Container.Name()).
+			Str("depends_on", link.Link).
+			Msg(logging.UnresolvedDependsOn)
 	}
 
 	// Skip every container in a circular dependency. Cycle members are also
@@ -324,12 +322,7 @@ func update(
 	// container.
 	inCycle := make(map[container.ContainerID]struct{})
 
-	var cycleMembers []*container.Container
-	if graphErr == nil {
-		cycleMembers = graph.CycleMembers()
-	}
-
-	for _, c := range cycleMembers {
+	for _, c := range graph.CycleMembers() {
 		inCycle[c.ID()] = struct{}{}
 
 		progress.AddSkipped(log, c, errCircularDependency, config)
@@ -337,6 +330,14 @@ func update(
 			Str("container", c.Name()).
 			Str("id", c.ID().ShortID()).
 			Msg(logging.CircularDependency)
+	}
+
+	// Run the pre-check lifecycle hooks just before the containers are
+	// checked. A session that ends earlier runs neither these hooks nor the
+	// post-checks.
+	if config.LifecycleHooks {
+		log.Debug().Msg("Executing pre-check lifecycle hooks")
+		hooks.ExecutePreChecks(log, ctx, client, config.Filter, config.LifecycleUID, config.LifecycleGID, filteredContainers)
 	}
 
 	// A failed check of Watchtower's own image delays the end of a run-once
@@ -363,7 +364,6 @@ func update(
 		gitSession,
 		progress,
 		graph,
-		graphErr,
 		allContainers,
 		filteredContainers,
 		inCycle,
@@ -885,7 +885,6 @@ func skipFailedUpdateCheck(
 //   - gitSession: The session's Git monitor.
 //   - progress: Session progress that receives the rebuild results.
 //   - graph: The session's dependency graph.
-//   - graphErr: The error from building the graph, which fails the first sort.
 //   - allContainers: Every listed container.
 //   - filteredContainers: The monitored containers, sorted in place.
 //   - inCycle: IDs of the containers in a circular dependency.
@@ -901,20 +900,9 @@ func planRestarts(
 	gitSession *rebuild.Session,
 	progress *state.Progress,
 	graph *sorter.DependencyGraph,
-	graphErr error,
 	allContainers, filteredContainers []*container.Container,
 	inCycle map[container.ContainerID]struct{},
 ) ([]*container.Container, error) {
-	// Each failed sort is logged at debug and ends the session with the same
-	// error.
-	sortFailed := func(msg string, err error) error {
-		log.Debug().
-			Err(err).
-			Msg(msg)
-
-		return fmt.Errorf("%w: %w", errSortDependenciesFailed, err)
-	}
-
 	// Sort containers by dependencies to ensure correct update and restart order.
 	// Cycle members cannot be ordered, so they are placed after the others.
 	// Every sort keeps only the graph's dependencies between the containers it
@@ -931,13 +919,9 @@ func planRestarts(
 		}
 	}
 
-	err := graphErr
-	if err == nil {
-		err = graph.Sort(log, sortable)
-	}
-
+	err := graph.Sort(log, sortable)
 	if err != nil {
-		return nil, sortFailed("Failed to sort containers by dependencies", err)
+		return nil, sortFailed(log, "Failed to sort containers by dependencies", err)
 	}
 
 	// Write the order back, with cycle members last.
@@ -957,7 +941,7 @@ func planRestarts(
 	// Sort containers to restart by dependencies to ensure correct update and restart order.
 	err = graph.Sort(log, allContainersToRestart)
 	if err != nil {
-		return nil, sortFailed("Failed to sort all containers to restart by dependencies", err)
+		return nil, sortFailed(log, "Failed to sort all containers to restart by dependencies", err)
 	}
 
 	// Log the number of containers prepared for restart.
@@ -995,12 +979,30 @@ func planRestarts(
 
 	err = graph.Sort(log, allContainersToRestart)
 	if err != nil {
-		return nil, sortFailed("Failed to sort all containers to restart by dependencies", err)
+		return nil, sortFailed(log, "Failed to sort all containers to restart by dependencies", err)
 	}
 
 	// Compose already recreated the containers it applied. Do not recreate
 	// them again from their inspect data.
 	return gitSession.ExcludeApplied(allContainersToRestart), nil
+}
+
+// sortFailed logs a failure to order the containers by dependency and returns
+// the error that ends the session.
+//
+// Parameters:
+//   - log: Process logger. The failure is logged at debug.
+//   - msg: Log message naming the failed step.
+//   - err: The failure.
+//
+// Returns:
+//   - error: err, wrapped in the error for a failed dependency sort.
+func sortFailed(log *zerolog.Logger, msg string, err error) error {
+	log.Debug().
+		Err(err).
+		Msg(msg)
+
+	return fmt.Errorf("%w: %w", errSortDependenciesFailed, err)
 }
 
 // unmonitoredContainers returns the containers of allContainers that are not
