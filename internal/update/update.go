@@ -277,59 +277,11 @@ func update(
 		Str("filter", fmt.Sprintf("%T", config.Filter)).
 		Msg("Retrieved containers for update check")
 
-	// Skip monitored containers that reference themselves as dependencies
-	// via the Watchtower depends-on label.
-	for _, monitoredContainer := range filteredContainers {
-		if hasSelfDependency(monitoredContainer) {
-			progress.AddSkipped(log,
-				monitoredContainer,
-				errSelfDependency,
-				config,
-			)
-			log.WithLevel(scanProblems.Level("self-dependency", string(monitoredContainer.ID()))).
-				Str("container", monitoredContainer.Name()).
-				Str("id", monitoredContainer.ID().ShortID()).
-				Msg(logging.SelfDependency)
-		}
-	}
-
-	// Build the dependency graph once. The cycle check, every dependency sort,
-	// and the implicit restarts below use it, so each link resolves to the same
-	// container throughout the scan. Unmonitored containers are passed so that
-	// a link naming one resolves to it, and is left alone, rather than to a
-	// monitored container.
-	graph, err := sorter.NewDependencyGraph(log,
-		filteredContainers,
-		unmonitoredContainers(allContainers, filteredContainers),
-		config.UseComposeDependsOn,
-	)
+	// A graph that cannot be built ends the session before any hook runs or
+	// any image is checked.
+	graph, inCycle, err := checkDependencies(log, config, progress, allContainers, filteredContainers)
 	if err != nil {
-		// Containers that cannot be ordered cannot be updated. The session
-		// ends before it runs a hook or checks any image.
-		return nil, cleanupImageInfos, sortFailed(log, "Failed to build the dependency graph", err)
-	}
-
-	for _, link := range graph.UnresolvedDependsOn() {
-		log.WithLevel(scanProblems.Level("unresolved depends-on", string(link.Container.ID()), link.Link)).
-			Str("container", link.Container.Name()).
-			Str("depends_on", link.Link).
-			Msg(logging.UnresolvedDependsOn)
-	}
-
-	// Skip every container in a circular dependency. Cycle members are also
-	// kept out of the dependency sorts and implicit restarts below, so a cycle
-	// cannot fail the session or be restarted through a link to an updated
-	// container.
-	inCycle := make(map[container.ContainerID]struct{})
-
-	for _, c := range graph.CycleMembers() {
-		inCycle[c.ID()] = struct{}{}
-
-		progress.AddSkipped(log, c, errCircularDependency, config)
-		log.WithLevel(scanProblems.Level("circular dependency", string(c.ID()))).
-			Str("container", c.Name()).
-			Str("id", c.ID().ShortID()).
-			Msg(logging.CircularDependency)
+		return nil, cleanupImageInfos, err
 	}
 
 	// Run the pre-check lifecycle hooks just before the containers are
@@ -428,6 +380,79 @@ func update(
 
 	// Return the final report summarizing the session and the cleanup image infos.
 	return progress.Report(log), cleanupImageInfos, nil
+}
+
+// checkDependencies builds the session's dependency graph and records the
+// monitored containers that cannot be ordered as skipped.
+//
+// A container whose Watchtower depends-on label names itself is skipped, and
+// so is every member of a circular dependency. Each problem, and each
+// depends-on entry that names no container, warns once and then logs at
+// debug. Unmonitored containers join the graph so that a link naming one
+// resolves to it, and is left alone, rather than to a monitored container.
+//
+// Parameters:
+//   - log: Process logger.
+//   - config: Update parameters.
+//   - progress: Session progress that receives the skips.
+//   - allContainers: Every listed container.
+//   - filteredContainers: The monitored containers.
+//
+// Returns:
+//   - *sorter.DependencyGraph: The graph that every dependency sort and the
+//     implicit restarts of the session use.
+//   - map[container.ContainerID]struct{}: IDs of the containers in a circular
+//     dependency, which the session keeps out of its dependency sorts and
+//     implicit restarts.
+//   - error: Non-nil when the graph cannot be built, for example when two
+//     containers share a name. It wraps the error for a failed dependency sort.
+func checkDependencies(
+	log *zerolog.Logger,
+	config updateParams.Params,
+	progress *state.Progress,
+	allContainers, filteredContainers []*container.Container,
+) (*sorter.DependencyGraph, map[container.ContainerID]struct{}, error) {
+	for _, c := range filteredContainers {
+		if hasSelfDependency(c) {
+			progress.AddSkipped(log, c, errSelfDependency, config)
+			log.WithLevel(scanProblems.Level("self-dependency", string(c.ID()))).
+				Str("container", c.Name()).
+				Str("id", c.ID().ShortID()).
+				Msg(logging.SelfDependency)
+		}
+	}
+
+	// The graph is built once, so each link resolves to the same container
+	// throughout the session.
+	graph, err := sorter.NewDependencyGraph(log,
+		filteredContainers,
+		unmonitoredContainers(allContainers, filteredContainers),
+		config.UseComposeDependsOn,
+	)
+	if err != nil {
+		return nil, nil, sortFailed(log, "Failed to build the dependency graph", err)
+	}
+
+	for _, link := range graph.UnresolvedDependsOn() {
+		log.WithLevel(scanProblems.Level("unresolved depends-on", string(link.Container.ID()), link.Link)).
+			Str("container", link.Container.Name()).
+			Str("depends_on", link.Link).
+			Msg(logging.UnresolvedDependsOn)
+	}
+
+	inCycle := make(map[container.ContainerID]struct{})
+
+	for _, c := range graph.CycleMembers() {
+		inCycle[c.ID()] = struct{}{}
+
+		progress.AddSkipped(log, c, errCircularDependency, config)
+		log.WithLevel(scanProblems.Level("circular dependency", string(c.ID()))).
+			Str("container", c.Name()).
+			Str("id", c.ID().ShortID()).
+			Msg(logging.CircularDependency)
+	}
+
+	return graph, inCycle, nil
 }
 
 // checkStaleness checks which monitored containers are stale and records each
