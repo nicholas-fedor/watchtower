@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Decide once whether a git-watched container may be rebuilt by @nicholas-fedor in [#3667](https://github.com/nicholas-fedor/watchtower/pull/3667)
 - Extract the staleness phase from update by @nicholas-fedor in [#3663](https://github.com/nicholas-fedor/watchtower/pull/3663)
 - Drop label writes on compose source containers by @nicholas-fedor in [#3648](https://github.com/nicholas-fedor/watchtower/pull/3648)
 - Parse the git-watch label once by @nicholas-fedor in [#3642](https://github.com/nicholas-fedor/watchtower/pull/3642)
