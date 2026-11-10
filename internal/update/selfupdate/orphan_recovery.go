@@ -2,6 +2,7 @@ package selfupdate
 
 import (
 	"context"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -28,6 +29,49 @@ type RestartPolicySetter interface {
 		containerID container.ContainerID,
 		policy dockerContainer.RestartPolicy,
 	) error
+}
+
+// RetireClient recovers an orphaned replacement and changes the restart policy
+// of an old Watchtower container.
+type RetireClient interface {
+	RecoveryClient
+	RestartPolicySetter
+}
+
+// RetireOldInstance stops an old Watchtower container from running again.
+//
+// It starts an orphaned replacement left in the created state, if there is
+// one, and sets the old container's restart policy to "no". Each step runs
+// under its own timeout and keeps ctx's values but not its cancellation.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: The caller's context.
+//   - client: Container client for the recovery and the restart policy.
+//   - oldContainer: The old Watchtower container.
+//   - timeout: The bound of each step.
+func RetireOldInstance(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client RetireClient,
+	oldContainer *container.Container,
+	timeout time.Duration,
+) {
+	recoverCtx, recoverCancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+	recovered, ok := TryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer)
+
+	recoverCancel()
+
+	if ok {
+		log.Info().
+			Str("container", recovered.Name()).
+			Msg("Recovered orphaned Watchtower container, exiting old instance")
+	}
+
+	policyCtx, policyCancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
+	DisableOldRestarts(log, policyCtx, oldContainer, client)
+
+	policyCancel()
 }
 
 // TryRecoverOrphanedContainer attempts to start an orphaned Watchtower container

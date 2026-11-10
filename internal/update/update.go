@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -42,7 +43,7 @@ type Client interface {
 	cleanup.Client
 	rebuild.ImageBuilder
 	restart.Client
-	selfupdate.RecoveryClient
+	selfupdate.RetireClient
 
 	// IsContainerStale reports whether the container's image is outdated, with
 	// the latest image ID and registry digest.
@@ -179,55 +180,20 @@ func update(
 		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
+	// An old instance's container stops itself rather than run a session.
+	// This catches one restarted despite the startup check.
+	if old := currentOldInstance(allContainers, config.CurrentContainerID); old != nil {
+		log.Debug().
+			Str("container", old.Name()).
+			Msg("Current container is an old Watchtower container, stopping self")
+
+		selfupdate.RetireOldInstance(log, ctx, client, old, config.DetachedTimeout())
+
+		return nil, nil, errOldSelfDetected
+	}
+
 	// Initialize a slice to collect cleaned image info for cleanup after updates.
 	cleanupImageInfos := []cleanup.RemovedImageInfo{}
-
-	// Self-check: if the current container is an old Watchtower container,
-	// update its restart policy to "no" and exit to prevent Docker from
-	// restarting it. This catches cases where the startup check was bypassed
-	// or the container was restarted despite other safeguards.
-	if config.CurrentContainerID != "" {
-		for _, c := range allContainers {
-			if c.ID() == config.CurrentContainerID && c.IsWatchtower() {
-				if container.IsOldContainer(c.Name()) {
-					log.Debug().
-						Str("container", c.Name()).
-						Msg("Current container is an old Watchtower container, stopping self")
-
-					recoverCtx, recoverCancel := context.WithTimeout(
-						context.Background(),
-						config.DetachedTimeout(),
-					)
-					defer recoverCancel()
-
-					//nolint:contextcheck // recoverCtx is intentionally created with timeout and passed to recovery
-					recoveredContainer, recovered := selfupdate.TryRecoverOrphanedContainer(log,
-						recoverCtx,
-						client,
-						c,
-					)
-					if recovered {
-						log.Info().
-							Str("container", recoveredContainer.Name()).
-							Msg("Recovered orphaned Watchtower container, exiting old instance")
-					}
-
-					setNoRestartCtx, setNoRestartCancel := context.WithTimeout(
-						context.Background(),
-						config.DetachedTimeout(),
-					)
-					defer setNoRestartCancel()
-
-					//nolint:contextcheck // setNoRestartCtx is intentionally used for restart policy update
-					selfupdate.DisableOldRestarts(log, setNoRestartCtx, c, client)
-
-					return nil, nil, errOldSelfDetected
-				}
-
-				break
-			}
-		}
-	}
 
 	// Clean up any old Watchtower containers that linger from a previous
 	// self-update. This runs each update cycle to catch containers that the
@@ -379,6 +345,34 @@ func update(
 
 	// Return the final report summarizing the session and the cleanup image infos.
 	return progress.Report(log), cleanupImageInfos, nil
+}
+
+// currentOldInstance returns the current container when it is an old
+// Watchtower instance with the watchtower-old- name prefix.
+//
+// Parameters:
+//   - containers: Every listed container.
+//   - currentID: The ID of Watchtower's own container, or empty when unknown.
+//
+// Returns:
+//   - *container.Container: The current container, or nil when it is unknown,
+//     not listed, or not an old Watchtower instance.
+func currentOldInstance(containers []*container.Container, currentID container.ContainerID) *container.Container {
+	if currentID == "" {
+		return nil
+	}
+
+	i := slices.IndexFunc(containers, func(c *container.Container) bool { return c.ID() == currentID })
+	if i < 0 {
+		return nil
+	}
+
+	current := containers[i]
+	if !current.IsWatchtower() || !container.IsOldContainer(current.Name()) {
+		return nil
+	}
+
+	return current
 }
 
 // checkDependencies builds the session's dependency graph and records the

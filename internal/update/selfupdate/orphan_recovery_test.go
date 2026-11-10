@@ -64,6 +64,57 @@ func expectListed(client *mockSelfupdate.MockRecoveryClient, containers ...*cont
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
 }
 
+// TestRetireOldInstance verifies that retiring an old Watchtower container
+// starts an orphaned replacement, if there is one, and disables the old
+// container's restarts. Both steps get a live context with a deadline even
+// when the caller's context is already canceled.
+func TestRetireOldInstance(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		orphan bool
+	}{
+		{name: "with an orphaned replacement", orphan: true},
+		{name: "without an orphaned replacement", orphan: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			old := recoveryContainer("old-id", "/watchtower-old-000000000000", true, "")
+			listed := []*container.Container{old}
+
+			// liveContext matches a context with a deadline that the caller's
+			// cancellation did not reach.
+			liveContext := mock.MatchedBy(func(ctx context.Context) bool {
+				_, bounded := ctx.Deadline()
+
+				return bounded && ctx.Err() == nil
+			})
+
+			client := mockSelfupdate.NewMockRetireClient(t)
+
+			if tt.orphan {
+				orphan := recoveryContainer("orphan-id", "/watchtower", false, "")
+				listed = append(listed, orphan)
+
+				client.EXPECT().StartContainerByID(liveContext, orphan.ID()).Return(nil).Once()
+			}
+
+			client.EXPECT().ListContainers(liveContext, mock.Anything).Return(listed, nil).Once()
+			client.EXPECT().SetRestartPolicy(liveContext, old.ID(),
+				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			RetireOldInstance(newTestLogger(t), ctx, client, old, time.Minute)
+		})
+	}
+}
+
 // TestTryRecoverOrphanedContainer verifies that a Watchtower replacement left
 // in the created state is started and returned, and that recovery gives up
 // without error when listing fails, the start fails, or no orphan in the
