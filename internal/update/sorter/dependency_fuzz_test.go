@@ -323,7 +323,7 @@ func isRealCycle(containers []*container.Container, circularErr circularReferenc
 			return false
 		}
 
-		links := fromContainer.Links(useComposeDependsOn)
+		links, _ := fromContainer.Links(useComposeDependsOn)
 		found := slices.Contains(links, toName)
 
 		if !found {
@@ -627,7 +627,8 @@ func TestGenerateLinkNormalizationContainers(t *testing.T) {
 			require.Len(t, picked, 1)
 
 			for _, useComposeDependsOn := range []bool{true, false} {
-				assert.Equal(t, tt.links, picked[0].Links(useComposeDependsOn))
+				links, _ := picked[0].Links(useComposeDependsOn)
+				assert.Equal(t, tt.links, links)
 
 				_, indegree, adjacency, _, err := buildDependencyGraph(newTestLogger(t), containers, useComposeDependsOn)
 				require.NoError(t, err)

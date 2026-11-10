@@ -2,14 +2,10 @@ package update
 
 import (
 	"testing"
-	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	dockerContainer "github.com/moby/moby/api/types/container"
-	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
@@ -19,7 +15,6 @@ import (
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
-	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
@@ -36,7 +31,7 @@ import (
 //   - config: Update parameters.
 //   - progress: Session progress.
 //   - filtered: The monitored containers, which are also every listed container.
-//   - inCycle: IDs of the containers treated as cycle members.
+//   - skipped: IDs of the containers treated as skipped by the dependency phase.
 //
 // Returns:
 //   - []*container.Container: The containers to restart.
@@ -46,7 +41,7 @@ func planTestRestarts(
 	config updateParams.Params,
 	progress *state.Progress,
 	filtered []*container.Container,
-	inCycle map[container.ContainerID]struct{},
+	skipped map[container.ContainerID]struct{},
 ) []*container.Container {
 	t.Helper()
 
@@ -55,7 +50,7 @@ func planTestRestarts(
 	require.NoError(t, err)
 
 	restarts, err := planRestarts(log, t.Context(), newMockClient(t), config, session, progress,
-		graph, filtered, filtered, inCycle)
+		graph, filtered, filtered, skipped)
 	require.NoError(t, err)
 
 	return restarts
@@ -93,192 +88,6 @@ func staleGitTestContainer(
 	return app, session, gitClient, commit
 }
 
-// Test_hasSelfDependency verifies that a container whose depends-on label
-// names itself is detected.
-func Test_hasSelfDependency(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should return false when no depends-on label is present", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels:       map[string]string{},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.False(t, result)
-	})
-
-	t.Run("should return false when depends-on label is empty", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.depends-on": "",
-				},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.False(t, result)
-	})
-
-	t.Run("should return false when depends-on contains other containers", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.depends-on": "other-container",
-				},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.False(t, result)
-	})
-
-	t.Run("should return true when depends-on contains self", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.depends-on": "test-container",
-				},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.True(t, result)
-	})
-
-	t.Run("should return true when depends-on contains self among multiple dependencies", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.depends-on": "other-container,test-container,another-container",
-				},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.True(t, result)
-	})
-
-	t.Run("should handle spaces and trimming correctly", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.depends-on": " other-container , test-container , another-container ",
-				},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.True(t, result)
-	})
-
-	t.Run("should handle leading slashes in container names", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels: map[string]string{
-					"com.centurylinklabs.watchtower.depends-on": "/test-container",
-				},
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.True(t, result)
-	})
-
-	t.Run("should return false when Config is nil", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			nil,
-		) // Config is nil
-		result := hasSelfDependency(container)
-		assert.False(t, result)
-	})
-
-	t.Run("should return false when Labels is nil", func(t *testing.T) {
-		t.Parallel()
-
-		container := mockUpdate.CreateMockContainerWithConfig(
-			"test-container",
-			"/test-container",
-			"test:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{
-				Labels:       nil, // Labels is nil
-				ExposedPorts: dockerNetwork.PortSet{},
-			},
-		)
-		result := hasSelfDependency(container)
-		assert.False(t, result)
-	})
-}
-
 // TestCheckDependencies verifies the dependency phase. It skips containers
 // that name themselves and the members of a cycle. It warns about a
 // depends-on entry that names no container but not about one that names an
@@ -307,11 +116,11 @@ func TestCheckDependencies(t *testing.T) {
 		log, buf := logcapture.NewJSON(zerolog.DebugLevel)
 		progress := &state.Progress{}
 
-		graph, inCycle, err := checkDependencies(log, updateParams.Params{}, progress, all, monitored)
+		graph, skipped, err := checkDependencies(log, updateParams.Params{}, progress, all, monitored)
 		require.NoError(t, err)
 
 		assert.NotNil(t, graph)
-		assert.Equal(t, map[container.ContainerID]struct{}{a.ID(): {}, b.ID(): {}}, inCycle)
+		assert.Equal(t, map[container.ContainerID]struct{}{self.ID(): {}, a.ID(): {}, b.ID(): {}}, skipped)
 		assert.Equal(t, map[string]string{
 			"self": errSelfDependency.Error(),
 			"a":    errCircularDependency.Error(),
@@ -325,6 +134,38 @@ func TestCheckDependencies(t *testing.T) {
 		}, logcapture.Messages(t, buf.String(), "warn"))
 	})
 
+	t.Run("reports a cycle member that also names itself only as a cycle member", func(t *testing.T) {
+		t.Parallel()
+
+		// Each replica's depends-on names its own service, which resolves to
+		// both replicas, so each depends on itself and on the other.
+		replica := func(number string) *container.Container {
+			return skipTestContainer(containerfixture.RandomID(), "proj-web-"+number, map[string]string{
+				"com.docker.compose.project":          "proj",
+				"com.docker.compose.service":          "web",
+				"com.docker.compose.container-number": number,
+				labels.DependsOn:                      "web",
+			})
+		}
+
+		first, second := replica("1"), replica("2")
+		monitored := []*container.Container{first, second}
+
+		log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+		progress := &state.Progress{}
+
+		_, skipped, err := checkDependencies(log, updateParams.Params{}, progress, monitored, monitored)
+		require.NoError(t, err)
+
+		assert.Equal(t, map[container.ContainerID]struct{}{first.ID(): {}, second.ID(): {}}, skipped)
+		assert.Equal(t, map[string]string{
+			"proj-web-1": errCircularDependency.Error(),
+			"proj-web-2": errCircularDependency.Error(),
+		}, reportErrors(progress.Report(log).Skipped()))
+		assert.Equal(t, []string{logging.CircularDependency, logging.CircularDependency},
+			logcapture.Messages(t, buf.String(), "warn"))
+	})
+
 	t.Run("fails with the sort error when the graph cannot be built", func(t *testing.T) {
 		t.Parallel()
 
@@ -333,12 +174,12 @@ func TestCheckDependencies(t *testing.T) {
 			skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "app", nil),
 		}
 
-		graph, inCycle, err := checkDependencies(newTestLogger(t), updateParams.Params{}, &state.Progress{},
+		graph, skipped, err := checkDependencies(newTestLogger(t), updateParams.Params{}, &state.Progress{},
 			monitored, monitored)
 
 		require.ErrorIs(t, err, errSortDependenciesFailed)
 		assert.Nil(t, graph)
-		assert.Nil(t, inCycle)
+		assert.Nil(t, skipped)
 	})
 }
 
@@ -408,7 +249,7 @@ func TestPlanRestarts(t *testing.T) {
 	t.Run("ends with the sort error when the containers cannot be ordered", func(t *testing.T) {
 		t.Parallel()
 
-		// The session passes every cycle member in inCycle. Leaving this
+		// The session passes every cycle member in skipped. Leaving this
 		// cycle out of it makes the first sort fail.
 		a := skipTestContainer("a-id", "a", map[string]string{labels.DependsOn: "b"})
 		b := skipTestContainer("b-id", "b", map[string]string{labels.DependsOn: "a"})

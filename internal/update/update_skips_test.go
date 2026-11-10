@@ -493,6 +493,51 @@ func TestUpdate_DependencyProblemsWarnOnce(t *testing.T) {
 	}
 }
 
+// TestUpdate_SelfDependentContainerIsNotRestarted verifies that a container
+// whose depends-on label names itself stays untouched when another of its
+// dependencies is updated. It is reported as skipped, as the linked containers
+// docs promise, and is neither stopped nor restarted.
+func TestUpdate_SelfDependentContainerIsNotRestarted(t *testing.T) {
+	t.Parallel()
+
+	db := skipTestContainer(containerfixture.RandomID(), "db", nil)
+	app := skipTestContainer(containerfixture.RandomID(), "app", map[string]string{labels.DependsOn: "app,db"})
+
+	client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
+		Containers: []*container.Container{db, app},
+		Staleness:  map[string]bool{"db": true},
+	}, false, false)
+
+	report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]string{"app": errSelfDependency.Error()}, reportErrors(report.Skipped()))
+	assert.Empty(t, report.Restarted())
+	require.Len(t, report.Updated(), 1)
+	assert.Equal(t, db.ID(), report.Updated()[0].ID())
+	assert.Equal(t, int32(1), client.TestData.StopContainerCount.Load(), "only db is stopped")
+}
+
+// TestUpdate_SelfDependencyByComposeServiceIsSkipped verifies that a
+// depends-on entry naming the container's own Compose service counts as a
+// self-dependency, as an entry naming its container name does.
+func TestUpdate_SelfDependencyByComposeServiceIsSkipped(t *testing.T) {
+	t.Parallel()
+
+	containerLabels := composeServiceLabels("proj", "app")
+	containerLabels[labels.DependsOn] = "app"
+
+	app := skipTestContainer(containerfixture.RandomID(), "proj-app-1", containerLabels)
+
+	client := newMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+
+	report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
+	require.NoError(t, err)
+
+	assert.Equal(t, map[string]string{"proj-app-1": errSelfDependency.Error()}, reportErrors(report.Skipped()))
+}
+
 // TestUpdate_FailedCheckWarnsOnce verifies that a failed staleness check warns
 // once per container and cause, so a lasting failure reaches notifications on
 // the first scan and is logged at debug on later scans. A check failure that

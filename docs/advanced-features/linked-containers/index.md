@@ -370,6 +370,8 @@ Watchtower reports each of the following dependency problems once per container.
 The first scan that finds a problem logs and notifies it as a warning.
 Later scans log it at debug level.
 Every scan still skips a container that depends on itself or sits in a circular dependency, and lists it as skipped in the session report.
+A container depends on itself when one of its dependencies names it by its container name or by its own Compose service.
+A skipped container is not restarted when another of its dependencies is updated.
 A depends-on entry that names no container is only ignored, and its container is still checked and updated.
 A recreated container or a restart of Watchtower reports the problem again.
 

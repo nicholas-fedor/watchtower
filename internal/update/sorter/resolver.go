@@ -133,8 +133,8 @@ func (r *linkResolver) byProject(c *container.Container, link string, keys []str
 }
 
 // unresolvedDependsOn returns the Watchtower depends-on label entries of c that
-// name no container. An entry naming c itself is a self-dependency, which the
-// update reports on its own.
+// name no container. An entry naming c itself is a self-dependency, which
+// [DependencyGraph.SelfDependencies] reports.
 //
 // Parameters:
 //   - c: A monitored container.

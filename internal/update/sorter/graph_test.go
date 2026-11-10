@@ -847,6 +847,93 @@ func TestDependencyGraph_UnresolvedDependsOn(t *testing.T) {
 	assert.ElementsMatch(t, []string{"app:missing", "watchtower:gone"}, got)
 }
 
+// TestDependencyGraph_SelfDependencies verifies that the graph reports a
+// container whose link names the container itself. The link may use the
+// container's name with or without a leading slash. It may also use the
+// container's own Compose service. A Watchtower container may name itself by
+// its ID, and it is reported after the monitored members.
+func TestDependencyGraph_SelfDependencies(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		containers []deployed
+		want       []string
+	}{
+		{
+			name:       "no depends-on label",
+			containers: []deployed{{name: "app"}},
+			want:       nil,
+		},
+		{
+			name:       "an empty depends-on label",
+			containers: []deployed{{name: "app", labels: map[string]string{"com.centurylinklabs.watchtower.depends-on": ""}}},
+			want:       nil,
+		},
+		{
+			name:       "entries that name other containers",
+			containers: []deployed{{name: "app", dependsOn: "db"}, {name: "db"}},
+			want:       nil,
+		},
+		{
+			name:       "its own name",
+			containers: []deployed{{name: "app", dependsOn: "app"}},
+			want:       []string{"app"},
+		},
+		{
+			name:       "its own name among other entries",
+			containers: []deployed{{name: "app", dependsOn: "db,app,cache"}, {name: "db"}, {name: "cache"}},
+			want:       []string{"app"},
+		},
+		{
+			name:       "its own name with spaces",
+			containers: []deployed{{name: "app", dependsOn: " db , app "}, {name: "db"}},
+			want:       []string{"app"},
+		},
+		{
+			name:       "its own name with a leading slash",
+			containers: []deployed{{name: "app", dependsOn: "/app"}},
+			want:       []string{"app"},
+		},
+		{
+			name: "its own Compose service",
+			containers: []deployed{
+				{name: "proj-app-1", project: "proj", service: "app", number: "1", dependsOn: "app"},
+			},
+			want: []string{"proj-app-1"},
+		},
+		{
+			name:       "a Watchtower container by its own ID",
+			containers: []deployed{{name: "watchtower", watchtower: true, dependsOn: dockerID("watchtower")}},
+			want:       []string{"watchtower"},
+		},
+		{
+			name: "a Watchtower container after the monitored members",
+			containers: []deployed{
+				{name: "watchtower", watchtower: true, dependsOn: "watchtower"},
+				{name: "app", dependsOn: "app"},
+			},
+			want: []string{"app", "watchtower"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			graph, err := NewDependencyGraph(newTestLogger(t), deploy(tt.containers...), nil, false)
+			require.NoError(t, err)
+
+			var got []string
+			for _, c := range graph.SelfDependencies() {
+				got = append(got, c.Name())
+			}
+
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // TestNewDependencyGraph_LogsDependenciesOnce verifies that building the graph
 // logs each container's dependencies in a single debug entry, and logs nothing
 // for a container without dependencies.

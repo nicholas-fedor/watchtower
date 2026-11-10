@@ -45,6 +45,9 @@ type DependencyGraph struct {
 	dependents map[*container.Container][]*container.Container
 	// unresolved lists the depends-on label entries that name no container.
 	unresolved []UnresolvedLink
+	// selfDependent lists the containers with a link that names the container
+	// itself. Members come first in the order given, then Watchtower containers.
+	selfDependent []*container.Container
 }
 
 // UnresolvedLink is a Watchtower depends-on label entry that names no
@@ -164,7 +167,10 @@ func newDependencyGraph(
 	for _, c := range slices.Concat(members, watchtowers) {
 		self, isMember := identifiers[c]
 
-		links := c.Links(useComposeDependsOn)
+		// Links leaves out an entry naming the container by its own name and
+		// reports it. An entry naming it by another form resolves to the
+		// container itself below.
+		links, namesItself := c.Links(useComposeDependsOn)
 		if logDependencies && len(links) > 0 {
 			log.Debug().
 				Str("container", c.Name()).
@@ -174,13 +180,17 @@ func newDependencyGraph(
 
 		for _, normalizedLink := range links {
 			keys, watchtower, _ := resolver.resolve(c, normalizedLink)
-			if watchtower != nil && watchtower != c {
+			if watchtower == c {
+				namesItself = true
+			} else if watchtower != nil {
 				graph.addDependent(watchtower, c)
 			}
 
 			for _, key := range keys {
 				if key == self {
-					// Self-reference: skip so the container stays indegree 0 for this link.
+					// A link to the container itself adds no edge.
+					namesItself = true
+
 					continue
 				}
 
@@ -195,6 +205,10 @@ func newDependencyGraph(
 		}
 
 		graph.unresolved = append(graph.unresolved, resolver.unresolvedDependsOn(c, self)...)
+
+		if namesItself {
+			graph.selfDependent = append(graph.selfDependent, c)
+		}
 	}
 
 	return graph, nil
@@ -205,7 +219,8 @@ func newDependencyGraph(
 // Every member of every cycle is reported, in the order the containers were
 // given to the graph. A container that only depends on a cycle member is not
 // part of the cycle, and a container that lists itself is a self-dependency
-// rather than a cycle, so neither is reported.
+// rather than a cycle, so neither is reported. [DependencyGraph.SelfDependencies]
+// reports the self-dependencies.
 //
 // Returns:
 //   - []*container.Container: Containers in a cycle.
@@ -263,6 +278,17 @@ func (g *DependencyGraph) Dependents(c *container.Container) []*container.Contai
 //   - []UnresolvedLink: The entries, in the order the containers were given.
 func (g *DependencyGraph) UnresolvedDependsOn() []UnresolvedLink {
 	return g.unresolved
+}
+
+// SelfDependencies returns the containers with a link that names the container
+// itself. The link may use the container's name or another form that resolves
+// to it, such as its own Compose service. Such a link is left out of the graph.
+//
+// Returns:
+//   - []*container.Container: The containers, monitored members in the order
+//     given, then Watchtower containers.
+func (g *DependencyGraph) SelfDependencies() []*container.Container {
+	return g.selfDependent
 }
 
 // Sort sorts containers in place by the dependencies between them, with

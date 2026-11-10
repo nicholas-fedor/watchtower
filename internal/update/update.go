@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"sync"
 	"time"
 
@@ -279,7 +278,7 @@ func update(
 
 	// A graph that cannot be built ends the session before any hook runs or
 	// any image is checked.
-	graph, inCycle, err := checkDependencies(log, config, progress, allContainers, filteredContainers)
+	graph, skipped, err := checkDependencies(log, config, progress, allContainers, filteredContainers)
 	if err != nil {
 		return nil, cleanupImageInfos, err
 	}
@@ -318,7 +317,7 @@ func update(
 		graph,
 		allContainers,
 		filteredContainers,
-		inCycle,
+		skipped,
 	)
 	if err != nil {
 		return nil, cleanupImageInfos, err
@@ -385,8 +384,9 @@ func update(
 // checkDependencies builds the session's dependency graph and records the
 // monitored containers that cannot be ordered as skipped.
 //
-// A container whose Watchtower depends-on label names itself is skipped, and
-// so is every member of a circular dependency. Each problem, and each
+// A container with a dependency that names the container itself is skipped,
+// and so is every member of a circular dependency. A cycle member that also
+// names itself is reported once, as a cycle member. Each problem, and each
 // depends-on entry that names no container, warns once and then logs at
 // debug. Unmonitored containers join the graph so that a link naming one
 // resolves to it, and is left alone, rather than to a monitored container.
@@ -401,9 +401,8 @@ func update(
 // Returns:
 //   - *sorter.DependencyGraph: The graph that every dependency sort and the
 //     implicit restarts of the session use.
-//   - map[container.ContainerID]struct{}: IDs of the containers in a circular
-//     dependency, which the session keeps out of its dependency sorts and
-//     implicit restarts.
+//   - map[container.ContainerID]struct{}: IDs of the skipped containers, which
+//     the session keeps out of its dependency sorts and implicit restarts.
 //   - error: Non-nil when the graph cannot be built, for example when two
 //     containers share a name. It wraps the error for a failed dependency sort.
 func checkDependencies(
@@ -412,16 +411,6 @@ func checkDependencies(
 	progress *state.Progress,
 	allContainers, filteredContainers []*container.Container,
 ) (*sorter.DependencyGraph, map[container.ContainerID]struct{}, error) {
-	for _, c := range filteredContainers {
-		if hasSelfDependency(c) {
-			progress.AddSkipped(log, c, errSelfDependency, config)
-			log.WithLevel(scanProblems.Level("self-dependency", string(c.ID()))).
-				Str("container", c.Name()).
-				Str("id", c.ID().ShortID()).
-				Msg(logging.SelfDependency)
-		}
-	}
-
 	// The graph is built once, so each link resolves to the same container
 	// throughout the session.
 	graph, err := sorter.NewDependencyGraph(log,
@@ -440,10 +429,10 @@ func checkDependencies(
 			Msg(logging.UnresolvedDependsOn)
 	}
 
-	inCycle := make(map[container.ContainerID]struct{})
+	skipped := make(map[container.ContainerID]struct{})
 
 	for _, c := range graph.CycleMembers() {
-		inCycle[c.ID()] = struct{}{}
+		skipped[c.ID()] = struct{}{}
 
 		progress.AddSkipped(log, c, errCircularDependency, config)
 		log.WithLevel(scanProblems.Level("circular dependency", string(c.ID()))).
@@ -452,16 +441,33 @@ func checkDependencies(
 			Msg(logging.CircularDependency)
 	}
 
-	return graph, inCycle, nil
+	// A cycle member that also names itself is reported once, as a cycle
+	// member, such as replicas whose depends-on names their own service.
+	for _, c := range graph.SelfDependencies() {
+		if _, reported := skipped[c.ID()]; reported {
+			continue
+		}
+
+		skipped[c.ID()] = struct{}{}
+
+		progress.AddSkipped(log, c, errSelfDependency, config)
+		log.WithLevel(scanProblems.Level("self-dependency", string(c.ID()))).
+			Str("container", c.Name()).
+			Str("id", c.ID().ShortID()).
+			Msg(logging.SelfDependency)
+	}
+
+	return graph, skipped, nil
 }
 
 // checkStaleness checks which monitored containers are stale and records each
 // result in the session's progress.
 //
-// It skips a container already in progress, such as a cycle member. It also
-// skips a container pinned by digest. The others are checked in parallel, up
-// to 20 at a time. Containers on the same upstream image share one release
-// tag lookup. A container that will be updated is marked stale.
+// It skips a container already in progress, such as one the dependency phase
+// skipped. It also skips a container pinned by digest. The others are checked
+// in parallel, up to 20 at a time. Containers on the same upstream image
+// share one release tag lookup. A container that will be updated is marked
+// stale.
 //
 // Parameters:
 //   - log: Process logger.
@@ -514,7 +520,7 @@ func checkStaleness(
 			return canceled()
 		}
 
-		// Skip containers already processed (e.g., skipped due to circular dependencies).
+		// Skip containers already processed, such as the ones the dependency phase skipped.
 		_, exists := (*progress)[sourceContainer.ID()]
 		if exists {
 			continue
@@ -899,8 +905,9 @@ func skipFailedUpdateCheck(
 // rebuilds of the stale Git-watched containers on that list. A container whose
 // rebuild failed is no longer stale. The list is then worked out again without
 // it. The list leaves out the containers that Compose already recreated and
-// the no-restart Git builds. Cycle members are kept out of the sorts and the
-// implicit restarts. They are placed after the other monitored containers.
+// the no-restart Git builds. The containers the dependency phase skipped are
+// kept out of the sorts and the implicit restarts. They are placed after the
+// other monitored containers.
 //
 // Parameters:
 //   - log: Process logger.
@@ -912,7 +919,8 @@ func skipFailedUpdateCheck(
 //   - graph: The session's dependency graph.
 //   - allContainers: Every listed container.
 //   - filteredContainers: The monitored containers, sorted in place.
-//   - inCycle: IDs of the containers in a circular dependency.
+//   - skipped: IDs of the containers the dependency phase skipped, the
+//     self-dependents and cycle members.
 //
 // Returns:
 //   - []*container.Container: The containers to restart, in restart order.
@@ -926,18 +934,19 @@ func planRestarts(
 	progress *state.Progress,
 	graph *sorter.DependencyGraph,
 	allContainers, filteredContainers []*container.Container,
-	inCycle map[container.ContainerID]struct{},
+	skipped map[container.ContainerID]struct{},
 ) ([]*container.Container, error) {
 	// Sort containers by dependencies to ensure correct update and restart order.
-	// Cycle members cannot be ordered, so they are placed after the others.
+	// Skipped containers are placed after the others. Cycle members cannot be
+	// ordered at all.
 	// Every sort keeps only the graph's dependencies between the containers it
 	// sorts, so leaving a container out cannot redirect a link to a different
 	// container and form a cycle that the graph does not have.
 	sortable := make([]*container.Container, 0, len(filteredContainers))
-	unsortable := make([]*container.Container, 0, len(inCycle))
+	unsortable := make([]*container.Container, 0, len(skipped))
 
 	for _, c := range filteredContainers {
-		if _, skip := inCycle[c.ID()]; skip {
+		if _, skip := skipped[c.ID()]; skip {
 			unsortable = append(unsortable, c)
 		} else {
 			sortable = append(sortable, c)
@@ -949,7 +958,7 @@ func planRestarts(
 		return nil, sortFailed(log, "Failed to sort containers by dependencies", err)
 	}
 
-	// Write the order back, with cycle members last.
+	// Write the order back, with the skipped containers last.
 	copy(filteredContainers, sortable)
 	copy(filteredContainers[len(sortable):], unsortable)
 
@@ -960,7 +969,7 @@ func planRestarts(
 		allContainers,
 		filteredContainers,
 		config,
-		inCycle,
+		skipped,
 	)
 
 	// Sort containers to restart by dependencies to ensure correct update and restart order.
@@ -987,11 +996,11 @@ func planRestarts(
 	progress.UpdateFailed(log, gitFailed)
 
 	// Work out the implicit restarts again without the failed rebuilds, which are no longer stale.
-	// Their dependents then stay running. Cycle members stay out because they cannot be ordered.
+	// Their dependents then stay running. The skipped containers stay out, as in the first pass.
 	// No-restart builds stay out because every container in the plan is stopped.
-	excluded := make(map[container.ContainerID]struct{}, len(inCycle))
+	excluded := make(map[container.ContainerID]struct{}, len(skipped))
 	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
-	maps.Copy(excluded, inCycle)
+	maps.Copy(excluded, skipped)
 
 	allContainersToRestart = implicitrestart.Reconcile(
 		log,
@@ -1054,12 +1063,4 @@ func unmonitoredContainers(allContainers, monitored []*container.Container) []*c
 	}
 
 	return unmonitored
-}
-
-// hasSelfDependency checks if a container has a self-dependency in its Watchtower depends-on label.
-// It uses the shared GetLinksFromWatchtowerLabel helper function for parsing and normalization.
-func hasSelfDependency(c *container.Container) bool {
-	links := container.GetLinksFromWatchtowerLabel(c)
-
-	return slices.Contains(links, c.Name())
 }
