@@ -908,9 +908,8 @@ func IsWatchtowerParent(currentID ContainerID, chain string) bool {
 }
 
 // IsSuperseded reports whether a container is a Watchtower instance that a
-// self-update has replaced. That is the case for a predecessor renamed with
-// the "watchtower-old-" prefix, and for a container whose chain label lists it
-// as the parent of a newer instance.
+// self-update has replaced, which renames it with the "watchtower-old-"
+// prefix.
 //
 // Parameters:
 //   - container: The running Watchtower container, or nil when it was not inspected.
@@ -918,17 +917,11 @@ func IsWatchtowerParent(currentID ContainerID, chain string) bool {
 // Returns:
 //   - bool: True when the container has been replaced, false otherwise or for nil.
 func IsSuperseded(container *Container) bool {
-	if container == nil {
-		return false
-	}
-
-	if IsOldContainer(container.Name()) {
-		return true
-	}
-
-	chain, present := container.GetContainerChain()
-
-	return present && IsWatchtowerParent(container.ID(), chain)
+	// A self-update writes the container chain label only into the
+	// replacement's configuration, and Docker cannot change a container's
+	// labels afterwards. So a container's own chain never lists its own ID.
+	// The name is the only mark a replaced instance carries.
+	return container != nil && IsOldContainer(container.Name())
 }
 
 // IsOrphanedReplacement reports whether a container counts as a replacement
