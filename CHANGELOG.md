@@ -119,6 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/schema to v1.9.4 by @renovate[bot] in [#3695](https://github.com/nicholas-fedor/watchtower/pull/3695)
 - Update golang docker tag to v1.27.4 by @renovate[bot] in [#3690](https://github.com/nicholas-fedor/watchtower/pull/3690)
 - Update golang:alpine3.24 docker digest to eb61c38 by @renovate[bot] in [#3689](https://github.com/nicholas-fedor/watchtower/pull/3689)
 - Remove stale gocyclo exclusions by @nicholas-fedor in [#3688](https://github.com/nicholas-fedor/watchtower/pull/3688)
