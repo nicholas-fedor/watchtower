@@ -620,7 +620,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					require.Len(t, links, 1)
 				})
@@ -631,7 +631,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres,redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 					require.Len(t, links, 2)
@@ -643,7 +643,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": " postgres , redis ",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 					require.Len(t, links, 2)
@@ -655,7 +655,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						composeLabels.ComposeDependsOnLabel: "/postgres,/redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 				})
@@ -667,7 +667,7 @@ func TestContainerModel(t *testing.T) {
 						"com.docker.compose.depends_on":             "postgres",
 						"com.centurylinklabs.watchtower.depends-on": "redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "redis")
 					assert.NotContains(t, links, "postgres")
 					require.Len(t, links, 1)
@@ -679,7 +679,8 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "",
 					}))
-					assert.Empty(t, container.Links(true))
+					links, _ := container.Links(true)
+					assert.Empty(t, links)
 				})
 
 				t.Run("parses colon-separated service:condition:required format", func(t *testing.T) {
@@ -688,7 +689,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres:service_started:required,redis:service_healthy",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 					require.Len(t, links, 2)
@@ -704,7 +705,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					require.Len(t, links, 1)
 				})
@@ -715,7 +716,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 					require.Len(t, links, 2)
@@ -727,7 +728,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "/postgres,/redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 				})
@@ -738,7 +739,8 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "",
 					}))
-					assert.Empty(t, container.Links(true))
+					links, _ := container.Links(true)
+					assert.Empty(t, links)
 				})
 
 				t.Run("does not prefix container names with project name for cross-project dependencies", func(t *testing.T) {
@@ -748,7 +750,7 @@ func TestContainerModel(t *testing.T) {
 						"com.docker.compose.project":                "myproject",
 						"com.centurylinklabs.watchtower.depends-on": "otherproject-db,external-service",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "otherproject-db")
 					assert.Contains(t, links, "external-service")
 					require.Len(t, links, 2)
@@ -763,7 +765,7 @@ func TestContainerModel(t *testing.T) {
 						"com.docker.compose.project":                "webapp",
 						"com.centurylinklabs.watchtower.depends-on": "database",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "database")
 					require.Len(t, links, 1)
 					assert.NotContains(t, links, "webapp-database")
@@ -775,7 +777,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "standalone-db,external-api",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "standalone-db")
 					assert.Contains(t, links, "external-api")
 					require.Len(t, links, 2)
@@ -787,7 +789,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres,test-watchtower,redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "postgres")
 					assert.Contains(t, links, "redis")
 					assert.NotContains(t, links, "test-watchtower")
@@ -803,7 +805,7 @@ func TestContainerModel(t *testing.T) {
 					container.containerInfo.Name = testContainerName
 					container.normalizedName = testContainerName
 
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Empty(t, links, "Container with name matching dependency should not include self in links")
 				})
 
@@ -816,7 +818,7 @@ func TestContainerModel(t *testing.T) {
 					container.containerInfo.Name = testContainerName
 					container.normalizedName = testContainerName
 
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Empty(t, links, "Compose depends-on with self-reference should be filtered out")
 				})
 
@@ -843,7 +845,7 @@ func TestContainerModel(t *testing.T) {
 							container := MockContainer(containerfixture.WithLabels(map[string]string{
 								"com.centurylinklabs.watchtower.depends-on": label,
 							}))
-							links := container.Links(true)
+							links, _ := container.Links(true)
 							assert.Equal(t, expected, links)
 						})
 					}
@@ -855,7 +857,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": "postgres db, redis",
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Equal(t, []string{"postgres db", "redis"}, links)
 				})
 
@@ -871,7 +873,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.centurylinklabs.watchtower.depends-on": label,
 					}))
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					require.Len(t, links, 100)
 					assert.Contains(t, links, "dep1")
 					assert.Contains(t, links, "dep50")
@@ -888,7 +890,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(containerfixture.WithLabels(map[string]string{
 						"com.docker.compose.depends_on": "postgres,redis",
 					}))
-					links := container.Links(false)
+					links, _ := container.Links(false)
 					assert.Empty(t, links, "Compose depends-on should be ignored when disabled")
 				})
 
@@ -899,7 +901,7 @@ func TestContainerModel(t *testing.T) {
 						"com.docker.compose.depends_on":             "postgres",
 						"com.centurylinklabs.watchtower.depends-on": "redis",
 					}))
-					links := container.Links(false)
+					links, _ := container.Links(false)
 					assert.Contains(t, links, "redis")
 					assert.NotContains(t, links, "postgres")
 					require.Len(t, links, 1)
@@ -913,7 +915,7 @@ func TestContainerModel(t *testing.T) {
 					}), containerfixture.WithLinks([]string{
 						"redis:test-watchtower",
 					}))
-					links := container.Links(false)
+					links, _ := container.Links(false)
 					assert.Contains(t, links, "redis")
 					assert.NotContains(t, links, "postgres")
 					require.Len(t, links, 1)
@@ -927,7 +929,7 @@ func TestContainerModel(t *testing.T) {
 					"redis:test-watchtower",
 					"postgres:test-watchtower",
 				}))
-				links := container.Links(true)
+				links, _ := container.Links(true)
 				assert.Contains(t, links, "redis")
 				assert.Contains(t, links, "postgres")
 				require.Len(t, links, 2)
@@ -941,7 +943,7 @@ func TestContainerModel(t *testing.T) {
 				l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 				container := MockContainer(containerfixture.WithLinks([]string{"invalidlink"}))
 				container.log = &l
-				links := container.Links(true)
+				links, _ := container.Links(true)
 				assert.Empty(t, links)
 				assert.Contains(t, logOutput.String(), "Invalid link format in host config, expected 'name:alias'")
 			})
@@ -954,7 +956,7 @@ func TestContainerModel(t *testing.T) {
 				l := zerolog.New(w).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 				container := MockContainer(containerfixture.WithLinks([]string{":alias"}))
 				container.log = &l
-				links := container.Links(true)
+				links, _ := container.Links(true)
 				assert.Empty(t, links)
 				assert.Contains(t, logOutput.String(), "Invalid link format in host config, missing container name")
 			})
@@ -963,7 +965,7 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				container := MockContainer(containerfixture.WithLinks([]string{"/redis:test-watchtower"}))
-				links := container.Links(true)
+				links, _ := container.Links(true)
 				assert.Contains(t, links, "redis")
 			})
 
@@ -974,7 +976,7 @@ func TestContainerModel(t *testing.T) {
 					containerfixture.WithLinks([]string{"myproject-redis:test-watchtower"}),
 					containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 				)
-				links := container.Links(true)
+				links, _ := container.Links(true)
 				assert.Contains(t, links, "myproject-redis")
 			})
 
@@ -982,7 +984,7 @@ func TestContainerModel(t *testing.T) {
 				t.Parallel()
 
 				container := MockContainer(containerfixture.WithLinks([]string{"redis:test-watchtower"}))
-				links := container.Links(true)
+				links, _ := container.Links(true)
 				assert.Contains(t, links, "redis")
 			})
 
@@ -996,7 +998,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithNetworkMode("container:other"),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "myproject"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Contains(t, links, "other")
 					assert.NotContains(t, links, "myproject-other")
 				})
@@ -1010,7 +1012,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithNetworkMode("container:gluetun"),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun"}, links)
 				})
 
@@ -1023,7 +1025,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithNetworkMode("container:/gluetun"),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun"}, links)
 				})
 
@@ -1034,7 +1036,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithNetworkMode("container:gluetun-vpn-1"),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "gluetun"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun-vpn-1"}, links)
 				})
 
@@ -1049,7 +1051,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithNetworkMode("container:"+providerID),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{providerID}, links)
 				})
 			})
@@ -1064,7 +1066,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"app"}, links)
 				})
 
@@ -1077,7 +1079,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithVolumesFrom([]string{appID}),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "nextcloud"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{appID}, links)
 				})
 
@@ -1087,7 +1089,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(
 						containerfixture.WithVolumesFrom([]string{"/nextcloud-app:ro"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"nextcloud-app"}, links)
 				})
 
@@ -1097,7 +1099,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(
 						containerfixture.WithVolumesFrom([]string{"app:rw", "db:ro"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"app", "db"}, links)
 				})
 
@@ -1107,7 +1109,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(
 						containerfixture.WithVolumesFrom([]string{"", "app:rw"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"app"}, links)
 				})
 
@@ -1117,7 +1119,7 @@ func TestContainerModel(t *testing.T) {
 					container := MockContainer(
 						containerfixture.WithVolumesFrom([]string{"app:latest"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"app:latest"}, links)
 				})
 
@@ -1130,7 +1132,7 @@ func TestContainerModel(t *testing.T) {
 						}),
 						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Equal(t, []string{"redis", "app"}, links)
 				})
 
@@ -1143,7 +1145,7 @@ func TestContainerModel(t *testing.T) {
 						}),
 						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Equal(t, []string{"postgres", "app"}, links)
 				})
 
@@ -1156,7 +1158,7 @@ func TestContainerModel(t *testing.T) {
 						}),
 						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.Equal(t, []string{"app"}, links)
 				})
 
@@ -1168,7 +1170,7 @@ func TestContainerModel(t *testing.T) {
 						containerfixture.WithVolumesFrom([]string{"app:rw"}),
 						containerfixture.WithLabels(map[string]string{"com.docker.compose.project": "qbittorrent"}),
 					)
-					links := container.Links(true)
+					links, _ := container.Links(true)
 					assert.ElementsMatch(t, []string{"gluetun", "app"}, links)
 				})
 			})
@@ -1426,8 +1428,9 @@ func TestContainerModel(t *testing.T) {
 
 				links := []string{"db", webContainerName, "cache"}
 				containerName := webContainerName
-				result := filterSelfReferences(links, containerName)
+				result, removed := filterSelfReferences(links, containerName)
 				assert.Equal(t, []string{"db", "cache"}, result)
+				assert.True(t, removed)
 			})
 
 			t.Run("filters out multiple self-references", func(t *testing.T) {
@@ -1435,8 +1438,9 @@ func TestContainerModel(t *testing.T) {
 
 				links := []string{"first", webContainerName, "second", webContainerName, "third"}
 				containerName := webContainerName
-				result := filterSelfReferences(links, containerName)
+				result, removed := filterSelfReferences(links, containerName)
 				assert.Equal(t, []string{"first", "second", "third"}, result)
+				assert.True(t, removed)
 			})
 
 			t.Run("returns empty slice when all links are self-references", func(t *testing.T) {
@@ -1444,8 +1448,9 @@ func TestContainerModel(t *testing.T) {
 
 				links := []string{webContainerName}
 				containerName := webContainerName
-				result := filterSelfReferences(links, containerName)
+				result, removed := filterSelfReferences(links, containerName)
 				assert.Empty(t, result)
+				assert.True(t, removed)
 			})
 
 			t.Run("preserves order of non-self links", func(t *testing.T) {
@@ -1453,8 +1458,9 @@ func TestContainerModel(t *testing.T) {
 
 				links := []string{"db", webContainerName, "cache", webContainerName, "redis"}
 				containerName := webContainerName
-				result := filterSelfReferences(links, containerName)
+				result, removed := filterSelfReferences(links, containerName)
 				assert.Equal(t, []string{"db", "cache", "redis"}, result)
+				assert.True(t, removed)
 			})
 
 			t.Run("returns original slice unchanged when no self-references exist", func(t *testing.T) {
@@ -1462,8 +1468,9 @@ func TestContainerModel(t *testing.T) {
 
 				links := []string{"db", "cache"}
 				containerName := webContainerName
-				result := filterSelfReferences(links, containerName)
+				result, removed := filterSelfReferences(links, containerName)
 				assert.Equal(t, []string{"db", "cache"}, result)
+				assert.False(t, removed)
 			})
 		})
 	})
@@ -1748,7 +1755,8 @@ func TestContainer_Links_DoesNotLog(t *testing.T) {
 			// Measure only the Links call, not the container's creation.
 			out.Reset()
 
-			assert.Equal(t, tt.want, c.Links(tt.useComposeDependsOn))
+			links, _ := c.Links(tt.useComposeDependsOn)
+			assert.Equal(t, tt.want, links)
 			assert.Empty(t, out.String())
 		})
 	}
@@ -1822,7 +1830,8 @@ func TestContainer_Links_HostConfigAlwaysCounts(t *testing.T) {
 				},
 			}, nil)
 
-			assert.Equal(t, tt.want, c.Links(tt.useComposeDependsOn))
+			links, _ := c.Links(tt.useComposeDependsOn)
+			assert.Equal(t, tt.want, links)
 		})
 	}
 }

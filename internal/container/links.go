@@ -22,16 +22,17 @@ import (
 // Duplicates are skipped, so a target named by a label and by the host config
 // appears once, in the label's position.
 //
-// Self-references are filtered out from all link sources to prevent circular
-// dependencies where a container would depend on itself. This ensures the
-// dependency resolution algorithm can process containers in a valid topological order.
+// An entry that names the container by its own name is left out, and the
+// second result reports that one was. Such an entry is a self-dependency, not
+// a link to another container.
 //
 // Parameters:
 //   - useComposeDependsOn: Whether to include Docker Compose depends_on label in dependency resolution.
 //
 // Returns:
 //   - []string: List of linked container names with self-references removed.
-func (c *Container) Links(useComposeDependsOn bool) []string {
+//   - bool: True when a source named the container by its own name.
+func (c *Container) Links(useComposeDependsOn bool) ([]string, bool) {
 	var links []string
 
 	// Check Watchtower's depends-on label first.
@@ -53,12 +54,7 @@ func (c *Container) Links(useComposeDependsOn bool) []string {
 	return filterSelfReferences(links, c.Name())
 }
 
-// filterSelfReferences removes any links that reference the container itself.
-//
-// This prevents circular dependencies where a container would depend on itself,
-// which could cause infinite loops during dependency resolution and update processing.
-// Self-references are filtered out to ensure the dependency graph remains acyclic
-// and containers are processed in the correct order.
+// filterSelfReferences removes the links equal to containerName.
 //
 // Parameters:
 //   - links: List of container names this container depends on.
@@ -66,16 +62,17 @@ func (c *Container) Links(useComposeDependsOn bool) []string {
 //
 // Returns:
 //   - []string: Filtered list with self-references removed.
-func filterSelfReferences(links []string, containerName string) []string {
+//   - bool: True when a link was removed.
+func filterSelfReferences(links []string, containerName string) ([]string, bool) {
 	filtered := make([]string, 0, len(links))
+
 	for _, link := range links {
-		// Skip links that reference the container itself to prevent self-dependencies
 		if link != containerName {
 			filtered = append(filtered, link)
 		}
 	}
 
-	return filtered
+	return filtered, len(filtered) < len(links)
 }
 
 // ResolveContainerIdentifier returns a standardized container identifier used

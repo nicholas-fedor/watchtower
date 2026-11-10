@@ -70,7 +70,7 @@ func ValidateRollingRestartDependencies(
 	// Check each container for links.
 	for _, c := range containers {
 		// If a container has any links, then return an error.
-		links := c.Links(useComposeDependsOn)
+		links, _ := c.Links(useComposeDependsOn)
 		if len(links) > 0 {
 			log.Debug().
 				Str("container", c.Name()).
