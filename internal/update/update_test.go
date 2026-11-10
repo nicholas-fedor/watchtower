@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,8 +14,11 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
@@ -272,6 +276,69 @@ func Test_hasSelfDependency(t *testing.T) {
 		)
 		result := hasSelfDependency(container)
 		assert.False(t, result)
+	})
+}
+
+// TestCheckDependencies verifies the dependency phase. It skips containers
+// that name themselves and the members of a cycle. It warns about a
+// depends-on entry that names no container but not about one that names an
+// unmonitored container. It fails when two containers share a name.
+func TestCheckDependencies(t *testing.T) {
+	t.Parallel()
+
+	// dependent returns a container with a fresh ID, since each problem warns
+	// only the first time the process sees it.
+	dependent := func(name, dependsOn string) *container.Container {
+		return skipTestContainer(containerfixture.RandomID(), name, map[string]string{labels.DependsOn: dependsOn})
+	}
+
+	t.Run("skips self-dependencies and cycle members and warns about unresolved links", func(t *testing.T) {
+		t.Parallel()
+
+		self := dependent("self", "self")
+		a := dependent("a", "b")
+		b := dependent("b", "a")
+		app := dependent("app", "missing")
+		web := dependent("web", "db")
+		db := skipTestContainer(containerfixture.RandomID(), "db", nil)
+		monitored := []*container.Container{self, a, b, app, web}
+		all := append([]*container.Container{db}, monitored...)
+
+		log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+		progress := &state.Progress{}
+
+		graph, inCycle, err := checkDependencies(log, updateParams.Params{}, progress, all, monitored)
+		require.NoError(t, err)
+
+		assert.NotNil(t, graph)
+		assert.Equal(t, map[container.ContainerID]struct{}{a.ID(): {}, b.ID(): {}}, inCycle)
+		assert.Equal(t, map[string]string{
+			"self": errSelfDependency.Error(),
+			"a":    errCircularDependency.Error(),
+			"b":    errCircularDependency.Error(),
+		}, reportErrors(progress.Report(log).Skipped()))
+		assert.ElementsMatch(t, []string{
+			logging.SelfDependency,
+			logging.CircularDependency,
+			logging.CircularDependency,
+			logging.UnresolvedDependsOn,
+		}, logcapture.Messages(t, buf.String(), "warn"))
+	})
+
+	t.Run("fails with the sort error when the graph cannot be built", func(t *testing.T) {
+		t.Parallel()
+
+		monitored := []*container.Container{
+			skipTestContainer("a000000000000000000000000000000000000000000000000000000000000000", "app", nil),
+			skipTestContainer("b000000000000000000000000000000000000000000000000000000000000000", "app", nil),
+		}
+
+		graph, inCycle, err := checkDependencies(newTestLogger(t), updateParams.Params{}, &state.Progress{},
+			monitored, monitored)
+
+		require.ErrorIs(t, err, errSortDependenciesFailed)
+		assert.Nil(t, graph)
+		assert.Nil(t, inCycle)
 	})
 }
 
