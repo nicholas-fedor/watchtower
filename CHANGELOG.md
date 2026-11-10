@@ -118,6 +118,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Remove stale gocyclo exclusions by @nicholas-fedor in [#3688](https://github.com/nicholas-fedor/watchtower/pull/3688)
 - Update go module directive to v1.27.4 by @renovate[bot] in [#3686](https://github.com/nicholas-fedor/watchtower/pull/3686)
 - Update golang.org/x/tools digest to 8af9cde by @renovate[bot] in [#3685](https://github.com/nicholas-fedor/watchtower/pull/3685)
 - Update peter-evans/create-pull-request action to v8.1.3 by @renovate[bot] in [#3681](https://github.com/nicholas-fedor/watchtower/pull/3681)
