@@ -5,12 +5,88 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
+	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
+	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
+
+// planTestRestarts builds the dependency graph of the monitored containers, as
+// the update session does, and plans their restarts with a client mock that
+// expects no calls.
+//
+// Parameters:
+//   - t: Test that owns the plan.
+//   - session: Git session that has checked the containers.
+//   - config: Update parameters.
+//   - progress: Session progress.
+//   - filtered: The monitored containers, which are also every listed container.
+//   - inCycle: IDs of the containers treated as cycle members.
+//
+// Returns:
+//   - []*container.Container: The containers to restart.
+func planTestRestarts(
+	t *testing.T,
+	session *rebuild.Session,
+	config updateParams.Params,
+	progress *state.Progress,
+	filtered []*container.Container,
+	inCycle map[container.ContainerID]struct{},
+) []*container.Container {
+	t.Helper()
+
+	log := newTestLogger(t)
+	graph, graphErr := sorter.NewDependencyGraph(log, filtered, nil, config.UseComposeDependsOn)
+
+	restarts, err := planRestarts(log, t.Context(), newMockClient(t), config, session, progress,
+		graph, graphErr, filtered, filtered, inCycle)
+	require.NoError(t, err)
+
+	return restarts
+}
+
+// staleGitTestContainer returns a Git-watched container whose remote tip is
+// newer than its stamp, after the session's staleness phase has checked and
+// recorded it.
+//
+// Parameters:
+//   - t: Test that owns the repository.
+//   - config: Update parameters for the check.
+//   - progress: Session progress that receives the check's result.
+//
+// Returns:
+//   - *container.Container: The stale container, marked for update.
+//   - *rebuild.Session: The session holding its check result.
+//   - *git.Client: The session's Git client.
+//   - string: The repository's tip commit.
+func staleGitTestContainer(
+	t *testing.T,
+	config updateParams.Params,
+	progress *state.Progress,
+) (*container.Container, *rebuild.Session, *git.Client, string) {
+	t.Helper()
+
+	app, gitClient, commit := gitWatchedTestContainer(t, nil)
+	session := rebuild.NewSession(gitClient)
+
+	_, err := checkStaleness(newTestLogger(t), t.Context(), newMockClient(t), config, ratelimit.New(),
+		session, progress, []*container.Container{app})
+	require.NoError(t, err)
+	require.True(t, app.IsStale())
+
+	return app, session, gitClient, commit
+}
 
 // Test_hasSelfDependency verifies that a container whose depends-on label
 // names itself is detected.
@@ -195,5 +271,69 @@ func Test_hasSelfDependency(t *testing.T) {
 		)
 		result := hasSelfDependency(container)
 		assert.False(t, result)
+	})
+}
+
+// TestPlanRestarts verifies the restart plan. Containers restart in
+// dependency order, without cycle members. The monitored containers are
+// sorted in place with cycle members last. A failed Git rebuild is recorded
+// as failed and leaves the containers that depend on it running. A no-restart
+// build is left out of the restart list.
+func TestPlanRestarts(t *testing.T) {
+	t.Parallel()
+
+	t.Run("orders the restart list by dependency without cycle members", func(t *testing.T) {
+		t.Parallel()
+
+		cyclic := skipTestContainer("cyclic-id", "cyclic", nil)
+		app := skipTestContainer("app-id", "app", map[string]string{labels.DependsOn: "db"})
+		db := skipTestContainer("db-id", "db", nil)
+
+		for _, c := range []*container.Container{cyclic, app, db} {
+			c.SetStale(true)
+		}
+
+		monitored := []*container.Container{cyclic, app, db}
+		restarts := planTestRestarts(t, rebuild.NewSession(nil), updateParams.Params{}, &state.Progress{},
+			monitored, map[container.ContainerID]struct{}{cyclic.ID(): {}})
+
+		assert.Equal(t, []*container.Container{db, app}, restarts)
+		// The monitored containers are sorted in place, with cycle members last.
+		assert.Equal(t, []*container.Container{db, app, cyclic}, monitored)
+	})
+
+	t.Run("keeps a failed rebuild's dependents running", func(t *testing.T) {
+		t.Parallel()
+
+		config := updateParams.Params{Git: gitConfig.Defaults{Enable: true}}
+		progress := &state.Progress{}
+		app, session, _, _ := staleGitTestContainer(t, config, progress)
+		web := skipTestContainer("web-id", "web", map[string]string{labels.DependsOn: "app"})
+
+		// A remote without a host fails the build before any image is
+		// built, so the client is never called.
+		restarts := planTestRestarts(t, session, config, progress, []*container.Container{app, web}, nil)
+
+		assert.Empty(t, restarts)
+
+		failed := progress.Report(newTestLogger(t)).Failed()
+		require.Len(t, failed, 1)
+		assert.Equal(t, app.ID(), failed[0].ID())
+	})
+
+	t.Run("leaves a no-restart build out of the restart list", func(t *testing.T) {
+		t.Parallel()
+
+		config := updateParams.Params{Git: gitConfig.Defaults{Enable: true}, NoRestart: true}
+		progress := &state.Progress{}
+		app, session, gitClient, commit := staleGitTestContainer(t, config, progress)
+
+		// An image an earlier no-restart session built for this commit is
+		// reused without a build.
+		gitClient.RecordUnrestartedBuild(app.ID(), commit, container.ImageID("sha256:built"))
+
+		restarts := planTestRestarts(t, session, config, progress, []*container.Container{app}, nil)
+
+		assert.Empty(t, restarts)
 	})
 }
