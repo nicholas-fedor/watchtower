@@ -48,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Extract the dependency phase from update by @nicholas-fedor in [#3677](https://github.com/nicholas-fedor/watchtower/pull/3677)
 - Decide skipped recreations once in the restart plan by @nicholas-fedor in [#3673](https://github.com/nicholas-fedor/watchtower/pull/3673)
 - Extract the restart planning phase from update by @nicholas-fedor in [#3671](https://github.com/nicholas-fedor/watchtower/pull/3671)
 - Decide once whether a git-watched container may be rebuilt by @nicholas-fedor in [#3667](https://github.com/nicholas-fedor/watchtower/pull/3667)
