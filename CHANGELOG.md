@@ -118,6 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang docker tag to v1.27.4 by @renovate[bot] in [#3690](https://github.com/nicholas-fedor/watchtower/pull/3690)
+- Update golang:alpine3.24 docker digest to eb61c38 by @renovate[bot] in [#3689](https://github.com/nicholas-fedor/watchtower/pull/3689)
 - Remove stale gocyclo exclusions by @nicholas-fedor in [#3688](https://github.com/nicholas-fedor/watchtower/pull/3688)
 - Update go module directive to v1.27.4 by @renovate[bot] in [#3686](https://github.com/nicholas-fedor/watchtower/pull/3686)
 - Update golang.org/x/tools digest to 8af9cde by @renovate[bot] in [#3685](https://github.com/nicholas-fedor/watchtower/pull/3685)
