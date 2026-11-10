@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
@@ -367,7 +368,7 @@ func (s *Session) needsApply(c *container.Container, params updateParams.Params)
 		return false
 	}
 
-	return !c.IsNoPull(params.Policy) && !c.IsMonitorOnly(params.Policy)
+	return Allowed(c, params.Policy)
 }
 
 // reuseUnrestartedBuild records an image an earlier session built from the
@@ -418,6 +419,21 @@ func (s *Session) reuseUnrestartedBuild(
 	reportGitImage(log, progress, c, image, result, params)
 
 	return true
+}
+
+// Allowed reports whether a Git-watched container may be rebuilt.
+//
+// The no-pull and monitor-only configuration options and labels check Git
+// without building. A newer ref then leaves the container in place.
+//
+// Parameters:
+//   - c: Git-watched container.
+//   - policy: Update policy for the no-pull and monitor-only checks.
+//
+// Returns:
+//   - bool: True when neither no-pull nor monitor-only applies.
+func Allowed(c *container.Container, policy updateConfig.Policy) bool {
+	return !c.IsNoPull(policy) && !c.IsMonitorOnly(policy)
 }
 
 // reportGitImage records an image built from Git as the container's latest

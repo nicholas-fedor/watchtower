@@ -217,8 +217,10 @@ func isGitWatched(
 
 // checkGitSource compares the hosted Git ref for a container.
 //
-// It mirrors the scheduled update path: no-pull reports the same skip, and a
-// resolved tag refines the changelog link to that release.
+// With no-pull, it reports no update without contacting the Git remote. A
+// scheduled session still checks the remote and reports the container stale.
+// It never rebuilds the container. A resolved tag refines the changelog link
+// to that release.
 //
 // Parameters:
 //   - ctx: Context for the Git request.
@@ -240,7 +242,7 @@ func checkGitSource(
 ) {
 	result.UpdateSource = "git"
 
-	// no-pull skips the Git rebuild. Report the same skip here.
+	// No-pull never rebuilds. The endpoint does not contact the Git remote.
 	if c.IsNoPull(params.Policy) {
 		return
 	}
