@@ -18,7 +18,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
@@ -766,6 +768,7 @@ func TestEphemeralOrchestrator(t *testing.T) {
 		t.Run("ContainerCreate fails", func(t *testing.T) {
 			t.Parallel()
 
+			// The caller reports the failure, so nothing is logged above debug.
 			t.Run("should return an error wrapping errEphemeralCreateFailed", func(t *testing.T) {
 				t.Parallel()
 
@@ -773,12 +776,15 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				api.EXPECT().ContainerCreate(mock.Anything, createOptions).
 					Return(dockerClient.ContainerCreateResult{}, serverError).Once()
 
+				log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
 				orchestratorID, err := CreateOrchestrator(
-					newTestLogger(t), t.Context(), api, newSource(), "watchtower:v2", "chain1", false,
+					log, t.Context(), api, newSource(), "watchtower:v2", "chain1", false,
 				)
 
 				require.ErrorIs(t, err, errEphemeralCreateFailed)
 				assert.Empty(t, orchestratorID)
+				assert.Empty(t, buf.String())
 			})
 		})
 
@@ -806,12 +812,49 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					dockerClient.ContainerRemoveOptions{Force: true},
 				).Return(dockerClient.ContainerRemoveResult{}, nil).Once()
 
+				log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
 				orchestratorID, err := CreateOrchestrator(
-					newTestLogger(t), ctx, api, newSource(), "watchtower:v2", "chain1", false,
+					log, ctx, api, newSource(), "watchtower:v2", "chain1", false,
 				)
 
 				require.ErrorIs(t, err, errEphemeralStartFailed)
 				assert.Empty(t, orchestratorID)
+				assert.Empty(t, buf.String())
+			})
+
+			// An orchestrator that is created but never started stays behind
+			// when its removal fails, so the warning names its ID.
+			t.Run("should warn with the orchestrator's ID when cleanup fails", func(t *testing.T) {
+				t.Parallel()
+
+				api := mockContainer.NewMockAPIClient(t)
+				api.EXPECT().ContainerCreate(mock.Anything, createOptions).
+					Return(dockerClient.ContainerCreateResult{ID: "0dd0dd0000001234"}, nil).Once()
+				api.EXPECT().ContainerStart(mock.Anything, "0dd0dd0000001234", dockerClient.ContainerStartOptions{}).
+					Return(dockerClient.ContainerStartResult{}, serverError).Once()
+				api.EXPECT().ContainerRemove(mock.Anything, "0dd0dd0000001234", dockerClient.ContainerRemoveOptions{Force: true}).
+					Return(dockerClient.ContainerRemoveResult{}, errors.New("removal in progress")).Once()
+
+				// cleanupEntry is the warning about the orchestrator left behind.
+				type cleanupEntry struct {
+					Level          string `json:"level"`
+					Message        string `json:"message"`
+					OrchestratorID string `json:"orchestrator_id"`
+					Error          string `json:"error"`
+				}
+
+				log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+
+				_, err := CreateOrchestrator(log, t.Context(), api, newSource(), "watchtower:v2", "chain1", false)
+				require.ErrorIs(t, err, errEphemeralStartFailed)
+
+				assert.Equal(t, []cleanupEntry{{
+					Level:          "warn",
+					Message:        logging.OrchestratorCleanupFailed,
+					OrchestratorID: "0dd0dd000000",
+					Error:          "removal in progress",
+				}}, logcapture.Entries[cleanupEntry](t, buf.String()))
 			})
 		})
 	})

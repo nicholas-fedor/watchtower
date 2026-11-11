@@ -756,7 +756,7 @@ func restartStaleContainer(
 				config,
 			)
 			if err != nil {
-				return "", false, fmt.Errorf("start self-update orchestrator: %w", err)
+				return "", false, err //nolint:wrapcheck // The orchestrator's error already names the step that failed.
 			}
 
 			// Skip health check and post-update hooks: the new container's ID is

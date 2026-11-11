@@ -129,6 +129,12 @@ const (
 	// StartedLinkedContainer is logged after Watchtower starts a container
 	// that restarts with one it updates.
 	StartedLinkedContainer = "Started linked container"
+	// EphemeralSelfUpdateStarting is logged when the short-lived orchestrator
+	// of an ephemeral self-update has started.
+	EphemeralSelfUpdateStarting = "Starting Watchtower ephemeral self-update"
+	// OrchestratorCleanupFailed is logged when the orchestrator of an
+	// ephemeral self-update could not be started and could not be removed.
+	OrchestratorCleanupFailed = "Failed to clean up ephemeral orchestrator after start failure"
 	// InvalidPreCheckTimeout is logged when a pre-check timeout label is not
 	// a valid timeout.
 	InvalidPreCheckTimeout = "Invalid pre-check timeout value, using default"

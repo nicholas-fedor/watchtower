@@ -34,6 +34,8 @@ var commonTemplates = map[string]string{
 	// "API setup failed" and "Could not schedule updates" (Watchtower exited on the error),
 	// "Recovered orphaned Watchtower container" (an old instance started the replacement a self-update left created),
 	// "Could not start orphaned Watchtower container" (an old instance could not start that replacement),
+	// "Starting Watchtower ephemeral self-update" (an ephemeral self-update's orchestrator started),
+	// "Failed to clean up ephemeral orchestrator after start failure" (an orchestrator that did not start is left behind),
 	// "Update panicked" (an update session stopped on a panic),
 	// "Update execution failed" (an update session ended in an error),
 	// "Could not check container for updates" (a container's update check failed),
@@ -148,6 +150,10 @@ var commonTemplates = map[string]string{
     Recovered orphaned Watchtower container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "id")}}{{.}}{{else}}unknown{{end}})
 {{- else if eq $msg "Could not start orphaned Watchtower container" -}}
     Could not start orphaned Watchtower container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "id")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Starting Watchtower ephemeral self-update" -}}
+    Starting Watchtower ephemeral self-update
+{{- else if eq $msg "Failed to clean up ephemeral orchestrator after start failure" -}}
+    Could not remove ephemeral orchestrator {{with (index $e.Data "orchestrator_id")}}{{.}}{{else}}unknown{{end}} after it failed to start{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Could not check container for updates" -}}
     Could not check {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} for updates{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Could not pull image" -}}

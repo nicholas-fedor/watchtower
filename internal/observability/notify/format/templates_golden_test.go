@@ -94,6 +94,8 @@ var legacyTemplateMessages = []string{
 	logging.UpdateFailed,
 	logging.UpdateCheckFailed,
 	logging.ImagePullFailed,
+	logging.EphemeralSelfUpdateStarting,
+	logging.OrchestratorCleanupFailed,
 	logging.ConfigNotRecreatable,
 }
 
@@ -262,6 +264,19 @@ func goldenEntryData(message string) map[string]any {
 			"container": "app",
 			"image":     "org/app:latest",
 			"error":     "failed to inspect image: org/app:latest: Error response from daemon: No such image: org/app:latest",
+		}
+	case logging.EphemeralSelfUpdateStarting:
+		return map[string]any{
+			"container":       "watchtower",
+			"orchestrator_id": "0dd0dd000000",
+		}
+	case logging.OrchestratorCleanupFailed:
+		return map[string]any{
+			"source_container": "watchtower",
+			"source_id":        "c0ffee000000",
+			"new_image":        "nickfedor/watchtower:latest",
+			"orchestrator_id":  "0dd0dd000000",
+			"error":            "Error response from daemon: removal of container 0dd0dd000000 is already in progress",
 		}
 	case logging.ImagePullFailed:
 		return map[string]any{

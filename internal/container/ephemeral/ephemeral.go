@@ -18,6 +18,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // Environment variable keys used by the ephemeral orchestrator.
@@ -174,7 +175,7 @@ func CreateOrchestrator(
 		},
 	)
 	if err != nil {
-		clog.Error().
+		clog.Debug().
 			Err(err).
 			Msg("Failed to create ephemeral orchestrator container")
 
@@ -194,7 +195,7 @@ func CreateOrchestrator(
 		dockerClient.ContainerStartOptions{},
 	)
 	if err != nil {
-		clog.Error().
+		clog.Debug().
 			Err(err).
 			Msg("Failed to start ephemeral orchestrator container")
 
@@ -215,15 +216,12 @@ func CreateOrchestrator(
 		if cleanupErr != nil {
 			clog.Warn().
 				Err(cleanupErr).
-				Msg("Failed to clean up ephemeral orchestrator after start failure")
+				Str("orchestrator_id", orchestratorID.ShortID()).
+				Msg(logging.OrchestratorCleanupFailed)
 		}
 
 		return "", fmt.Errorf("%w: %w", errEphemeralStartFailed, err)
 	}
-
-	clog.Debug().
-		Str("orchestrator_id", orchestratorID.ShortID()).
-		Msg("Started ephemeral orchestrator for self-update")
 
 	return orchestratorID, nil
 }
