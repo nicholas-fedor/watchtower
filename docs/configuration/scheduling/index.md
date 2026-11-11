@@ -80,6 +80,36 @@ Environment Variable: WATCHTOWER_UPDATE_ON_START
 !!! Note
     If used with [`run-once`](#run_once), a warning is logged and [`run-once`](#run_once) takes precedence.
 
+## Container Schedules
+
+Lets a container set its own update schedule with the `com.centurylinklabs.watchtower.schedule` label, in place of the global [schedule](#schedule) or [interval](#interval).
+The label takes the same cron syntax as `--schedule`, including the `@every` and `@hourly` descriptors.
+
+```text
+            Argument: --container-schedules
+Environment Variable: WATCHTOWER_CONTAINER_SCHEDULES
+                Type: Boolean
+             Default: false
+```
+
+```yaml
+services:
+  game:
+    image: example/game:latest
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+      # checked every 10 minutes; everything else on the global schedule
+      - com.centurylinklabs.watchtower.schedule=@every 10m
+```
+
+- A container with a schedule label is checked for updates on its own schedule, and the global schedule checks the containers without one. Schedules that fire at the same moment, the global one included, share one update run.
+- Every run covers the containers Watchtower manages, as a global run does, but checks only the containers whose schedule fired. Dependencies work as in a global run: when a container is updated, the containers that depend on it restart with it, in dependency order, whatever their schedule. They are not checked for updates until their own schedule fires.
+- Watchtower reads the schedule labels at startup and after each update run, from the container list the run uses anyway. A new or changed label takes effect after the next run of any schedule.
+- A label that does not parse is ignored with a warning, and the container follows the global schedule.
+- The other selection settings still apply: a labeled container in another [scope](../container-selection/index.md#scope_filter), or one not enabled when [label-enable](../container-selection/index.md#enable_label_filter) is set, is not updated.
+- Leaving out both [schedule](#schedule) and [interval](#interval) keeps the default global schedule, which checks the containers without a label once a day. To update only the containers with a schedule label, pass `--schedule ""` on the command line (an empty `WATCHTOWER_SCHEDULE` is ignored). [Update on start](#update_on_start) checks the containers on the global schedule.
+- With the [HTTP API](../http-api/index.md)'s update endpoint, scheduled updates (container schedules included) run only when [HTTP API periodic polls](#http_api_periodic_polls) are enabled. An update request covers every container it selects, whatever its schedule.
+
 ## HTTP API Periodic Polls
 
 Enables periodic updates when the HTTP API update endpoint is active.

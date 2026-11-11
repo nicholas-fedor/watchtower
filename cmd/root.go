@@ -934,6 +934,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		UpdateOnStart:         cfg.UpdateOnStart,
 		ReplacedOlderInstance: totalRemovedInstances > 0,
 		BaseParams:            sharedBase,
+		ContainerSchedules:    schedule.ListFrom(appCfg.Schedule.ContainerSchedules, client),
 	})
 
 	// Stop the HTTP API and give it its shutdown grace period to finish the
