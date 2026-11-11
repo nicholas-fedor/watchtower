@@ -122,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module golang.org/x/crypto to v0.59.0 by @renovate[bot] in [#3709](https://github.com/nicholas-fedor/watchtower/pull/3709)
 - Update module github.com/gofiber/utils/v2 to v2.6.5 by @renovate[bot] in [#3703](https://github.com/nicholas-fedor/watchtower/pull/3703)
 - Update module github.com/docker/compose/v5 to v5.7.1 by @renovate[bot] in [#3702](https://github.com/nicholas-fedor/watchtower/pull/3702)
 - Update module github.com/docker/docker-credential-helpers to v0.9.13 by @renovate[bot] in [#3698](https://github.com/nicholas-fedor/watchtower/pull/3698)
