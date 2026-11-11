@@ -80,8 +80,6 @@ const orchestratorRecoveryTimeout = 60 * time.Second
 
 // Errors for ephemeral self-update operations in ephemeral.go.
 var (
-	// errEphemeralOrchestratorFailed indicates the ephemeral orchestrator failed.
-	errEphemeralOrchestratorFailed = errors.New("ephemeral orchestrator failed")
 	// errOrchestratorMissingEnv indicates a required environment variable is missing.
 	errOrchestratorMissingEnv = errors.New("missing orchestrator environment variable")
 	// errOrchestratorInvalidEnv indicates an environment variable holds a value Watchtower never writes.
@@ -181,10 +179,6 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 		Str("container_chain", newChain).
 		Msg("Computed container chain for ephemeral self-update")
 
-	clog.Debug().Msg("Creating ephemeral orchestrator for self-update")
-
-	// Create the ephemeral orchestrator container.
-
 	orchestratorID, err := client.CreateEphemeralOrchestrator(
 		detachedCtx,
 		sourceContainer,
@@ -193,32 +187,15 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 		config.Cleanup,
 	)
 	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to create ephemeral orchestrator")
-
-		return "", false, fmt.Errorf("%w: %w", errEphemeralOrchestratorFailed, err)
+		return "", false, err //nolint:wrapcheck // The orchestrator's error already names the step that failed.
 	}
 
-	// The orchestrator is running and stops this container next. Log the same
-	// Info entries as the normal update flow, so notifications match it. They
-	// come after the orchestrator starts, so a failed handoff does not report
-	// a stop that never happens.
-	log.Info().
-		Str("container", sourceContainer.Name()).
-		Str("id", sourceContainer.ID().ShortID()).
-		Str("old_image_id", sourceContainer.ImageID().ShortID()).
-		Msg(logging.StoppingContainer)
-	log.Info().Msg("Starting new Watchtower container")
-
-	// Log that the orchestrator has been started. The orchestrator ID identifies
-	// the ephemeral container that will perform the replacement. The actual new
-	// container's ID is determined by the orchestrator and emitted in its own
-	// "Started new container" log entry.
-	log.Debug().
-		Str("container", sourceContainer.Name()).
+	// The orchestrator stops and replaces this container after this process
+	// returns. The line comes only once the orchestrator has started, so a
+	// failed handoff does not report it.
+	clog.Info().
 		Str("orchestrator_id", orchestratorID.ShortID()).
-		Msg("Started self-update orchestrator")
+		Msg(logging.EphemeralSelfUpdateStarting)
 
 	// Return immediately. The orchestrator handles the full replacement sequence
 	// asynchronously: stopping the old container, creating and starting the new one,

@@ -2088,8 +2088,9 @@ func TestRun(t *testing.T) {
 }
 
 // TestClientErrorsNamedOnce verifies that a failed stop, remove, create or
-// start reports the container client's error as it is. The client's error
-// already names the step, so the restart adds no second prefix.
+// start, or a failed ephemeral self-update orchestrator, reports the container
+// client's error as it is. The client's error already names the step, so the
+// restart adds no second prefix.
 func TestClientErrorsNamedOnce(t *testing.T) {
 	t.Parallel()
 
@@ -2162,6 +2163,36 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			source,
 			client,
 			updateParams.Params{ReviveStopped: true},
+		)
+		require.Same(t, clientErr, err)
+		require.EqualError(t, err, text)
+	})
+
+	t.Run("ephemeral self-update orchestrator", func(t *testing.T) {
+		t.Parallel()
+
+		text := "failed to start ephemeral orchestrator container: daemon unavailable"
+		clientErr := errors.New(text)
+		watchtower := mockUpdate.CreateMockContainerWithConfig(
+			"watchtower",
+			"/watchtower",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{Labels: map[string]string{"com.centurylinklabs.watchtower": "true"}},
+		)
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().
+			CreateEphemeralOrchestrator(mock.Anything, watchtower, mock.Anything, mock.Anything, mock.Anything).
+			Return("", clientErr)
+
+		_, _, err := restartStaleContainer(
+			newTestLogger(t),
+			t.Context(),
+			watchtower,
+			client,
+			updateParams.Params{EphemeralSelfUpdate: true},
 		)
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)

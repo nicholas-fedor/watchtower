@@ -1,7 +1,6 @@
 package selfupdate
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -15,11 +14,15 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	mockSelfupdate "github.com/nicholas-fedor/watchtower/internal/update/selfupdate/mocks"
 )
+
+// watchtowerLabels marks a container as a Watchtower container.
+var watchtowerLabels = map[string]string{"com.centurylinklabs.watchtower": "true"}
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
 // failing test shows what it logged.
@@ -93,8 +96,6 @@ func expectOrchestrator(t *testing.T, source *container.Container, chain string,
 func TestStartOrchestrator(t *testing.T) {
 	t.Parallel()
 
-	watchtowerLabels := map[string]string{"com.centurylinklabs.watchtower": "true"}
-
 	t.Run("the orchestrator is created successfully", func(t *testing.T) {
 		t.Parallel()
 
@@ -156,14 +157,15 @@ func TestStartOrchestrator(t *testing.T) {
 	t.Run("CreateEphemeralOrchestrator fails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should return an error containing the orchestrator failure message", func(t *testing.T) {
+		t.Run("should return the orchestrator's error unchanged", func(t *testing.T) {
 			t.Parallel()
 
+			createErr := errors.New("failed to start ephemeral orchestrator container: start refused")
 			source := createDefaultMockContainer("source-err", watchtowerLabels)
-			client := expectOrchestrator(t, source, "source-err", false, errors.New("create failed"))
+			client := expectOrchestrator(t, source, "source-err", false, createErr)
 
 			_, _, err := StartOrchestrator(newTestLogger(t), t.Context(), client, source, updateParams.Params{})
-			require.ErrorContains(t, err, "ephemeral orchestrator failed")
+			require.Same(t, createErr, err)
 		})
 	})
 
@@ -202,63 +204,59 @@ func TestStartOrchestrator(t *testing.T) {
 	})
 }
 
-// TestEphemeralSelfUpdate_StoppingContainerLog verifies that the "Stopping
-// container" entry, which notifications include, is logged only once the
-// orchestrator that stops the container has started.
-func TestEphemeralSelfUpdate_StoppingContainerLog(t *testing.T) {
+// TestEphemeralSelfUpdate_HandoffLog verifies the line that notifications
+// include during an ephemeral self-update. Once the orchestrator has started,
+// "Starting Watchtower ephemeral self-update" is logged at info with the
+// container and the orchestrator's ID. No stop is reported, since the
+// orchestrator stops the container later. A failed orchestrator logs nothing
+// above debug, since the restart phase reports the container's failed update.
+func TestEphemeralSelfUpdate_HandoffLog(t *testing.T) {
 	t.Parallel()
+
+	// handoffEntry is a logged line above debug.
+	type handoffEntry struct {
+		Level          string `json:"level"`
+		Message        string `json:"message"`
+		Container      string `json:"container"`
+		OrchestratorID string `json:"orchestrator_id"`
+	}
+
+	source := createDefaultMockContainer("source-ephemeral", watchtowerLabels)
 
 	tests := []struct {
 		name string
 		// createErr fails the orchestrator creation when set.
 		createErr error
-		// wantLevels are the levels of the logged "Stopping container" records.
-		wantLevels []string
+		want      []handoffEntry
 	}{
-		{name: "orchestrator started", wantLevels: []string{"info"}},
-		{name: "orchestrator failed", createErr: errors.New("create failed"), wantLevels: nil},
+		{
+			name: "orchestrator started",
+			want: []handoffEntry{{
+				Level:          "info",
+				Message:        logging.EphemeralSelfUpdateStarting,
+				Container:      "watchtower",
+				OrchestratorID: "orchestrator",
+			}},
+		},
+		{name: "orchestrator failed", createErr: errors.New("create failed"), want: nil},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			source := createDefaultMockContainer("source-ephemeral", map[string]string{
-				"com.centurylinklabs.watchtower": "true",
-			})
+			client := expectOrchestrator(t, source, "source-ephemeral", false, tt.createErr)
 
-			client := mockSelfupdate.NewMockOrchestratorCreator(t)
-			client.EXPECT().
-				CreateEphemeralOrchestrator(mock.Anything, source, mock.Anything, mock.Anything, mock.Anything).
-				Return(container.ContainerID("orchestrator"), tt.createErr).Once()
+			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
 
-			var out bytes.Buffer
-
-			log := zerolog.New(&out).Level(zerolog.DebugLevel)
-
-			_, _, err := StartOrchestrator(&log, t.Context(), client, source, updateParams.Params{})
+			_, _, err := StartOrchestrator(log, t.Context(), client, source, updateParams.Params{})
 			if tt.createErr != nil {
-				require.Error(t, err)
+				require.ErrorIs(t, err, tt.createErr)
 			} else {
 				require.NoError(t, err)
 			}
 
-			var levels []string
-
-			for _, record := range logcapture.Entries[logcapture.Entry](t, out.String()) {
-				if record["message"] == "Stopping container" {
-					assert.Equal(t, "watchtower", record["container"])
-					assert.Equal(t, source.ID().ShortID(), record["id"])
-					assert.Equal(t, source.ImageID().ShortID(), record["old_image_id"])
-
-					level, ok := record["level"].(string)
-					require.True(t, ok)
-
-					levels = append(levels, level)
-				}
-			}
-
-			assert.Equal(t, tt.wantLevels, levels)
+			assert.Equal(t, tt.want, logcapture.Entries[handoffEntry](t, buf.String()))
 		})
 	}
 }

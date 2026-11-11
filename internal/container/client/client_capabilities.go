@@ -121,10 +121,6 @@ func (c *Client) CreateEphemeralOrchestrator(
 	containerChain string,
 	cleanup bool,
 ) (container.ContainerID, error) {
-	orchestratorID, err := ephemeral.CreateOrchestrator(c.log, ctx, c.api, sourceContainer, newImage, containerChain, cleanup)
-	if err != nil {
-		return "", fmt.Errorf("create ephemeral orchestrator: %w", err)
-	}
-
-	return orchestratorID, nil
+	//nolint:wrapcheck // The orchestrator's error already names the step that failed.
+	return ephemeral.CreateOrchestrator(c.log, ctx, c.api, sourceContainer, newImage, containerChain, cleanup)
 }

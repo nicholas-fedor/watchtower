@@ -2086,7 +2086,7 @@ func TestClientWrappers(t *testing.T) {
 
 		id, err := (&Client{log: newTestLogger(t), api: api}).
 			CreateEphemeralOrchestrator(t.Context(), source, "watchtower:v2", "chain1", false)
-		require.ErrorContains(t, err, "create ephemeral orchestrator: failed to create ephemeral orchestrator container")
+		require.EqualError(t, err, "failed to create ephemeral orchestrator container: Error response from daemon: no such image")
 		assert.Empty(t, id)
 	})
 }

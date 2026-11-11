@@ -555,13 +555,34 @@
     },
     {
       "data": {
+        "container": "watchtower",
+        "orchestrator_id": "0dd0dd000000"
+      },
+      "level": "debug",
+      "message": "Starting Watchtower ephemeral self-update",
+      "time": "2026-10-07T12:00:59Z"
+    },
+    {
+      "data": {
+        "error": "Error response from daemon: removal of container 0dd0dd000000 is already in progress",
+        "new_image": "nickfedor/watchtower:latest",
+        "orchestrator_id": "0dd0dd000000",
+        "source_container": "watchtower",
+        "source_id": "c0ffee000000"
+      },
+      "level": "info",
+      "message": "Failed to clean up ephemeral orchestrator after start failure",
+      "time": "2026-10-07T12:01:00Z"
+    },
+    {
+      "data": {
         "container": "app",
         "error": "no image info available",
         "image": "org/app:latest"
       },
-      "level": "debug",
+      "level": "warning",
       "message": "Could not update container. Its configuration cannot be recreated",
-      "time": "2026-10-07T12:00:59Z"
+      "time": "2026-10-07T12:01:01Z"
     },
     {
       "data": {

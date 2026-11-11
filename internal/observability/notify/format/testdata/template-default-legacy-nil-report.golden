@@ -57,6 +57,8 @@ Update panicked: runtime error: invalid memory address or nil pointer dereferenc
 Update execution failed: failed to list containers: context deadline exceeded
 Could not check app for updates: failed to inspect image: org/app:latest: Error response from daemon: No such image: org/app:latest
 Docker could not pull org/app:latest for app: Get "https://registry.example.com/v2/org/app/manifests/latest": net/http: timeout awaiting response headers
+Starting Watchtower ephemeral self-update
+Could not remove ephemeral orchestrator 0dd0dd000000 after it failed to start: Error response from daemon: removal of container 0dd0dd000000 is already in progress
 Could not update app: no image info available
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields
