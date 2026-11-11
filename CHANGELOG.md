@@ -120,6 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/utils/v2 to v2.6.5 by @renovate[bot] in [#3703](https://github.com/nicholas-fedor/watchtower/pull/3703)
+- Update module github.com/docker/compose/v5 to v5.7.1 by @renovate[bot] in [#3702](https://github.com/nicholas-fedor/watchtower/pull/3702)
 - Update module github.com/docker/docker-credential-helpers to v0.9.13 by @renovate[bot] in [#3698](https://github.com/nicholas-fedor/watchtower/pull/3698)
 - Update golang.org/x/tools digest to 86b298c by @renovate[bot] in [#3697](https://github.com/nicholas-fedor/watchtower/pull/3697)
 - Update module github.com/gofiber/schema to v1.9.4 by @renovate[bot] in [#3695](https://github.com/nicholas-fedor/watchtower/pull/3695)
