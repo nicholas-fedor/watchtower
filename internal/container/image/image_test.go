@@ -289,6 +289,7 @@ func TestImageClient_PullImage(t *testing.T) {
 					updateConfig.Policy{},
 				)
 				requirePullError(t, err, image, tt.engineErr.Error())
+				require.ErrorIs(t, err, tt.engineErr)
 
 				if tt.category != nil {
 					assert.True(t, tt.category(err))
