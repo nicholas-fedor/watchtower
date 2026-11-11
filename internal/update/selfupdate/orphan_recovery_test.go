@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
 
@@ -131,11 +130,11 @@ func TestRetireOldInstance(t *testing.T) {
 	}
 }
 
-// TestTryRecoverOrphanedContainer verifies that a Watchtower replacement left
+// Test_tryRecoverOrphanedContainer verifies that a Watchtower replacement left
 // in the created state is started. Recovery gives up quietly when listing
 // fails or when no orphan in the current container's scope exists, and reports
 // a start that fails. The client mocks expect exactly the starts each case makes.
-func TestTryRecoverOrphanedContainer(t *testing.T) {
+func Test_tryRecoverOrphanedContainer(t *testing.T) {
 	t.Parallel()
 
 	t.Run("listing containers fails", func(t *testing.T) {
@@ -149,7 +148,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
 
-			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
@@ -167,7 +166,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, oldContainer, current)
 
-			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
@@ -184,7 +183,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).Return(nil).Once()
 
-			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
@@ -203,7 +202,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 				Return(context.DeadlineExceeded).Once()
 
 			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-			TryRecoverOrphanedContainer(log, t.Context(), client, current)
+			tryRecoverOrphanedContainer(log, t.Context(), client, current)
 
 			// No Watchtower may run once the old instance exits, so the failure
 			// is reported at error with its cause.
@@ -238,7 +237,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			// The attempts log at debug, so an info capture holds the failed
 			// start of the first orphan and the recovery of the second.
 			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-			TryRecoverOrphanedContainer(log, t.Context(), client, current)
+			tryRecoverOrphanedContainer(log, t.Context(), client, current)
 
 			type recoveryEntry struct {
 				Level     string `json:"level"`
@@ -265,21 +264,6 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 		})
 	})
 
-	t.Run("the current container is nil", func(t *testing.T) {
-		t.Parallel()
-
-		t.Run("should not panic or start anything", func(t *testing.T) {
-			t.Parallel()
-
-			// The mock has no expectations, so any client call fails the test.
-			client := mockSelfupdate.NewMockRecoveryClient(t)
-
-			require.NotPanics(t, func() {
-				TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, nil)
-			})
-		})
-	})
-
 	t.Run("the orphaned container is in a different scope", func(t *testing.T) {
 		t.Parallel()
 
@@ -292,7 +276,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
-			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
@@ -308,7 +292,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
-			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 }

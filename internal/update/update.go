@@ -183,10 +183,6 @@ func update(
 	// An old instance's container stops itself rather than run a session.
 	// This catches one restarted despite the startup check.
 	if old := currentOldInstance(allContainers, config.CurrentContainerID); old != nil {
-		log.Debug().
-			Str("container", old.Name()).
-			Msg("Current container is an old Watchtower container, stopping self")
-
 		selfupdate.RetireOldInstance(log, ctx, client, old, config.DetachedTimeout())
 
 		return nil, nil, errOldSelfDetected
