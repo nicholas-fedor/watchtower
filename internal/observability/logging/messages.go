@@ -38,6 +38,13 @@ const (
 	StartingAPIServer = "Starting HTTP API server"
 	// APIServerEnabled is logged once the HTTP API server is set up.
 	APIServerEnabled = "HTTP API server is enabled"
+	// OrphanRecovered is logged when an old Watchtower instance starts the
+	// replacement that an interrupted self-update left in the created state.
+	OrphanRecovered = "Recovered orphaned Watchtower container"
+	// OrphanStartFailed is logged when an old Watchtower instance cannot start
+	// the replacement that an interrupted self-update left in the created
+	// state.
+	OrphanStartFailed = "Could not start orphaned Watchtower container"
 )
 
 // Update session messages. Watchtower logs them while it checks and updates

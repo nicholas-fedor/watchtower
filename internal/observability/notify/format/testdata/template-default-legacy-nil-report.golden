@@ -34,6 +34,8 @@ Run once mode: Watchtower self-update skipped
 Only checking containers in scope: production
 Starting HTTP API server at https://0.0.0.0:8080
 HTTP API server is available at https://0.0.0.0:8080
+Recovered orphaned Watchtower container: watchtower (f00f00f00f00)
+Could not start orphaned Watchtower container: watchtower (f00f00f00f00): failed to start container f00f00f00f00: context deadline exceeded
 Update failed for app (org/app:latest): failed to pull image: org/app:latest: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s
 Update failed for app (org/app:latest): pre-update command failed: exit code 1
 Ignored depends-on missing-db for app: no container has that name

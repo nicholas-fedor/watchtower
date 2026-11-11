@@ -34,6 +34,8 @@ Skipping Watchtower self-update in run-once mode
 Only checking containers in scope
 Starting HTTP API server
 HTTP API server is enabled
+Recovered orphaned Watchtower container
+Could not start orphaned Watchtower container: failed to start container f00f00f00f00: context deadline exceeded
 Registry rate limit retries exhausted. Container failed for this cycle: failed to pull image: org/app:latest: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s
 Could not update container: pre-update command failed: exit code 1
 Ignoring depends-on entry that names no container

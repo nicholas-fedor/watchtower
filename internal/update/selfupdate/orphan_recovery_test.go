@@ -14,6 +14,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	mockSelfupdate "github.com/nicholas-fedor/watchtower/internal/update/selfupdate/mocks"
@@ -110,22 +111,37 @@ func TestRetireOldInstance(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			cancel()
 
-			RetireOldInstance(newTestLogger(t), ctx, client, old, time.Minute)
+			// The other recovery lines are at debug, so an info capture holds
+			// only the line reporting the recovery.
+			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+			RetireOldInstance(log, ctx, client, old, time.Minute)
+
+			type recoveryEntry struct {
+				Message   string `json:"message"`
+				Container string `json:"container"`
+			}
+
+			var want []recoveryEntry
+			if tt.orphan {
+				want = []recoveryEntry{{Message: logging.OrphanRecovered, Container: "watchtower"}}
+			}
+
+			assert.Equal(t, want, logcapture.Entries[recoveryEntry](t, buf.String()))
 		})
 	}
 }
 
 // TestTryRecoverOrphanedContainer verifies that a Watchtower replacement left
-// in the created state is started and returned, and that recovery gives up
-// without error when listing fails, the start fails, or no orphan in the
-// current container's scope exists.
+// in the created state is started. Recovery gives up quietly when listing
+// fails or when no orphan in the current container's scope exists, and reports
+// a start that fails. The client mocks expect exactly the starts each case makes.
 func TestTryRecoverOrphanedContainer(t *testing.T) {
 	t.Parallel()
 
 	t.Run("listing containers fails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should return false without error", func(t *testing.T) {
+		t.Run("should start nothing", func(t *testing.T) {
 			t.Parallel()
 
 			client := mockSelfupdate.NewMockRecoveryClient(t)
@@ -133,16 +149,14 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.False(t, ok)
-			assert.Nil(t, recovered)
+			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
 	t.Run("no orphaned container exists", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should return false", func(t *testing.T) {
+		t.Run("should start nothing", func(t *testing.T) {
 			t.Parallel()
 
 			// The mock has no start expectation, so starting a container fails
@@ -153,16 +167,14 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, oldContainer, current)
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.False(t, ok)
-			assert.Nil(t, recovered)
+			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
 	t.Run("an orphaned created-state Watchtower container exists", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should start it and return the recovered container", func(t *testing.T) {
+		t.Run("should start it", func(t *testing.T) {
 			t.Parallel()
 
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
@@ -172,17 +184,14 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).Return(nil).Once()
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.True(t, ok)
-			require.NotNil(t, recovered)
-			assert.Equal(t, container.ContainerID("orphaned-id"), recovered.ID())
+			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
 	t.Run("start fails for the orphaned container", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should return false when no other orphan exists", func(t *testing.T) {
+		t.Run("should report the failure when no other orphan exists", func(t *testing.T) {
 			t.Parallel()
 
 			orphaned := recoveryContainer("orphaned-id", "watchtower-xyz", false, "")
@@ -193,12 +202,26 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).
 				Return(context.DeadlineExceeded).Once()
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.False(t, ok)
-			assert.Nil(t, recovered)
+			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+			TryRecoverOrphanedContainer(log, t.Context(), client, current)
+
+			// No Watchtower may run once the old instance exits, so the failure
+			// is reported at error with its cause.
+			type failureEntry struct {
+				Level   string `json:"level"`
+				Message string `json:"message"`
+				Error   string `json:"error"`
+			}
+
+			want := []failureEntry{{
+				Level:   "error",
+				Message: logging.OrphanStartFailed,
+				Error:   context.DeadlineExceeded.Error(),
+			}}
+			assert.Equal(t, want, logcapture.Entries[failureEntry](t, buf.String()))
 		})
 
-		t.Run("should start and return the next orphan", func(t *testing.T) {
+		t.Run("should start the next orphan", func(t *testing.T) {
 			t.Parallel()
 
 			first := recoveryContainer("first-orphan-id", "watchtower-xyz", false, "")
@@ -212,32 +235,48 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("second-orphan-id")).
 				Return(nil).Once()
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.True(t, ok)
-			require.NotNil(t, recovered)
-			assert.Equal(t, container.ContainerID("second-orphan-id"), recovered.ID())
+			// The attempts log at debug, so an info capture holds the failed
+			// start of the first orphan and the recovery of the second.
+			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
+			TryRecoverOrphanedContainer(log, t.Context(), client, current)
+
+			type recoveryEntry struct {
+				Level     string `json:"level"`
+				Message   string `json:"message"`
+				Container string `json:"container"`
+				ID        string `json:"id"`
+			}
+
+			want := []recoveryEntry{
+				{
+					Level:     "error",
+					Message:   logging.OrphanStartFailed,
+					Container: "watchtower-xyz",
+					ID:        container.ContainerID("first-orphan-id").ShortID(),
+				},
+				{
+					Level:     "info",
+					Message:   logging.OrphanRecovered,
+					Container: "watchtower-abc",
+					ID:        container.ContainerID("second-orphan-id").ShortID(),
+				},
+			}
+			assert.Equal(t, want, logcapture.Entries[recoveryEntry](t, buf.String()))
 		})
 	})
 
 	t.Run("the current container is nil", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should not panic and return false", func(t *testing.T) {
+		t.Run("should not panic or start anything", func(t *testing.T) {
 			t.Parallel()
 
 			// The mock has no expectations, so any client call fails the test.
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 
-			var (
-				recovered *container.Container
-				ok        bool
-			)
-
 			require.NotPanics(t, func() {
-				recovered, ok = TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, nil)
+				TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, nil)
 			})
-			assert.False(t, ok)
-			assert.Nil(t, recovered)
 		})
 	})
 
@@ -253,9 +292,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.False(t, ok)
-			assert.Nil(t, recovered)
+			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 
@@ -271,9 +308,7 @@ func TestTryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
-			recovered, ok := TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
-			assert.False(t, ok)
-			assert.Nil(t, recovered)
+			TryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
 		})
 	})
 }
