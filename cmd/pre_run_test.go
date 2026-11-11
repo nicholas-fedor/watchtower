@@ -640,13 +640,14 @@ func TestPreRun_Exit(t *testing.T) {
 		},
 		{
 			// An old instance that starts its orphaned replacement sends the
-			// recovery in a notification before it exits.
+			// recovery in one notification before it exits.
 			helperCase:   "orphan-recovery-by-old-instance",
 			wantExitCode: 0,
 			wantOutput: []string{
 				"SetRestartPolicy cccccccccccc no",
 				"Recovered orphaned Watchtower container: watchtower (0f0f0f0f0f0f)",
 			},
+			wantOnce: []string{"Recovered orphaned Watchtower container: watchtower (0f0f0f0f0f0f)"},
 		},
 		{
 			// An old instance still starts its orphaned replacement and exits
