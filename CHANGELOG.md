@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Retire old instances through one sequence by @nicholas-fedor in [#3705](https://github.com/nicholas-fedor/watchtower/pull/3705)
 - Report orphan recoveries once in notifications by @nicholas-fedor in [#3700](https://github.com/nicholas-fedor/watchtower/pull/3700)
 - Skip self-dependent containers fully by @nicholas-fedor in [#3679](https://github.com/nicholas-fedor/watchtower/pull/3679)
 - End a session that cannot order its containers before it touches them by @nicholas-fedor in [#3675](https://github.com/nicholas-fedor/watchtower/pull/3675)
