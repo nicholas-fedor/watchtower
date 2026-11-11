@@ -55,7 +55,8 @@ Invalid pre-check timeout value, using default: lifecycle hook timeout must be a
 Invalid post-check timeout value, using default: lifecycle hook timeout must be a whole number of minutes of 0 or more: got -5
 Update panicked: runtime error: invalid memory address or nil pointer dereference
 Update execution failed: failed to list containers: context deadline exceeded
-Could not check container for updates: failed to pull image: org/app:latest: unauthorized: authentication required
+Could not check container for updates: failed to inspect image: org/app:latest: Error response from daemon: No such image: org/app:latest
+Could not pull image: Get "https://registry.example.com/v2/org/app/manifests/latest": net/http: timeout awaiting response headers
 Could not update container. Its configuration cannot be recreated: no image info available
 Unrecognized message with fields
 Unrecognized message without fields

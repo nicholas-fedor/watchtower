@@ -37,6 +37,7 @@ var commonTemplates = map[string]string{
 	// "Update panicked" (an update session stopped on a panic),
 	// "Update execution failed" (an update session ended in an error),
 	// "Could not check container for updates" (a container's update check failed),
+	// "Could not pull image" (the container engine could not pull a container's image),
 	// "Could not update container. Its configuration cannot be recreated"
 	// (a stale container's configuration failed the recreation check),
 	// "Invalid pre-check timeout value, using default", "Invalid post-check timeout value, using default",
@@ -149,6 +150,8 @@ var commonTemplates = map[string]string{
     Could not start orphaned Watchtower container: {{with (index $e.Data "container")}}{{.}}{{else}}unknown{{end}} ({{with (index $e.Data "id")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Could not check container for updates" -}}
     Could not check {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} for updates{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Could not pull image" -}}
+    {{with (index $e.Data "engine")}}{{.}}{{else}}The container engine{{end}} could not pull {{with (index $e.Data "image")}}{{.}}{{else}}the image{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}a container{{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if or (eq $msg "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed") (eq $msg "Could not inspect Watchtower's own container. Self-updates are disabled") (eq $msg "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope") (eq $msg "Could not disable Watchtower's restart policy. The runtime may start it again") (eq $msg "Failed to build run configuration") (eq $msg "Rolling restart compatibility validation failed") (eq $msg "API setup failed") (eq $msg "Could not schedule updates") (eq $msg "Update panicked") (eq $msg "Update execution failed") -}}
     {{$msg}}{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if $e.Data -}}

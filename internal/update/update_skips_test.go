@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
@@ -542,7 +544,8 @@ func TestUpdate_SelfDependencyByComposeServiceIsSkipped(t *testing.T) {
 // once per container and cause, so a lasting failure reaches notifications on
 // the first scan and is logged at debug on later scans. A check failure that
 // is reported in a line of its own, such as a cooldown deferral, a registry
-// rate limit, or an invalid Git label, adds no warning.
+// rate limit, an invalid Git label, or a pull the engine failed, adds no
+// warning.
 func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 	t.Parallel()
 
@@ -586,6 +589,14 @@ func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 			},
 			want: [][]string{nil, nil},
 		},
+		{
+			name: "a pull the engine failed",
+			checkErrs: []error{
+				&containerImage.PullError{Err: errors.New("net/http: timeout awaiting response headers"), Image: "org/app:latest", Podman: false},
+				&containerImage.PullError{Err: errors.New("net/http: timeout awaiting response headers"), Image: "org/app:latest", Podman: false},
+			},
+			want: [][]string{nil, nil},
+		},
 	}
 
 	for _, tt := range tests {
@@ -617,6 +628,65 @@ func TestUpdate_FailedCheckWarnsOnce(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+// TestUpdate_FailedPullWarnsOnce verifies that a pull the engine failed is
+// reported in a line that names the engine and carries only the engine's
+// error. It warns once per container and cause, and the skipped container's
+// reason names the engine.
+func TestUpdate_FailedPullWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	// A fresh ID per run keeps the process-wide record of reported problems
+	// from carrying over between test runs.
+	app := skipTestContainer(containerfixture.RandomID(), "app", nil)
+	pullErr := &containerImage.PullError{
+		Err:    errors.New("net/http: timeout awaiting response headers"),
+		Image:  app.ImageName(),
+		Podman: true,
+	}
+
+	// pullEntry is the line reporting the failed pull.
+	type pullEntry struct {
+		Message   string `json:"message"`
+		Level     string `json:"level"`
+		Container string `json:"container"`
+		Image     string `json:"image"`
+		Engine    string `json:"engine"`
+		Error     string `json:"error"`
+	}
+
+	levels := make([]string, 0, 2)
+
+	for scan := range 2 {
+		client := newMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+		client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
+			Return(false, app.ImageID(), "", pullErr).Once()
+
+		var out bytes.Buffer
+
+		log := zerolog.New(&out).Level(zerolog.DebugLevel)
+
+		report, _, err := update(&log, t.Context(), client, updateParams.Params{}, ratelimit.New())
+		require.NoError(t, err)
+
+		assert.Equal(t, map[string]string{"app": "Podman could not pull " + app.ImageName() + ": net/http: timeout awaiting response headers"},
+			reportErrors(report.Skipped()))
+
+		entries := slices.DeleteFunc(logcapture.Entries[pullEntry](t, out.String()), func(e pullEntry) bool {
+			return e.Message != logging.ImagePullFailed
+		})
+		require.Len(t, entries, 1, "scan %d", scan)
+		assert.Equal(t, "app", entries[0].Container)
+		assert.Equal(t, app.ImageName(), entries[0].Image)
+		assert.Equal(t, "Podman", entries[0].Engine)
+		assert.Equal(t, "net/http: timeout awaiting response headers", entries[0].Error)
+
+		levels = append(levels, entries[0].Level)
+	}
+
+	assert.Equal(t, []string{"warn", "debug"}, levels)
 }
 
 // TestUpdate_UnparsableImageWarnsOnce verifies that a container whose image

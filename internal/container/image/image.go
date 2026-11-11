@@ -55,18 +55,12 @@ var (
 	errPinnedImage = errors.New("image is pinned with sha256, skipping pull")
 	// errInspectImageFailed indicates a failure to inspect an image from the Docker daemon.
 	errInspectImageFailed = errors.New("failed to inspect image")
-	// errPullImageFailed indicates a failure to pull an image from the registry.
+	// errPullImageFailed indicates that Watchtower could not start a pull, such
+	// as when its credentials cannot be loaded or the registry's rate limit
+	// holds it back. A failure of the engine's pull is a [PullError] instead.
 	errPullImageFailed = errors.New("failed to pull image")
 	// errFailedToLoadPullOptions indicates pull options could not be resolved.
 	errFailedToLoadPullOptions = errors.New("failed to load pull options")
-	// errPullImageUnauthorized indicates that a pull failed because the registry
-	// required authentication.
-	errPullImageUnauthorized = errors.New("authentication required")
-	// errPullImageNotFound indicates that a pull failed because the registry
-	// does not have the image.
-	errPullImageNotFound = errors.New("image not found")
-	// errReadPullResponseFailed indicates a failure to read the pull response stream.
-	errReadPullResponseFailed = errors.New("failed to read pull response")
 	// errRemoveImageFailed indicates a failure to remove an image from the Docker host.
 	errRemoveImageFailed = errors.New("failed to remove image")
 )
@@ -136,6 +130,46 @@ type Client struct {
 	// registrySettings holds the settings for registry requests.
 	registrySettings registryConfig.Registry
 }
+
+// PullError reports that the container engine could not pull an image.
+//
+// Its message names the engine and gives the engine's own error, so a reader
+// can tell it apart from a failure of Watchtower's own registry requests.
+type PullError struct {
+	// Err is the error the engine returned.
+	Err error
+	// Image is the image the engine was asked to pull.
+	Image string
+	// Podman is true when the engine is Podman. The caller that knows the
+	// engine sets it.
+	Podman bool
+}
+
+// Engine names the container engine that failed the pull.
+//
+// Returns:
+//   - string: "Podman" or "Docker".
+func (e *PullError) Engine() string {
+	if e.Podman {
+		return "Podman"
+	}
+
+	return "Docker"
+}
+
+// Error returns the engine's name, the image and the engine's error.
+//
+// Returns:
+//   - string: The error message.
+func (e *PullError) Error() string {
+	return e.Engine() + " could not pull " + e.Image + ": " + e.Err.Error()
+}
+
+// Unwrap returns the engine's error.
+//
+// Returns:
+//   - error: The error the engine returned.
+func (e *PullError) Unwrap() error { return e.Err }
 
 // NewClient creates a new Client instance.
 //
@@ -218,17 +252,17 @@ func (c Client) IsContainerStale(
 			return false, sourceContainer.ImageID(), "", err
 		}
 
-		if errors.Is(err, errPullImageNotFound) {
+		// A pull error names its engine only after the container client
+		// detects it, so this line logs the engine's own error. The container
+		// client logs the pull failures returned here.
+		pullErr, isPullError := errors.AsType[*PullError](err)
+		if isPullError && cerrdefs.IsNotFound(pullErr.Err) {
 			clog.Debug().
-				Err(err).
+				Err(pullErr.Err).
 				Msg("Image not found in any registry - treating as up-to-date")
 
 			return false, sourceContainer.ImageID(), "", nil
 		}
-
-		clog.Debug().
-			Err(err).
-			Msg("Failed to pull image")
 
 		return false, sourceContainer.ImageID(), "", err
 	}
@@ -881,31 +915,12 @@ func (c Client) performImagePull(
 				return info
 			}
 
-			// Differentiate error types for appropriate logging and handling.
-			// Auth failures and missing images return distinct sentinel errors
-			// so callers can programmatically distinguish error categories.
-			// These lines stay at debug because the update check that called
-			// the pull warns about its failure once.
-			switch {
-			case cerrdefs.IsUnauthorized(err):
-				clog.Debug().
-					Err(err).
-					Msg("Image pull failed: authentication required")
+			// The update check that called the pull reports its failure once.
+			clog.Debug().
+				Err(err).
+				Msg("Failed to initiate image pull")
 
-				return fmt.Errorf("%w: %w", errPullImageUnauthorized, err)
-			case cerrdefs.IsNotFound(err):
-				clog.Debug().
-					Err(err).
-					Msg("Image pull failed: image not found in registry")
-
-				return fmt.Errorf("%w: %w", errPullImageNotFound, err)
-			default:
-				clog.Debug().
-					Err(err).
-					Msg("Failed to initiate image pull")
-
-				return err //nolint:wrapcheck // Wrapped once with the image name after the retries.
-			}
+			return &PullError{Err: err, Image: imageName, Podman: false}
 		}
 		defer response.Close()
 
@@ -925,7 +940,7 @@ func (c Client) performImagePull(
 				Err(waitErr).
 				Msg("Failed to read image pull response")
 
-			return fmt.Errorf("%w: %w", errReadPullResponseFailed, waitErr)
+			return &PullError{Err: waitErr, Image: imageName, Podman: false}
 		}
 
 		clog.Debug().Msg("Image pull completed")
@@ -933,7 +948,12 @@ func (c Client) performImagePull(
 		return nil
 	})
 	if pullErr != nil {
-		// Each attempt's error gives only the cause. The image is named here once.
+		// The engine's failure already names the image. Each other attempt's
+		// error gives only the cause, so the image is named here once.
+		if engineErr, ok := errors.AsType[*PullError](pullErr); ok {
+			return engineErr
+		}
+
 		return fmt.Errorf("%w: %s: %w", errPullImageFailed, imageName, pullErr)
 	}
 

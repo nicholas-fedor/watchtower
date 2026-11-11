@@ -57,6 +57,9 @@ const (
 	// UpdateCheckFailed is logged when Watchtower cannot check a container
 	// for a newer image or Git revision.
 	UpdateCheckFailed = "Could not check container for updates"
+	// ImagePullFailed is logged when the container engine cannot pull a
+	// container's image. Its error is the engine's own.
+	ImagePullFailed = "Could not pull image"
 	// ConfigNotRecreatable is logged when a stale container is skipped
 	// because its configuration cannot be recreated.
 	ConfigNotRecreatable = "Could not update container. Its configuration cannot be recreated"
