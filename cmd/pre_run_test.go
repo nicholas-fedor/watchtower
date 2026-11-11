@@ -639,6 +639,24 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
 		},
 		{
+			// An old instance that starts its orphaned replacement sends the
+			// recovery in a notification before it exits.
+			helperCase:   "orphan-recovery-by-old-instance",
+			wantExitCode: 0,
+			wantOutput: []string{
+				"SetRestartPolicy cccccccccccc no",
+				"Recovered orphaned Watchtower container: watchtower (0f0f0f0f0f0f)",
+			},
+		},
+		{
+			// An old instance still starts its orphaned replacement and exits
+			// when Shoutrrr rejects a notification URL.
+			helperCase:     "orphan-recovery-with-rejected-notification-url",
+			wantExitCode:   0,
+			wantOutput:     []string{logging.OrphanRecovered, "SetRestartPolicy cccccccccccc no"},
+			unwantedOutput: []string{"Failed to initialize notifications"},
+		},
+		{
 			// A notification URL that Shoutrrr rejects fails on every start,
 			// so the main process disables its restarts before it exits.
 			helperCase:   "rejected-notification-url",
@@ -787,6 +805,28 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
 		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{old}, nil).Maybe()
+	case "orphan-recovery-by-old-instance", "orphan-recovery-with-rejected-notification-url":
+		args = []string{"--log-level", "info", "--notification-url", "logger://"}
+		if helperCase == "orphan-recovery-with-rejected-notification-url" {
+			args = []string{"--log-level", "info", "--notification-url", "discord://secrettoken@notanumber"}
+		}
+
+		old := selfContainer("/watchtower-old-cccccccccccc", "")
+		orphanID := container.ContainerID(strings.Repeat("0f", 32))
+		orphan := container.NewContainer(nil,
+			&dockerContainer.InspectResponse{
+				ID:     string(orphanID),
+				Name:   "/watchtower",
+				State:  &dockerContainer.State{Status: dockerContainer.StateCreated},
+				Config: &dockerContainer.Config{Labels: map[string]string{watchtowerLabelKey: "true"}},
+			},
+			nil,
+		)
+		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
+		mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{old, orphan}, nil)
+		mockClient.EXPECT().StartContainerByID(mock.Anything, orphanID).Return(nil).Once()
 	case "rejected-notification-url":
 		args = []string{"--notification-url", "discord://secrettoken@notanumber"}
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}

@@ -491,26 +491,20 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	currentWatchtowerContainerUnknown = currentWatchtowerContainerID == "" &&
 		containerClient.InContainer(processFs)
 
+	notifyErr := p.setUpNotifications()
+
 	// Check if this is an old Watchtower container that should not run continuously.
 	// A run-once instance ends after its run, so only a continuous one exits here.
+	// Notifications are set up first, so the recovery of an orphaned replacement
+	// reaches them. A notifier that cannot be created does not stop the recovery.
 	if !appCfg.Mode.RunOnce && container.IsSuperseded(currentWatchtowerContainer) {
 		p.stopInvalidWatchtowerRestart()
 
 		return &exitError{err: errSupersededInstance, msg: "", code: 0}
 	}
 
-	// Set up the notification client from loaded process config (appCfg.Notify).
-	// RegisterHook attaches the notifier to p.log and updates p.log in place to the
-	// hooked logger so subsequent application logging is captured for notifications.
-	// Because a health check probe runs often, its warnings stay in the log and
-	// never reach notifications.
-	if !appCfg.Mode.HealthCheck {
-		notifier, err = notify.NewNotifier(p.log, appCfg.Notify)
-		if err != nil {
-			return &exitError{err: err, msg: "Failed to initialize notifications", code: 1}
-		}
-
-		notifier.RegisterHook(p.log)
+	if notifyErr != nil {
+		return notifyErr
 	}
 
 	// Without the container's labels, a scope set only by its scope label is
@@ -537,34 +531,46 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+// setUpNotifications creates the notifier from the notification settings and
+// hooks it to the process logger, so the lines logged after it reach
+// notifications.
+//
+// A health check probe runs often, so it sets up no notifier, and its warnings
+// stay in the log.
+//
+// Returns:
+//   - error: An [exitError] when the notifier cannot be created.
+func (p *process) setUpNotifications() error {
+	if appCfg.Mode.HealthCheck {
+		return nil
+	}
+
+	var err error
+
+	notifier, err = notify.NewNotifier(p.log, appCfg.Notify)
+	if err != nil {
+		return &exitError{err: err, msg: "Failed to initialize notifications", code: 1}
+	}
+
+	notifier.RegisterHook(p.log)
+
+	return nil
+}
+
 // stopInvalidWatchtowerRestart recovers any orphaned instance and sets the
 // restart policy of the current Watchtower container to "no", so the old
 // instance can exit. The invalid restart check that leads here requires a
 // current container.
 func (p *process) stopInvalidWatchtowerRestart() {
-	p.log.Info().
+	p.log.Debug().
 		Msg("Detected invalid restart of old Watchtower container, stopping Watchtower container now")
 
-	// Attempt to recover an orphaned Watchtower container that is stuck
-	// in the created state before exiting. If recovery succeeds, the
-	// old container still exits with restart policy set to "no".
 	recoverCtx, recoverCancel := context.WithTimeout(
 		context.Background(),
 		restartPolicyTimeout,
 	)
 
-	recoveredContainer, recovered := selfupdate.TryRecoverOrphanedContainer(
-		p.log,
-		recoverCtx,
-		client,
-		currentWatchtowerContainer,
-	)
-	if recovered {
-		p.log.Info().
-			Str("container", recoveredContainer.Name()).
-			Msg("Recovered orphaned Watchtower container, exiting old instance")
-	}
-
+	selfupdate.TryRecoverOrphanedContainer(p.log, recoverCtx, client, currentWatchtowerContainer)
 	recoverCancel()
 	p.disableRestarts()
 }

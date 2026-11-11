@@ -10,6 +10,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // RecoveryClient finds and starts an orphaned replacement container.
@@ -58,15 +59,9 @@ func RetireOldInstance(
 	timeout time.Duration,
 ) {
 	recoverCtx, recoverCancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
-	recovered, ok := TryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer)
+	TryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer)
 
 	recoverCancel()
-
-	if ok {
-		log.Info().
-			Str("container", recovered.Name()).
-			Msg("Recovered orphaned Watchtower container, exiting old instance")
-	}
 
 	policyCtx, policyCancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 	DisableOldRestarts(log, policyCtx, oldContainer, client)
@@ -79,27 +74,25 @@ func RetireOldInstance(
 // creates a replacement container but fails to start it, leaving the old container
 // running and the new container never started.
 //
-// It lists all containers and starts the first one that
+// It lists all containers and starts the first container that
 // [container.IsOrphanedReplacement] reports as an orphaned replacement of the
-// current container.
+// current container and that starts without error. A recovery is logged once,
+// at info. A start that fails is logged at error, since no Watchtower may run
+// once the old instance exits.
 //
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker API operations.
 //   - currentContainer: The current running container to exclude from recovery.
-//
-// Returns:
-//   - *container.Container: The recovered container if successful, nil otherwise.
-//   - bool: True if a container was found and started, false otherwise.
 func TryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client RecoveryClient,
 	currentContainer *container.Container,
-) (*container.Container, bool) {
+) {
 	if currentContainer == nil {
-		return nil, false
+		return
 	}
 
 	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
@@ -108,7 +101,7 @@ func TryRecoverOrphanedContainer(
 			Err(err).
 			Msg("Failed to list containers for orphaned Watchtower recovery")
 
-		return nil, false
+		return
 	}
 
 	for _, c := range allContainers {
@@ -116,31 +109,29 @@ func TryRecoverOrphanedContainer(
 			continue
 		}
 
-		log.Info().
-			Str("container_id", string(c.ID())).
-			Str("container_name", c.Name()).
+		log.Debug().
+			Str("container", c.Name()).
+			Str("id", c.ID().ShortID()).
 			Msg("Attempting to recover orphaned Watchtower container")
 
 		err := client.StartContainerByID(ctx, c.ID())
 		if err != nil {
-			log.Debug().
+			log.Error().
 				Err(err).
-				Str("container_id", string(c.ID())).
-				Str("container_name", c.Name()).
-				Msg("Failed to start orphaned Watchtower container")
+				Str("container", c.Name()).
+				Str("id", c.ID().ShortID()).
+				Msg(logging.OrphanStartFailed)
 
 			continue
 		}
 
 		log.Info().
-			Str("container_id", string(c.ID())).
-			Str("container_name", c.Name()).
-			Msg("Successfully recovered orphaned Watchtower container")
+			Str("container", c.Name()).
+			Str("id", c.ID().ShortID()).
+			Msg(logging.OrphanRecovered)
 
-		return c, true
+		return
 	}
-
-	return nil, false
 }
 
 // DisableOldRestarts sets the restart policy of an old Watchtower container to

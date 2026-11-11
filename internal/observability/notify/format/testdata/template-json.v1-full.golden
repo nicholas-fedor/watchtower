@@ -344,13 +344,32 @@
     },
     {
       "data": {
+        "container": "watchtower",
+        "id": "f00f00f00f00"
+      },
+      "level": "info",
+      "message": "Recovered orphaned Watchtower container",
+      "time": "2026-10-07T12:00:36Z"
+    },
+    {
+      "data": {
+        "container": "watchtower",
+        "error": "failed to start container f00f00f00f00: context deadline exceeded",
+        "id": "f00f00f00f00"
+      },
+      "level": "warning",
+      "message": "Could not start orphaned Watchtower container",
+      "time": "2026-10-07T12:00:37Z"
+    },
+    {
+      "data": {
         "container": "app",
         "error": "failed to pull image: org/app:latest: registry rate limited: retry-after 347.256µs allowed 44000 per 1m0s",
         "image": "org/app:latest"
       },
-      "level": "info",
+      "level": "error",
       "message": "Registry rate limit retries exhausted. Container failed for this cycle",
-      "time": "2026-10-07T12:00:36Z"
+      "time": "2026-10-07T12:00:38Z"
     },
     {
       "data": {
@@ -358,100 +377,100 @@
         "error": "pre-update command failed: exit code 1",
         "image": "org/app:latest"
       },
-      "level": "warning",
+      "level": "debug",
       "message": "Could not update container",
-      "time": "2026-10-07T12:00:37Z"
+      "time": "2026-10-07T12:00:39Z"
     },
     {
       "data": {
         "container": "app",
         "depends_on": "missing-db"
       },
-      "level": "error",
-      "message": "Ignoring depends-on entry that names no container",
-      "time": "2026-10-07T12:00:38Z"
-    },
-    {
-      "data": {
-        "container": "app",
-        "id": "abcdef123456"
-      },
-      "level": "debug",
-      "message": "Skipping container update (self-dependency)",
-      "time": "2026-10-07T12:00:39Z"
-    },
-    {
-      "data": {
-        "container": "app",
-        "id": "abcdef123456"
-      },
       "level": "info",
-      "message": "Skipping container update (circular dependency)",
+      "message": "Ignoring depends-on entry that names no container",
       "time": "2026-10-07T12:00:40Z"
+    },
+    {
+      "data": {
+        "container": "app",
+        "id": "abcdef123456"
+      },
+      "level": "warning",
+      "message": "Skipping container update (self-dependency)",
+      "time": "2026-10-07T12:00:41Z"
+    },
+    {
+      "data": {
+        "container": "app",
+        "id": "abcdef123456"
+      },
+      "level": "error",
+      "message": "Skipping container update (circular dependency)",
+      "time": "2026-10-07T12:00:42Z"
     },
     {
       "data": {
         "error": "failed to detect current container ID: no container ID in cgroup file"
       },
-      "level": "warning",
-      "message": "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed",
-      "time": "2026-10-07T12:00:41Z"
-    },
-    {
-      "data": {
-        "error": "failed to inspect container: context deadline exceeded"
-      },
-      "level": "error",
-      "message": "Could not inspect Watchtower's own container. Self-updates are disabled",
-      "time": "2026-10-07T12:00:42Z"
-    },
-    {
-      "data": {
-        "error": "failed to inspect container: context deadline exceeded"
-      },
       "level": "debug",
-      "message": "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope",
+      "message": "Could not identify Watchtower's own container. Self-updates are disabled and old instances will not be removed",
       "time": "2026-10-07T12:00:43Z"
+    },
+    {
+      "data": {
+        "error": "failed to inspect container: context deadline exceeded"
+      },
+      "level": "info",
+      "message": "Could not inspect Watchtower's own container. Self-updates are disabled",
+      "time": "2026-10-07T12:00:44Z"
+    },
+    {
+      "data": {
+        "error": "failed to inspect container: context deadline exceeded"
+      },
+      "level": "warning",
+      "message": "Could not inspect Watchtower's own container to read its scope label. Exiting rather than running without a scope",
+      "time": "2026-10-07T12:00:45Z"
     },
     {
       "data": {
         "error": "failed to set restart policy: context deadline exceeded"
       },
-      "level": "info",
+      "level": "error",
       "message": "Could not disable Watchtower's restart policy. The runtime may start it again",
-      "time": "2026-10-07T12:00:44Z"
+      "time": "2026-10-07T12:00:46Z"
     },
     {
       "data": {
         "error": "invalid http-api-host: must be empty or a valid IP address (IPv4 or IPv6): \"not-an-ip\""
       },
-      "level": "warning",
+      "level": "debug",
       "message": "Failed to build run configuration",
-      "time": "2026-10-07T12:00:45Z"
+      "time": "2026-10-07T12:00:47Z"
     },
     {
       "data": {
         "error": "container has dependencies incompatible with rolling restarts"
       },
-      "level": "error",
+      "level": "info",
       "message": "Rolling restart compatibility validation failed",
-      "time": "2026-10-07T12:00:46Z"
+      "time": "2026-10-07T12:00:48Z"
     },
     {
       "data": {
         "error": "API token is empty or unset"
       },
-      "level": "debug",
+      "level": "warning",
       "message": "API setup failed",
-      "time": "2026-10-07T12:00:47Z"
+      "time": "2026-10-07T12:00:49Z"
     },
     {
       "data": {
         "error": "invalid schedule \"bad\": expected exactly 6 fields, found 1: [bad]"
       },
-      "level": "info",
+      "level": "error",
       "message": "Could not schedule updates",
-      "time": "2026-10-07T12:00:48Z"
+      "time": "2026-10-07T12:00:50Z"
     },
     {
       "data": {
@@ -460,9 +479,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.pre-update-timeout",
         "value": "-1"
       },
-      "level": "warning",
+      "level": "debug",
       "message": "Invalid pre-update timeout value, using default",
-      "time": "2026-10-07T12:00:49Z"
+      "time": "2026-10-07T12:00:51Z"
     },
     {
       "data": {
@@ -471,9 +490,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.post-update-timeout",
         "value": "soon"
       },
-      "level": "error",
+      "level": "info",
       "message": "Invalid post-update timeout value, using default",
-      "time": "2026-10-07T12:00:50Z"
+      "time": "2026-10-07T12:00:52Z"
     },
     {
       "data": {
@@ -482,9 +501,9 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.pre-check-timeout",
         "value": "1.5"
       },
-      "level": "debug",
+      "level": "warning",
       "message": "Invalid pre-check timeout value, using default",
-      "time": "2026-10-07T12:00:51Z"
+      "time": "2026-10-07T12:00:53Z"
     },
     {
       "data": {
@@ -493,25 +512,25 @@
         "label": "com.centurylinklabs.watchtower.lifecycle.post-check-timeout",
         "value": "-5"
       },
-      "level": "info",
+      "level": "error",
       "message": "Invalid post-check timeout value, using default",
-      "time": "2026-10-07T12:00:52Z"
+      "time": "2026-10-07T12:00:54Z"
     },
     {
       "data": {
         "error": "runtime error: invalid memory address or nil pointer dereference"
       },
-      "level": "warning",
+      "level": "debug",
       "message": "Update panicked",
-      "time": "2026-10-07T12:00:53Z"
+      "time": "2026-10-07T12:00:55Z"
     },
     {
       "data": {
         "error": "failed to list containers: context deadline exceeded"
       },
-      "level": "error",
+      "level": "info",
       "message": "Update execution failed",
-      "time": "2026-10-07T12:00:54Z"
+      "time": "2026-10-07T12:00:56Z"
     },
     {
       "data": {
@@ -519,9 +538,9 @@
         "error": "failed to pull image: org/app:latest: unauthorized: authentication required",
         "image": "org/app:latest"
       },
-      "level": "debug",
+      "level": "warning",
       "message": "Could not check container for updates",
-      "time": "2026-10-07T12:00:55Z"
+      "time": "2026-10-07T12:00:57Z"
     },
     {
       "data": {
@@ -529,9 +548,9 @@
         "error": "no image info available",
         "image": "org/app:latest"
       },
-      "level": "info",
+      "level": "error",
       "message": "Could not update container. Its configuration cannot be recreated",
-      "time": "2026-10-07T12:00:56Z"
+      "time": "2026-10-07T12:00:58Z"
     },
     {
       "data": {

@@ -71,6 +71,8 @@ var legacyTemplateMessages = []string{
 	logging.ScopedToContainers,
 	logging.StartingAPIServer,
 	logging.APIServerEnabled,
+	logging.OrphanRecovered,
+	logging.OrphanStartFailed,
 	logging.RateLimitRetriesExhausted,
 	logging.ContainerUpdateFailed,
 	logging.UnresolvedDependsOn,
@@ -219,6 +221,14 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{"container": "app", "id": "abcdef123456"}
 	case logging.ScopedToContainers:
 		return map[string]any{"scope": "production"}
+	case logging.OrphanRecovered:
+		return map[string]any{"container": "watchtower", "id": "f00f00f00f00"}
+	case logging.OrphanStartFailed:
+		return map[string]any{
+			"container": "watchtower",
+			"id":        "f00f00f00f00",
+			"error":     "failed to start container f00f00f00f00: context deadline exceeded",
+		}
 	case logging.SelfUnidentified:
 		return map[string]any{"error": "failed to detect current container ID: no container ID in cgroup file"}
 	case logging.SelfUninspected,
