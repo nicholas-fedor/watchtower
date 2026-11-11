@@ -58,8 +58,10 @@ func RetireOldInstance(
 	oldContainer *container.Container,
 	timeout time.Duration,
 ) {
+	log.Debug().Str("container", oldContainer.Name()).Msg("Retiring old Watchtower container")
+
 	recoverCtx, recoverCancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
-	TryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer)
+	tryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer)
 
 	recoverCancel()
 
@@ -69,7 +71,7 @@ func RetireOldInstance(
 	policyCancel()
 }
 
-// TryRecoverOrphanedContainer attempts to start an orphaned Watchtower container
+// tryRecoverOrphanedContainer attempts to start an orphaned Watchtower container
 // that is stuck in the Docker "created" state. This can happen when a self-update
 // creates a replacement container but fails to start it, leaving the old container
 // running and the new container never started.
@@ -85,16 +87,12 @@ func RetireOldInstance(
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker API operations.
 //   - currentContainer: The current running container to exclude from recovery.
-func TryRecoverOrphanedContainer(
+func tryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client RecoveryClient,
 	currentContainer *container.Container,
 ) {
-	if currentContainer == nil {
-		return
-	}
-
 	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
 	if err != nil {
 		log.Debug().

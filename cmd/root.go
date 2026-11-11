@@ -43,8 +43,8 @@ const (
 	// update operations.
 	//
 	// It bounds the Docker API call that sets the current Watchtower
-	// container's restart policy to "no", so a slow or unresponsive
-	// daemon cannot delay shutdown paths.
+	// container's restart policy to "no" and each step of retiring an old
+	// instance. A slow or unresponsive daemon then cannot delay shutdown paths.
 	restartPolicyTimeout = 5 * time.Second
 
 	// containerLookupTimeout is the maximum duration allowed for current
@@ -491,20 +491,13 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	currentWatchtowerContainerUnknown = currentWatchtowerContainerID == "" &&
 		containerClient.InContainer(processFs)
 
-	notifyErr := p.setUpNotifications()
-
-	// Check if this is an old Watchtower container that should not run continuously.
-	// A run-once instance ends after its run, so only a continuous one exits here.
-	// Notifications are set up first, so the recovery of an orphaned replacement
-	// reaches them. A notifier that cannot be created does not stop the recovery.
-	if !appCfg.Mode.RunOnce && container.IsSuperseded(currentWatchtowerContainer) {
-		p.stopInvalidWatchtowerRestart()
-
-		return &exitError{err: errSupersededInstance, msg: "", code: 0}
+	if !appCfg.Mode.HealthCheck && container.IsSuperseded(currentWatchtowerContainer) {
+		return p.retire()
 	}
 
-	if notifyErr != nil {
-		return notifyErr
+	err = p.setUpNotifications()
+	if err != nil {
+		return err
 	}
 
 	// Without the container's labels, a scope set only by its scope label is
@@ -531,6 +524,22 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
+// retire retires Watchtower's container after a self-update replaced it.
+//
+// Returns:
+//   - error: An [exitError] with exit code 0.
+func (p *process) retire() error {
+	// Notifications are set up first, so the recovery is notified.
+	err := p.setUpNotifications()
+	if err != nil {
+		p.log.Debug().Err(err).Msg("Could not set up notifications for the retirement of an old Watchtower container")
+	}
+
+	selfupdate.RetireOldInstance(p.log, context.Background(), client, currentWatchtowerContainer, restartPolicyTimeout)
+
+	return &exitError{err: errSupersededInstance, msg: "", code: 0}
+}
+
 // setUpNotifications creates the notifier from the notification settings and
 // hooks it to the process logger, so the lines logged after it reach
 // notifications.
@@ -555,24 +564,6 @@ func (p *process) setUpNotifications() error {
 	notifier.RegisterHook(p.log)
 
 	return nil
-}
-
-// stopInvalidWatchtowerRestart recovers any orphaned instance and sets the
-// restart policy of the current Watchtower container to "no", so the old
-// instance can exit. The invalid restart check that leads here requires a
-// current container.
-func (p *process) stopInvalidWatchtowerRestart() {
-	p.log.Debug().
-		Msg("Detected invalid restart of old Watchtower container, stopping Watchtower container now")
-
-	recoverCtx, recoverCancel := context.WithTimeout(
-		context.Background(),
-		restartPolicyTimeout,
-	)
-
-	selfupdate.TryRecoverOrphanedContainer(p.log, recoverCtx, client, currentWatchtowerContainer)
-	recoverCancel()
-	p.disableRestarts()
 }
 
 // run executes the main Watchtower logic based on parsed command-line flags.

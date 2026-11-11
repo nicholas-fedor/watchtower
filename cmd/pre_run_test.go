@@ -274,8 +274,12 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			wantError:   cerrdefs.ErrNotFound.Error(),
 		},
 		{
-			name:      "old instance continues in run-once mode",
-			args:      []string{"--run-once"},
+			// A health check probe can run in an old container during a
+			// self-update. It changes no containers, so it neither starts an
+			// orphaned replacement that the handoff is about to start nor
+			// disables the old container's restarts.
+			name:      "old instance continues in a health check",
+			args:      []string{"--health-check"},
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
 			setup: func(client *mockCmd.MockDockerClient) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
@@ -639,6 +643,21 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
 		},
 		{
+			// A run-once instance in an old container retires before its run.
+			helperCase:   "invalid-restart-of-old-instance-in-run-once",
+			wantExitCode: 0,
+			wantOutput:   []string{"SetRestartPolicy cccccccccccc no"},
+		},
+		{
+			// A failed policy update is logged at debug only. An old container
+			// that the runtime starts again exits as old once more, until the
+			// instance that replaced it removes it.
+			helperCase:     "invalid-restart-of-old-instance-restarts-kept",
+			wantExitCode:   0,
+			wantOutput:     []string{"SetRestartPolicy cccccccccccc no"},
+			unwantedOutput: []string{logging.RestartsKept, errRunTestDocker.Error()},
+		},
+		{
 			// An old instance that starts its orphaned replacement sends the
 			// recovery in one notification before it exits.
 			helperCase:   "orphan-recovery-by-old-instance",
@@ -800,12 +819,21 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
 		detection = selfDetection{}
-	case "invalid-restart-of-old-instance":
+	case "invalid-restart-of-old-instance", "invalid-restart-of-old-instance-in-run-once",
+		"invalid-restart-of-old-instance-restarts-kept":
 		old := selfContainer("/watchtower-old-cccccccccccc", "")
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 
+		switch helperCase {
+		case "invalid-restart-of-old-instance-in-run-once":
+			args = []string{"--run-once"}
+		case "invalid-restart-of-old-instance-restarts-kept":
+			policyErr = errRunTestDocker
+		default:
+		}
+
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{old}, nil).Maybe()
+		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{old}, nil).Once()
 	case "orphan-recovery-by-old-instance", "orphan-recovery-with-rejected-notification-url":
 		args = []string{"--log-level", "info", "--notification-url", "logger://"}
 		if helperCase == "orphan-recovery-with-rejected-notification-url" {
