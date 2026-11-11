@@ -144,6 +144,9 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 		switch field.Name {
 		case "Filter":
 			assert.False(t, fv.IsNil(), "Filter must be assigned")
+		case "Due":
+			// Set per run by the scheduler. Nil checks every filtered container.
+			assert.True(t, fv.IsNil(), "Due must not be assigned by UpdateParams")
 		default:
 			assert.False(t, fv.IsZero(), "field %s must be assigned by UpdateParams", field.Name)
 		}
