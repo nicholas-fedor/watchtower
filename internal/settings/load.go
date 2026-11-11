@@ -274,6 +274,8 @@ func loadSchedule(values *flagValues) schedule.Schedule {
 		IntervalSeconds: values.Int("interval"),
 		Spec:            values.String("schedule"),
 		UpdateOnStart:   values.Bool("update-on-start"),
+
+		ContainerSchedules: values.Bool("container-schedules"),
 	}
 }
 

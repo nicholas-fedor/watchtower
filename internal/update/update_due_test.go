@@ -146,6 +146,32 @@ func TestUpdate_Due(t *testing.T) {
 	})
 }
 
+// TestUpdate_Listed verifies that a session hands every container it lists to
+// Listed, managed or not, so its caller need not list them again.
+func TestUpdate_Listed(t *testing.T) {
+	t.Parallel()
+
+	client := mockUpdate.CreateFakeClient(&mockUpdate.TestData{
+		Containers: []*container.Container{
+			dueTestContainer("web", map[string]string{}),
+			dueTestContainer("other", map[string]string{}),
+		},
+	}, false, false)
+
+	var listed []string
+
+	_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{
+		Filter: dueNamed("web"),
+		Listed: func(containers []filters.FilterableContainer) {
+			for _, c := range containers {
+				listed = append(listed, c.Name())
+			}
+		},
+	}, ratelimit.New())
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"web", "other"}, listed)
+}
+
 // TestDueFilter_PostChecksFollowTheSessionStart verifies that the post-checks
 // run in the containers due when the session began: an updated container's
 // replacement matches by name even if its labels changed, and a container

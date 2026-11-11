@@ -14,31 +14,32 @@ import (
 
 // Params holds the settings that one update run applies to the containers it checks.
 type Params struct {
-	Filter              filters.Filter          // Container filter.
-	Due                 filters.Filter          // Containers checked for updates; nil checks every filtered container. The others restart only for a dependency.
-	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
-	CurrentContainerID  container.ContainerID   // ID of the current container being updated.
-	Git                 gitConfig.Defaults      // Credential-free Git association settings.
-	Registry            registryConfig.Registry // Settings for registry requests.
-	updateConfig.Policy                         // Settings that a container's labels can override.
-	Timeout             time.Duration           // Container stop timeout before a forced kill.
-	PullFailureDelay    time.Duration           // Delay after a failed self-update pull in run-once mode.
-	LifecycleUID        int                     // Default UID for lifecycle hooks.
-	LifecycleGID        int                     // Default GID for lifecycle hooks.
-	DiskSpaceMax        int64                   // Block session when Docker image usage reaches this many bytes. Zero disables the block gate.
-	DiskSpaceWarn       int64                   // Warn when Docker image usage reaches this many bytes. Zero disables the warning.
-	GitTimeout          time.Duration           // Git network timeout.
-	Cleanup             bool                    // Remove old images if true.
-	NoRestart           bool                    // Skip restarts if true.
-	ReviveStopped       bool                    // Start stopped containers after update if true.
-	LifecycleHooks      bool                    // Enable lifecycle hooks if true.
-	RollingRestart      bool                    // Use rolling restart if true.
-	RunOnce             bool                    // Run once mode if true.
-	UseComposeDependsOn bool                    // Enable Docker Compose depends_on label processing.
-	SkipSelfUpdate      bool                    // Skip Watchtower self-update if true.
-	EphemeralSelfUpdate bool                    // Use ephemeral container for self-update if true.
-	LabelEnable         bool                    // Require enable label for monitoring.
-	GitComposeStash     bool                    // Save and restore local Compose project files around checkout.
+	Filter              filters.Filter                      // Container filter.
+	Due                 filters.Filter                      // Containers checked for updates; nil checks every filtered container. The others restart only for a dependency.
+	Listed              func([]filters.FilterableContainer) // Called with every container the session lists; nil does nothing.
+	ComposeProjects     map[string]string                   // Compose project name to directory inside Watchtower.
+	CurrentContainerID  container.ContainerID               // ID of the current container being updated.
+	Git                 gitConfig.Defaults                  // Credential-free Git association settings.
+	Registry            registryConfig.Registry             // Settings for registry requests.
+	updateConfig.Policy                                     // Settings that a container's labels can override.
+	Timeout             time.Duration                       // Container stop timeout before a forced kill.
+	PullFailureDelay    time.Duration                       // Delay after a failed self-update pull in run-once mode.
+	LifecycleUID        int                                 // Default UID for lifecycle hooks.
+	LifecycleGID        int                                 // Default GID for lifecycle hooks.
+	DiskSpaceMax        int64                               // Block session when Docker image usage reaches this many bytes. Zero disables the block gate.
+	DiskSpaceWarn       int64                               // Warn when Docker image usage reaches this many bytes. Zero disables the warning.
+	GitTimeout          time.Duration                       // Git network timeout.
+	Cleanup             bool                                // Remove old images if true.
+	NoRestart           bool                                // Skip restarts if true.
+	ReviveStopped       bool                                // Start stopped containers after update if true.
+	LifecycleHooks      bool                                // Enable lifecycle hooks if true.
+	RollingRestart      bool                                // Use rolling restart if true.
+	RunOnce             bool                                // Run once mode if true.
+	UseComposeDependsOn bool                                // Enable Docker Compose depends_on label processing.
+	SkipSelfUpdate      bool                                // Skip Watchtower self-update if true.
+	EphemeralSelfUpdate bool                                // Use ephemeral container for self-update if true.
+	LabelEnable         bool                                // Require enable label for monitoring.
+	GitComposeStash     bool                                // Save and restore local Compose project files around checkout.
 }
 
 // detachedCallBudget is the time a detached Docker call gets beyond the

@@ -180,6 +180,8 @@ func update(
 		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
+	reportListed(config, allContainers)
+
 	// An old instance's container stops itself rather than run a session.
 	// This catches one restarted despite the startup check.
 	if old := currentOldInstance(allContainers, config.CurrentContainerID); old != nil {
@@ -1159,4 +1161,20 @@ func unmonitoredContainers(allContainers, monitored []*container.Container) []*c
 	}
 
 	return unmonitored
+}
+
+// reportListed hands the containers the session listed to
+// [updateParams.Params.Listed], when set, so its caller can read their labels
+// without listing them again.
+func reportListed(config updateParams.Params, listed []*container.Container) {
+	if config.Listed == nil {
+		return
+	}
+
+	found := make([]filters.FilterableContainer, 0, len(listed))
+	for _, c := range listed {
+		found = append(found, c)
+	}
+
+	config.Listed(found)
 }

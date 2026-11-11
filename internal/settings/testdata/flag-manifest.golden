@@ -95,6 +95,14 @@
   list-parse: none
   hidden: false
   deprecated: ""
+--container-schedules
+  shorthand: ""
+  kind: bool
+  default: false
+  env: WATCHTOWER_CONTAINER_SCHEDULES
+  list-parse: none
+  hidden: false
+  deprecated: ""
 --run-once
   shorthand: "R"
   kind: bool

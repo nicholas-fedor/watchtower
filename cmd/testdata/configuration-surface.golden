@@ -9,6 +9,7 @@ environment variables:
   REPO_USER
   WATCHTOWER_CLEANUP
   WATCHTOWER_COMPOSE_PROJECT
+  WATCHTOWER_CONTAINER_SCHEDULES
   WATCHTOWER_COOLDOWN_DELAY
   WATCHTOWER_COOLDOWN_PLATFORM_ARCH
   WATCHTOWER_COOLDOWN_PLATFORM_OS
@@ -150,5 +151,6 @@ container labels:
   com.centurylinklabs.watchtower.lifecycle.uid
   com.centurylinklabs.watchtower.monitor-only
   com.centurylinklabs.watchtower.no-pull
+  com.centurylinklabs.watchtower.schedule
   com.centurylinklabs.watchtower.scope
   com.centurylinklabs.watchtower.stop-signal
