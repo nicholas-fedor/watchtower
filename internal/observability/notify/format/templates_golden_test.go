@@ -93,6 +93,7 @@ var legacyTemplateMessages = []string{
 	logging.UpdatePanicked,
 	logging.UpdateFailed,
 	logging.UpdateCheckFailed,
+	logging.ImagePullFailed,
 	logging.ConfigNotRecreatable,
 }
 
@@ -260,7 +261,14 @@ func goldenEntryData(message string) map[string]any {
 		return map[string]any{
 			"container": "app",
 			"image":     "org/app:latest",
-			"error":     "failed to pull image: org/app:latest: unauthorized: authentication required",
+			"error":     "failed to inspect image: org/app:latest: Error response from daemon: No such image: org/app:latest",
+		}
+	case logging.ImagePullFailed:
+		return map[string]any{
+			"container": "app",
+			"image":     "org/app:latest",
+			"engine":    "Docker",
+			"error":     `Get "https://registry.example.com/v2/org/app/manifests/latest": net/http: timeout awaiting response headers`,
 		}
 	case logging.InvalidPreUpdateTimeout:
 		return map[string]any{

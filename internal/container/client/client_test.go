@@ -41,6 +41,8 @@ import (
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
+	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
@@ -1824,6 +1826,53 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 	newID, err := (&Client{log: newTestLogger(t), api: api}).StartContainer(t.Context(), source)
 	require.NoError(t, err)
 	assert.Equal(t, container.ContainerID(createdID), newID)
+}
+
+// TestClientIsContainerStale_NamesEngine verifies that a pull the engine
+// fails names the engine the client detects, Docker or Podman, so a
+// notification can say which one failed.
+//
+// Pulls share package-level slots per registry host, so the test does not run
+// in parallel.
+func TestClientIsContainerStale_NamesEngine(t *testing.T) {
+	tests := []struct {
+		engine string
+		marker string
+	}{
+		{engine: "Docker", marker: ".dockerenv"},
+		{engine: "Podman", marker: "run/.containerenv"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.engine, func(t *testing.T) {
+			// A registry that answers nothing, so the digest check falls back
+			// to a pull.
+			registry := httpstub.New(t)
+			registry.AllowUnhandledRequests()
+
+			image := registry.Addr() + "/app:latest"
+
+			api := newImageAPI(t)
+			api.EXPECT().ImagePull(mock.Anything, image, mock.Anything).
+				Return(nil, daemonError("pull refused")).Once()
+
+			client := &Client{
+				log:         newTestLogger(t),
+				api:         api,
+				Fs:          fstest.MapFS{tt.marker: {}},
+				Registry:    registryConfig.Registry{TLSSkip: true},
+				RateLimiter: ratelimit.New(),
+			}
+
+			c := modelfixture.Container(
+				containerfixture.WithImageName(image),
+				containerfixture.WithRepoDigests([]string{image + "@sha256:" + containerfixture.RandomID()}),
+			)
+
+			_, _, _, err := client.IsContainerStale(t.Context(), c, updateConfig.Policy{})
+			require.EqualError(t, err, tt.engine+" could not pull "+image+": Error response from daemon: pull refused")
+		})
+	}
 }
 
 // TestClientWrappers verifies that the client methods delegating to the image

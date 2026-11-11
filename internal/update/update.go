@@ -769,6 +769,7 @@ func recordStalenessCheck(
 		}
 
 		cooldownErr, isCooldownError := errors.AsType[*containerImage.CooldownError](result.checkErr)
+		pullErr, isPullError := errors.AsType[*containerImage.PullError](result.checkErr)
 
 		// Each failure gets at most one line that reaches notifications.
 		// A failure that its own check already logged in such a line gets
@@ -798,6 +799,15 @@ func recordStalenessCheck(
 				cooldownErr.Remaining,
 				cooldownErr.EligibleAt,
 			)
+		case isPullError:
+			// The line names the engine in a field and carries only the
+			// engine's error, since the container fields already name the
+			// image.
+			progress.AddSkipped(log, sourceContainer, result.checkErr, config)
+			clog.WithLevel(scanProblems.Level("failed pull", string(sourceContainer.ID()), pullErr.Err.Error())).
+				Str("engine", pullErr.Engine()).
+				Err(pullErr.Err).
+				Msg(logging.ImagePullFailed)
 		case errors.Is(result.checkErr, semver.ErrInvalidPolicy):
 			// A container's labels cannot change, so the container ID
 			// identifies an invalid label problem.

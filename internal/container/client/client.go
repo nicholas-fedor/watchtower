@@ -977,13 +977,18 @@ func (c *Client) RenameContainer(ctx context.Context, target *container.Containe
 
 // IsContainerStale checks if a container's image is outdated.
 //
+// A pull the engine fails returns a [containerImage.PullError] that names the
+// engine the client detects.
+//
 // Parameters:
+//   - ctx: Context for the check and the engine detection.
 //   - target: Container to check.
 //   - policy: Update policy for staleness check.
 //
 // Returns:
 //   - bool: True if stale, false otherwise.
 //   - container.ImageID: Latest image ID.
+//   - string: Latest registry manifest digest (empty if unavailable).
 //   - error: Non-nil if check fails, nil on success.
 func (c *Client) IsContainerStale(
 	ctx context.Context,
@@ -1000,6 +1005,10 @@ func (c *Client) IsContainerStale(
 		c.WarnOnHeadFailed,
 	)
 	if err != nil {
+		if pullErr, ok := errors.AsType[*containerImage.PullError](err); ok {
+			pullErr.Podman = c.getRuntime(ctx)
+		}
+
 		c.logger().Debug().
 			Err(err).
 			Str("container", target.Name()).
@@ -1302,12 +1311,11 @@ func (c *Client) logger() *zerolog.Logger {
 
 // getRuntime reports whether the container runtime is Podman.
 //
-// Callers ask only when the answer changes their behavior: the container list
-// filter when restarting containers are included, and CPU handling in the auto
-// CPU copy mode. A successful detection is cached to avoid repeated API calls
-// and filesystem checks. The runtime is assumed to not change during the
-// lifetime of the client. A failed or canceled detection is not cached, so the
-// next call tries again.
+// Callers ask only when the answer changes what the client does or reports. A
+// successful detection is cached to avoid repeated API calls and filesystem
+// checks. The runtime is assumed to not change during the lifetime of the
+// client. A failed or canceled detection is not cached, so the next call tries
+// again.
 //
 // Parameters:
 //   - ctx: Context for the detection's API call.
