@@ -9,8 +9,6 @@ import (
 
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
-
-	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 )
 
 // orphanedOrchestratorAge is how long an orchestrator must have been running
@@ -59,18 +57,12 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 	removed := 0
 
 	for _, c := range allContainers {
-		containerInfo := c.ContainerInfo()
-		if containerInfo == nil || containerInfo.Config == nil {
-			continue
-		}
-
-		// Check for the orchestrator label.
-		if containerInfo.Config.Labels[labels.EphemeralOrchestrator] != "true" {
+		if !c.IsEphemeralOrchestrator() {
 			continue
 		}
 
 		// Keep orchestrators that may still be running a self-update.
-		started, ok := orchestratorStartTime(containerInfo)
+		started, ok := orchestratorStartTime(c.ContainerInfo())
 		if !ok || time.Since(started) < orphanedOrchestratorAge {
 			clog.Debug().
 				Str("container", c.Name()).

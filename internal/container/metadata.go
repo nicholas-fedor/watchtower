@@ -546,6 +546,20 @@ func (c *Container) IsWatchtower() bool {
 	return containsWatchtowerLabel(info.Config.Labels)
 }
 
+// IsEphemeralOrchestrator reports whether the container is the ephemeral
+// orchestrator of a self-update.
+//
+// Returns:
+//   - bool: True when the ephemeral orchestrator label is "true".
+func (c *Container) IsEphemeralOrchestrator() bool {
+	info := c.ContainerInfo()
+	if info == nil || info.Config == nil {
+		return false
+	}
+
+	return info.Config.Labels[labels.EphemeralOrchestrator] == "true"
+}
+
 // StopSignal returns the custom stop signal from labels or HostConfig.
 //
 // Returns:
