@@ -208,15 +208,22 @@ Watchtower uses Shoutrrr's [SMTP service](https://shoutrrr.nickfedor.com/latest/
 
 === "Microsoft 365"
 
-    | Property    | Value         |
-    |-------------|---------------|
-    | Port        | `587`         |
-    | Encryption  | `ExplicitTLS` |
-    | UseStartTLS | `Yes`         |
+    | Property        | Value                     |
+    |-----------------|---------------------------|
+    | Port            | `587`                     |
+    | Authentication  | OAuth2 client credentials |
+    | RequireStartTLS | `Yes`                     |
 
     ```text
-    smtp://${USER}:${PASSWORD}@smtp.office365.com:587/?fromaddress=${FROM}&toaddresses=${TO}&encryption=ExplicitTLS&usestarttls=yes&timeout=30s
+    smtp://${USER}@smtp.office365.com:587/?fromaddress=${FROM}&toaddresses=${TO}&clientid=${CLIENT_ID}&clientsecret=${CLIENT_SECRET}&scopes=https%3A%2F%2Foutlook.office365.com%2F.default&tokenurl=https%3A%2F%2Flogin.microsoftonline.com%2F${TENANT_ID}%2Foauth2%2Fv2.0%2Ftoken&requirestarttls=yes&timeout=30s
     ```
+
+    !!! Note
+        Shoutrrr gets OAuth2 access tokens from Microsoft Entra ID with the client credentials grant. Follow Shoutrrr's [Microsoft 365 guide](https://shoutrrr.nickfedor.com/latest/guides/microsoft-365/){target="_blank" rel="noopener noreferrer"} to register the application and give it access to the sending mailbox.
+
+        `${USER}` is the sending mailbox, with its `@` written as `%40`. Percent-encode the client secret.
+
+        Exchange Online turns off Basic authentication for SMTP AUTH by default in existing tenants at the end of December 2026. A URL with a password, such as `smtp://${USER}:${PASSWORD}@smtp.office365.com:587/`, works only while the tenant allows it.
 
 === "Generic (SSL)"
 
@@ -252,6 +259,7 @@ Watchtower uses Shoutrrr's [SMTP service](https://shoutrrr.nickfedor.com/latest/
 - **Authentication**:
 
     * Use `&auth=Plain` for username and password authentication, including [Gmail App Passwords](https://support.google.com/accounts/answer/185833){target="_blank" rel="noopener noreferrer"}. This is the default when credentials are provided.
+    * Set `clientid`, `clientsecret`, `scopes` and `tokenurl` to have Shoutrrr get OAuth2 access tokens with the [client credentials grant](https://shoutrrr.nickfedor.com/latest/services/email/smtp/#oauth2_client_credentials){target="_blank" rel="noopener noreferrer"}, as the Microsoft 365 example does. Shoutrrr then uses OAuth2 without `&auth=OAuth2`.
     * Use `&auth=OAuth2` only for [SASL XOAUTH2](https://shoutrrr.nickfedor.com/latest/services/email/smtp/#authentication){target="_blank" rel="noopener noreferrer"} with a static access token in the password field. App Passwords are not OAuth2.
 
 - **Testing**:
