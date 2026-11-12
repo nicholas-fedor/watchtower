@@ -3603,7 +3603,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
 </ul>
 </li>
 <li>A carriage return directly before a newline is dropped. Any other carriage return becomes a newline, as do the Unicode line and paragraph separators.</li>
-<li>It replaces the user information of URLs, such as the <code>user:token</code> in <code>https://user:token@host</code>, with <code>xxxxx</code>. Query values such as <code>?token=…</code> stay as printed.</li>
+<li>It replaces the user information of URLs, such as the <code>dana:s3cret</code> in <code>https://dana:s3cret@git.example.com</code>, with <code>xxxxx</code>. Query values such as <code>?token=…</code> stay as printed.</li>
 <li>It puts the output on one line, joining its lines with <code>|</code>. No line of hook output can then pass for one of Watchtower's own notification lines.</li>
 <li>The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.</li>
 </ul>
@@ -4104,7 +4104,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
 <a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-39-6" name="__codelineno-39-6" href="#__codelineno-39-6"></a><span class="w">      </span><span class="nt">POSTGRES_DB</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">mydb</span>
 <a id="__codelineno-39-7" name="__codelineno-39-7" href="#__codelineno-39-7"></a><span class="w">      </span><span class="nt">POSTGRES_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user</span>
-<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="w">      </span><span class="nt">POSTGRES_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pass</span>
+<a id="__codelineno-39-8" name="__codelineno-39-8" href="#__codelineno-39-8"></a><span class="w">      </span><span class="nt">POSTGRES_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="s">'DB_PASSWORD'</span>
 <a id="__codelineno-39-9" name="__codelineno-39-9" href="#__codelineno-39-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-39-10" name="__codelineno-39-10" href="#__codelineno-39-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">postgres_data:/var/lib/postgresql/data</span>
 <a id="__codelineno-39-11" name="__codelineno-39-11" href="#__codelineno-39-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">./backup.sh:/usr/local/bin/backup.sh:ro</span>
@@ -4126,6 +4126,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
 <a id="__codelineno-39-27" name="__codelineno-39-27" href="#__codelineno-39-27"></a><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-39-28" name="__codelineno-39-28" href="#__codelineno-39-28"></a><span class="w">  </span><span class="nt">postgres_data</span><span class="p">:</span>
 </code></pre></div>
+<p>Replace <em><code>DB_PASSWORD</code></em> with a password for the database user, inside the single quotes so that YAML reads every character as part of it. Inside the quotes, write each <code>'</code> as <code>''</code>. Write each <code>$</code> as <code>$$</code>, because Compose reads a <code>$</code> as the start of a variable even inside quotes.</p>
 </div>
 </div>
 </div>
@@ -4302,7 +4303,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 10, 2026 08:10:09 UTC"><span class="timeago" datetime="2026-11-10T08:10:09+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 10, 2026 08:10:09 UTC">2026-11-10</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

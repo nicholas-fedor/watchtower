@@ -4600,7 +4600,7 @@ The hostname must match. A different hostname is ignored, and the token is not s
 </li>
 <li>
 <p>Push a commit to <code>main</code>.
-    On the next session the daemon builds <code>https://github.com/org/app.git#&lt;commit&gt;</code>, Watchtower recreates <code>app</code>, and the replacement receives the stamp.</p>
+    On the next session the daemon builds <code>https://github.com/org/app.git#COMMIT</code>, for the commit you pushed, shown here as <em><code>COMMIT</code></em>. Watchtower then recreates <code>app</code> and stamps the replacement.</p>
 <div class="highlight"><span class="filename">After the rebuild the stamp is that commit</span><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>docker<span class="w"> </span>inspect<span class="w"> </span>-f<span class="w"> </span><span class="s1">'{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}'</span><span class="w"> </span>app
 </code></pre></div>
 </li>
@@ -4811,7 +4811,7 @@ They warn about a value they cannot read.</p>
 <p>Watchtower compares the hosted tip to the first known running revision it can find, in this order:</p>
 <ol>
 <li>Stamp labels on the container (<code>com.centurylinklabs.watchtower.git-last-commit</code>, <code>com.centurylinklabs.watchtower.git-last-tag</code>)</li>
-<li>Image identity (<code>org.opencontainers.image.revision</code>, a semver <code>org.opencontainers.image.version</code>, or a <code>name:git-&lt;shortsha&gt;</code> tag)</li>
+<li>Image identity (<code>org.opencontainers.image.revision</code>, a semver <code>org.opencontainers.image.version</code>, or a Git build tag such as <code>app:git-0123456789ab</code>)</li>
 <li>The remote tip remembered earlier in this Watchtower process</li>
 </ol>
 <pre class="mermaid"><code>flowchart TD
@@ -4943,11 +4943,11 @@ Use a <a href="#local_path_context">local path context</a> when the compose file
 <h4 id="what_the_daemon_builds">What the Daemon Builds<a class="headerlink" href="#what_the_daemon_builds" title="Permanent link">&para;</a></h4>
 <p>On a stale session:</p>
 <ol>
-<li>Watchtower builds a Docker Git URL context: <code>https://git.example.com/org/app.git#&lt;commit&gt;</code>, or <code>#&lt;commit&gt;:&lt;subdir&gt;</code> when <code>com.centurylinklabs.watchtower.git-context</code> or the <a href="../../configuration/git-monitoring/#git_context">Git Context</a> configuration option is set.</li>
+<li>Watchtower builds a Docker Git URL context: <code>https://git.example.com/org/app.git#COMMIT</code>, or <code>#COMMIT:SUBDIRECTORY</code> when <code>com.centurylinklabs.watchtower.git-context</code> or the <a href="../../configuration/git-monitoring/#git_context">Git Context</a> configuration option is set. Here <em><code>COMMIT</code></em> is the commit to build and <em><code>SUBDIRECTORY</code></em> is the build context directory.</li>
 <li>The Docker daemon (BuildKit) performs a shallow clone of that commit.
     Watchtower does not clone the tree first.</li>
 <li>The Dockerfile is <code>com.centurylinklabs.watchtower.git-dockerfile</code>, or the <a href="../../configuration/git-monitoring/#git_dockerfile">Git Dockerfile</a> configuration option, defaulting to <code>Dockerfile</code>.</li>
-<li>The image is tagged <code>name:git-&lt;shortsha&gt;</code> (12 hex characters) and the original image name is retagged.</li>
+<li>Watchtower tags the image with its original name and with <code>NAME:git-SHORT_SHA</code>, where <em><code>SHORT_SHA</code></em> is the commit's first 12 hex characters.</li>
 <li>Watchtower recreates the container from the running inspect config.</li>
 <li>Stamp labels are written onto the new container.</li>
 </ol>
@@ -5091,8 +5091,8 @@ Setting <a href="../../configuration/git-monitoring/#git_enable">Git Enable</a> 
 <p>Those releases also wrote the default ref, semver policy, Dockerfile, and context onto containers rebuilt through Compose.
 A container rebuilt that way treats them as its own labels.
 A later change to <a href="../../configuration/git-monitoring/#git_dockerfile">Git Dockerfile</a> or <a href="../../configuration/git-monitoring/#git_context">Git Context</a> does not reach it.
-To check a container, run <code>docker inspect -f '{{json .Config.Labels}}' &lt;container&gt;</code> and look for <code>com.centurylinklabs.watchtower.git-dockerfile</code> and <code>com.centurylinklabs.watchtower.git-context</code>.
-If you did not set them, recreate the container with <code>docker compose up -d --force-recreate &lt;service&gt;</code> so it starts from the labels in your Compose file.</p>
+To check a container, run <code>docker inspect -f '{{json .Config.Labels}}' CONTAINER</code> and look for <code>com.centurylinklabs.watchtower.git-dockerfile</code> and <code>com.centurylinklabs.watchtower.git-context</code>. Replace <em><code>CONTAINER</code></em> with the container name.
+If you did not set them, recreate the container with <code>docker compose up -d --force-recreate SERVICE</code> so it starts from the labels in your Compose file. Replace <em><code>SERVICE</code></em> with the container's Compose service.</p>
 </div>
 <h3 id="where_settings_come_from">Where Settings Come From<a class="headerlink" href="#where_settings_come_from" title="Permanent link">&para;</a></h3>
 <p>Watchtower reads the repository URL, ref, and semver policy from the container's Watchtower labels when <code>com.centurylinklabs.watchtower.git-repo</code> is set.</p>
@@ -5386,7 +5386,7 @@ An HTTPS origin uses the token, or the username and password.</p>
 <h3 id="docker_secrets">Docker Secrets<a class="headerlink" href="#docker_secrets" title="Permanent link">&para;</a></h3>
 <div class="admonition important">
 <p class="admonition-title">Prefer Docker Secrets for tokens and passwords</p>
-<p>Point the <a href="../../configuration/git-monitoring/#git_auth_token">Git Auth Token</a> and <a href="../../configuration/git-monitoring/#git_password">Git Password</a> configuration options at a mounted file, typically <code>/run/secrets/&lt;name&gt;</code>.
+<p>Point the <a href="../../configuration/git-monitoring/#git_auth_token">Git Auth Token</a> and <a href="../../configuration/git-monitoring/#git_password">Git Password</a> configuration options at a mounted file, typically <code>/run/secrets/SECRET_NAME</code>, where <em><code>SECRET_NAME</code></em> is the name of the Docker secret.
 Watchtower reads the file contents at startup.
 Do not put the value in the compose file or in the Watchtower process environment.</p>
 </div>
@@ -5703,7 +5703,7 @@ The first session after Watchtower restarts builds the current commit once more.
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 9, 2026 19:43:22 UTC"><span class="timeago" datetime="2026-11-09T19:43:22+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 9, 2026 19:43:22 UTC">2026-11-09</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

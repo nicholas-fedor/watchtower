@@ -2968,7 +2968,7 @@ This is typically done using <a href="https://github.com/bbernhard/signal-cli-re
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signal://localhost:8080/+1234567890/+0987654321</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">signal://localhost:8080/+18005550100/+18005550101</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
@@ -2978,19 +2978,20 @@ This is typically done using <a href="https://github.com/bbernhard/signal-cli-re
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"signal://localhost:8080/+1234567890/+0987654321"</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"signal://localhost:8080/+18005550100/+18005550101"</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>signal://localhost:8080/+1234567890/+0987654321<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span>signal://localhost:8080/+18005550100/+18005550101<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>The examples send from <code>+18005550100</code> to <code>+18005550101</code> through a Signal API server on <code>localhost:8080</code>. Replace the first number with your registered Signal number and the second with the number to send to. <a href="#shoutrrrs_signal_url_format">Shoutrrr's Signal URL Format</a> describes each part.</p>
 <h2 id="setting_up_a_signal_api_server">Setting up a Signal API Server<a class="headerlink" href="#setting_up_a_signal_api_server" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>Phone Number</strong>: A dedicated phone number registered with Signal</li>
@@ -3000,16 +3001,16 @@ This is typically done using <a href="https://github.com/bbernhard/signal-cli-re
 </ol>
 <p>The server must be able to receive SMS verification codes during initial setup and maintain a persistent connection to Signal's servers.</p>
 <h2 id="shoutrrrs_signal_url_format">Shoutrrr's Signal URL Format<a class="headerlink" href="#shoutrrrs_signal_url_format" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>signal://[user:password@]host:port/source_phone/recipient1/recipient2
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>signal://[USERNAME:PASSWORD@]HOST[:PORT]/SOURCE_PHONE/RECIPIENT[/RECIPIENT...]
 </code></pre></div>
 <h3 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>host</code>: Signal API server hostname or IP address</li>
-<li><code>port</code>: Signal API server port (default: 8080)</li>
-<li><code>user</code>: Username for HTTP Basic Authentication (optional)</li>
-<li><code>password</code>: Password for HTTP Basic Authentication (optional)</li>
-<li><code>source_phone</code>: Your Signal phone number with country code (e.g., +1234567890)</li>
-<li><code>recipient1, recipient2</code>: Phone numbers or group IDs to send to</li>
+<li><em><code>USERNAME</code></em>: the user name for HTTP Basic Authentication (optional)</li>
+<li><em><code>PASSWORD</code></em>: the password for HTTP Basic Authentication (optional)</li>
+<li><em><code>HOST</code></em>: the host name or IP address of the Signal API server</li>
+<li><em><code>PORT</code></em>: the port of the Signal API server (default: 8080)</li>
+<li><em><code>SOURCE_PHONE</code></em>: the Signal phone number that sends, with its country code, such as <code>+18005550100</code></li>
+<li><em><code>RECIPIENT</code></em>: a phone number, or a group ID written as <code>group.GROUP_ID</code>, to send to</li>
 </ul>
 <h3 id="tls_configuration">TLS Configuration<a class="headerlink" href="#tls_configuration" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3018,32 +3019,33 @@ This is typically done using <a href="https://github.com/bbernhard/signal-cli-re
 </ul>
 <h3 id="attachments">Attachments<a class="headerlink" href="#attachments" title="Permanent link">&para;</a></h3>
 <p>The Signal service supports sending base64-encoded attachments:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span><span class="s2">"signal://localhost:8080/+1234567890/+0987654321"</span><span class="w"> </span><span class="se">\</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span><span class="s2">"signal://localhost:8080/+18005550100/+18005550101"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span><span class="s2">"Message with attachment"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--attachments<span class="w"> </span><span class="s2">"base64data1,base64data2"</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>--attachments<span class="w"> </span><span class="s2">"ATTACHMENT_1,ATTACHMENT_2"</span>
 </code></pre></div>
+<p>Replace <em><code>ATTACHMENT_1</code></em> and <em><code>ATTACHMENT_2</code></em> with the base64-encoded files to attach.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Attachments must be provided as base64-encoded data. The API server handles MIME type detection and file handling.</p>
 </div>
 <h3 id="examples_1">Examples<a class="headerlink" href="#examples_1" title="Permanent link">&para;</a></h3>
 <p>Send to a single phone number:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>signal://localhost:8080/+1234567890/+0987654321
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>signal://localhost:8080/+18005550100/+18005550101
 </code></pre></div>
 <p>Send to multiple recipients:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>signal://localhost:8080/+1234567890/+0987654321/+1123456789/group.testgroup
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>signal://localhost:8080/+18005550100/+18005550101/+18005550102/group.GROUP_ID
 </code></pre></div>
-<p>Send to a group:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>signal://localhost:8080/+1234567890/group.abcdefghijklmnop=
+<p>Send to a group, replacing <em><code>GROUP_ID</code></em> with the group's ID:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>signal://localhost:8080/+18005550100/group.GROUP_ID
 </code></pre></div>
-<p>With authentication:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>signal://user:password@localhost:8080/+1234567890/+0987654321
+<p>With authentication, replacing <em><code>USERNAME</code></em> and <em><code>PASSWORD</code></em> with the HTTP Basic Authentication credentials:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>signal://USERNAME:PASSWORD@localhost:8080/+18005550100/+18005550101
 </code></pre></div>
-<p>With API token (Bearer auth):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>signal://localhost:8080/+1234567890/+0987654321?token=YOUR_API_TOKEN
+<p>With API token (Bearer auth), replacing <em><code>API_TOKEN</code></em> with the token:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>signal://localhost:8080/+18005550100/+18005550101?token=API_TOKEN
 </code></pre></div>
 <p>Using HTTP instead of HTTPS:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>signal://localhost:8080/+1234567890/+0987654321?disabletls=yes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>signal://localhost:8080/+18005550100/+18005550101?disabletls=yes
 </code></pre></div>
 
 
@@ -3067,7 +3069,7 @@ This is typically done using <a href="https://github.com/bbernhard/signal-cli-re
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="July 14, 2026 14:36:11 UTC"><span class="timeago" datetime="2026-07-14T14:36:11+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="July 14, 2026 14:36:11 UTC">2026-07-14</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

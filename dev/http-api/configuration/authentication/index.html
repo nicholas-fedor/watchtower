@@ -2944,15 +2944,16 @@
 <li><a href="../../endpoints/status/"><code>/v1/status</code></a></li>
 <li><a href="../../endpoints/update/"><code>/v1/update</code></a></li>
 </ul>
-<p>Clients send the token in the <code>Authorization</code> header, usually as <code>Authorization: Bearer &lt;token&gt;</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer your-secure-token"</span><span class="w"> </span>http://localhost:8080/v1/metrics
+<p>Clients send the token in the <code>Authorization</code> header, usually as <code>Authorization: Bearer API_TOKEN</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer API_TOKEN"</span><span class="w"> </span>http://localhost:8080/v1/metrics
 </code></pre></div>
-<p>The header may also carry the token on its own, as <code>Authorization: &lt;token&gt;</code>. Swagger UI sends the token this way when you authorize with it.</p>
+<p>Replace <em><code>API_TOKEN</code></em> with your HTTP API token.</p>
+<p>The header may also carry the token on its own, as <code>Authorization: API_TOKEN</code>. Swagger UI sends the token this way when you authorize with it.</p>
 <p>Invalid or missing tokens result in <code>401 Unauthorized</code>.
 Failed authentication attempts are logged with the client IP address.</p>
 <p>A cookie-based fallback is also supported for clients that cannot set custom headers.
 The token may be provided in a cookie named <code>access_token</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="err">Cookie: access_token=your-secure-token</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="err">Cookie: access_token=API_TOKEN</span>
 </code></pre></div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -2975,13 +2976,14 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 <li><code>access_token</code> query parameter (required for browser <code>EventSource</code>, which cannot set custom headers)</li>
 </ul>
 <p>Example using the header:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer your-events-token"</span><span class="w"> </span>http://localhost:8080/v1/events
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer EVENTS_TOKEN"</span><span class="w"> </span>http://localhost:8080/v1/events
 </code></pre></div>
+<p>Replace <em><code>EVENTS_TOKEN</code></em> with your events token.</p>
 <p>Example using the query parameter:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-N<span class="w"> </span><span class="s2">"http://localhost:8080/v1/events?access_token=your-events-token"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>curl<span class="w"> </span>-N<span class="w"> </span>-G<span class="w"> </span>--data-urlencode<span class="w"> </span><span class="s2">"access_token=EVENTS_TOKEN"</span><span class="w"> </span><span class="s2">"http://localhost:8080/v1/events"</span>
 </code></pre></div>
 <p>In JavaScript (for browsers):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">eventSource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">EventSource</span><span class="p">(</span><span class="s1">'http://localhost:8080/v1/events?access_token=your-events-token'</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kd">const</span><span class="w"> </span><span class="nx">eventSource</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">EventSource</span><span class="p">(</span><span class="s1">'http://localhost:8080/v1/events?access_token='</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="nb">encodeURIComponent</span><span class="p">(</span><span class="s1">'EVENTS_TOKEN'</span><span class="p">));</span>
 </code></pre></div>
 <div class="admonition important">
 <p class="admonition-title">Important</p>
@@ -2996,7 +2998,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker Secrets</label><label for="__tabbed_2_2">Environment  Variables</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
-<p>Use Compose secrets to mount the token file inside the container and point the environment variable at the mounted path (commonly <code>/run/secrets/&lt;name&gt;</code>).</p>
+<p>Use Compose secrets to mount the token file inside the container and point the environment variable at the mounted path (commonly <code>/run/secrets/SECRET_NAME</code>, where <em><code>SECRET_NAME</code></em> is the name of the Compose secret).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">services</span><span class="p">:</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
@@ -3024,7 +3026,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=your-secure-token</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_TOKEN=API_TOKEN</span>
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">            </span><span class="c1"># Enable an endpoint that requires authentication</span>
 <a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WATCHTOWER_HTTP_API_ENDPOINTS=metrics</span>
 <a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">        </span><span class="nt">ports</span><span class="p">:</span>
@@ -3042,7 +3044,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_HTTP_API_TOKEN</span><span class="o">=</span>your-secure-token<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_HTTP_API_TOKEN</span><span class="o">=</span>API_TOKEN<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_HTTP_API_ENDPOINTS</span><span class="o">=</span>metrics<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">    </span>-p<span class="w"> </span><span class="m">8080</span>:8080<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
@@ -3056,7 +3058,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">    </span>-p<span class="w"> </span><span class="m">8080</span>:8080<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">    </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span>--http-api-token<span class="o">=</span>your-secure-token<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">    </span>--http-api-token<span class="o">=</span>API_TOKEN<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">    </span>--http-api-endpoints<span class="o">=</span>metrics
 </code></pre></div>
 </div>
@@ -3065,6 +3067,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
 </div>
 </div>
 </div>
+<p>Replace <em><code>API_TOKEN</code></em> with your HTTP API token.</p>
 <h2 id="unauthenticated_endpoints">Unauthenticated Endpoints<a class="headerlink" href="#unauthenticated_endpoints" title="Permanent link">&para;</a></h2>
 <p>The following endpoints do not require authentication when enabled:</p>
 <ul>
@@ -3112,7 +3115,7 @@ Prefer header-based <code>Authorization: Bearer</code> auth.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 29, 2026 23:08:54 UTC"><span class="timeago" datetime="2026-10-29T23:08:54+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 29, 2026 23:08:54 UTC">2026-10-29</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

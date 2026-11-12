@@ -2883,7 +2883,7 @@
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp://user:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
@@ -2892,7 +2892,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"smtp://user:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>nickfedor/watchtower
 </code></pre></div>
 </div>
@@ -2901,11 +2901,17 @@
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>--notification-url<span class="w"> </span><span class="s2">"smtp://user:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com"</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>--notification-url<span class="w"> </span><span class="s2">"smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com"</span>
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>USERNAME</code></em>: the user name for your SMTP server, with an <code>@</code> in it written as <code>%40</code></li>
+<li><em><code>PASSWORD</code></em>: the password for your SMTP server, percent-encoded</li>
+</ul>
+<p>Use your SMTP server's host name in place of <code>smtp.example.com</code> and your own addresses in place of <code>sender@example.com</code> and <code>recipient@example.com</code>.</p>
 <details class="warning">
 <summary>The following legacy SMTP configuration examples are deprecated and will be removed with the release of Watchtower v2.</summary>
 <div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker Compose</label><label for="__tabbed_2_2">Docker CLI</label></div>
@@ -2923,8 +2929,8 @@
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
 <a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">USERNAME</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="s">'PASSWORD'</span>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">    </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 <a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
@@ -2965,8 +2971,8 @@
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>USERNAME<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span><span class="s1">'PASSWORD'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>nickfedor/watchtower
 </code></pre></div>
@@ -2981,8 +2987,8 @@
 <a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>--notification-email-to<span class="w"> </span>recipient@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>--notification-email-server<span class="w"> </span>smtp.example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>--notification-email-server-port<span class="w"> </span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>--notification-email-server-user<span class="w"> </span>user<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>--notification-email-server-password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>--notification-email-server-user<span class="w"> </span>USERNAME<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>--notification-email-server-password<span class="w"> </span><span class="s1">'PASSWORD'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>--notification-email-delay<span class="w"> </span><span class="m">10</span>
 </code></pre></div>
 </div>
@@ -3018,6 +3024,12 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </div>
 </div>
 </div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>USERNAME</code></em>: the user name for your SMTP server</li>
+<li><em><code>PASSWORD</code></em>: the password for your SMTP server, inside the single quotes. In a Compose file, write each <code>'</code> in it as <code>''</code> and each <code>$</code> as <code>$$</code>. In a shell command, write each <code>'</code> as <code>'\''</code>.</li>
+</ul>
+<p>Use your SMTP server's or relay's host name in place of <code>smtp.example.com</code> or <code>relay.example.com</code> and your own addresses in place of <code>sender@example.com</code> and <code>recipient@example.com</code>.</p>
 </details>
 <h2 id="common_smtp_configurations">Common SMTP Configurations<a class="headerlink" href="#common_smtp_configurations" title="Permanent link">&para;</a></h2>
 <div class="tabbed-set tabbed-alternate" data-tabs="5:5"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><input id="__tabbed_5_3" name="__tabbed_5" type="radio" /><input id="__tabbed_5_4" name="__tabbed_5" type="radio" /><input id="__tabbed_5_5" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Gmail</label><label for="__tabbed_5_2">AWS SES</label><label for="__tabbed_5_3">Microsoft 365</label><label for="__tabbed_5_4">Generic (SSL)</label><label for="__tabbed_5_5">Generic (Plain)</label></div>
@@ -3045,13 +3057,18 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>smtp://user%40gmail.com:${PASSWORD}@smtp.gmail.com:587/?fromaddress=user%40gmail.com&amp;toaddresses=user%40gmail.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>smtp://GMAIL_USER%40gmail.com:APP_PASSWORD@smtp.gmail.com:587/?fromaddress=GMAIL_USER%40gmail.com&amp;toaddresses=TO_ADDRESS&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>GMAIL_USER</code></em>: the part of your Gmail address before the <code>@</code></li>
+<li><em><code>APP_PASSWORD</code></em>: your Gmail password, or an App Password</li>
+<li><em><code>TO_ADDRESS</code></em>: the address that receives the notifications, with its <code>@</code> written as <code>%40</code></li>
+</ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>For Gmail, use an <a href="https://support.google.com/accounts/answer/185833" rel="noopener noreferrer" target="_blank">App Password</a> if two-factor authentication is enabled.</p>
 <p>Omit spaces from the App Password. Google displays the 16-character passcode in groups of four, but those spaces are not part of the password.</p>
-<p>URL-encode <code>@</code> in the username as <code>%40</code>.</p>
 <p>Do not use <code>&amp;auth=OAuth2</code> with an App Password. That method expects a SASL XOAUTH2 access token in the password field.</p>
 </div>
 </div>
@@ -3078,8 +3095,16 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>smtp://${USER}:${PASSWORD}@email-smtp.us-east-1.amazonaws.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>smtp://SMTP_USERNAME:SMTP_PASSWORD@email-smtp.REGION.amazonaws.com:587/?fromaddress=FROM_ADDRESS&amp;toaddresses=TO_ADDRESS&amp;encryption=ExplicitTLS&amp;usestarttls=yes&amp;timeout=30s
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>SMTP_USERNAME</code></em>: the user name of your Amazon SES SMTP credentials</li>
+<li><em><code>SMTP_PASSWORD</code></em>: the password of your Amazon SES SMTP credentials, percent-encoded</li>
+<li><em><code>REGION</code></em>: the AWS Region of your Amazon SES endpoint, such as <code>us-east-1</code></li>
+<li><em><code>FROM_ADDRESS</code></em>: a verified sender address, with its <code>@</code> written as <code>%40</code></li>
+<li><em><code>TO_ADDRESS</code></em>: the address that receives the notifications, with its <code>@</code> written as <code>%40</code></li>
+</ul>
 </div>
 <div class="tabbed-block">
 <table>
@@ -3104,13 +3129,21 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>smtp://${USER}@smtp.office365.com:587/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;clientid=${CLIENT_ID}&amp;clientsecret=${CLIENT_SECRET}&amp;scopes=https%3A%2F%2Foutlook.office365.com%2F.default&amp;tokenurl=https%3A%2F%2Flogin.microsoftonline.com%2F${TENANT_ID}%2Foauth2%2Fv2.0%2Ftoken&amp;requirestarttls=yes&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>smtp://MAILBOX@smtp.office365.com:587/?fromaddress=FROM_ADDRESS&amp;toaddresses=TO_ADDRESS&amp;clientid=CLIENT_ID&amp;clientsecret=CLIENT_SECRET&amp;scopes=https%3A%2F%2Foutlook.office365.com%2F.default&amp;tokenurl=https%3A%2F%2Flogin.microsoftonline.com%2FTENANT_ID%2Foauth2%2Fv2.0%2Ftoken&amp;requirestarttls=yes&amp;timeout=30s
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>MAILBOX</code></em>: the address of the sending mailbox, with its <code>@</code> written as <code>%40</code></li>
+<li><em><code>FROM_ADDRESS</code></em>: the sender address, with its <code>@</code> written as <code>%40</code></li>
+<li><em><code>TO_ADDRESS</code></em>: the address that receives the notifications, with its <code>@</code> written as <code>%40</code></li>
+<li><em><code>CLIENT_ID</code></em>: the application (client) ID of your app registration</li>
+<li><em><code>CLIENT_SECRET</code></em>: the client secret of your app registration, percent-encoded</li>
+<li><em><code>TENANT_ID</code></em>: your Microsoft Entra tenant ID</li>
+</ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Shoutrrr gets OAuth2 access tokens from Microsoft Entra ID with the client credentials grant. Follow Shoutrrr's <a href="https://shoutrrr.nickfedor.com/latest/guides/microsoft-365/" rel="noopener noreferrer" target="_blank">Microsoft 365 guide</a> to register the application and give it access to the sending mailbox.</p>
-<p><code>${USER}</code> is the sending mailbox, with its <code>@</code> written as <code>%40</code>. Percent-encode the client secret.</p>
-<p>Exchange Online turns off Basic authentication for SMTP AUTH by default in existing tenants at the end of December 2026. A URL with a password, such as <code>smtp://${USER}:${PASSWORD}@smtp.office365.com:587/</code>, works only while the tenant allows it.</p>
+<p>Exchange Online turns off Basic authentication for SMTP AUTH by default in existing tenants at the end of December 2026. A URL with a password, such as <code>smtp://MAILBOX:PASSWORD@smtp.office365.com:587/</code>, works only while the tenant allows it.</p>
 </div>
 </div>
 <div class="tabbed-block">
@@ -3136,8 +3169,15 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>smtp://${USER}:${PASSWORD}@smtp.example.com:465/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=ImplicitTLS&amp;usestarttls=no&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>smtp://USERNAME:PASSWORD@smtp.example.com:465/?fromaddress=FROM_ADDRESS&amp;toaddresses=TO_ADDRESS&amp;encryption=ImplicitTLS&amp;usestarttls=no&amp;timeout=30s
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>USERNAME</code></em>: the user name for your SMTP server, with an <code>@</code> in it written as <code>%40</code></li>
+<li><em><code>PASSWORD</code></em>: the password for your SMTP server, percent-encoded</li>
+<li><em><code>FROM_ADDRESS</code></em>: the sender address, with its <code>@</code> written as <code>%40</code></li>
+<li><em><code>TO_ADDRESS</code></em>: the address that receives the notifications, with its <code>@</code> written as <code>%40</code></li>
+</ul>
 </div>
 <div class="tabbed-block">
 <table>
@@ -3162,8 +3202,15 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>smtp://${USER}:${PASSWORD}@smtp.example.com:25/?fromaddress=${FROM}&amp;toaddresses=${TO}&amp;encryption=None&amp;usestarttls=no&amp;timeout=30s
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>smtp://USERNAME:PASSWORD@smtp.example.com:25/?fromaddress=FROM_ADDRESS&amp;toaddresses=TO_ADDRESS&amp;encryption=None&amp;usestarttls=no&amp;timeout=30s
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>USERNAME</code></em>: the user name for your SMTP server, with an <code>@</code> in it written as <code>%40</code></li>
+<li><em><code>PASSWORD</code></em>: the password for your SMTP server, percent-encoded</li>
+<li><em><code>FROM_ADDRESS</code></em>: the sender address, with its <code>@</code> written as <code>%40</code></li>
+<li><em><code>TO_ADDRESS</code></em>: the address that receives the notifications, with its <code>@</code> written as <code>%40</code></li>
+</ul>
 </div>
 </div>
 </div>
@@ -3189,15 +3236,16 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
 <ul>
 <li>Install Shoutrrr using one of the various <a href="https://shoutrrr.nickfedor.com/installation/" rel="noopener noreferrer" target="_blank">installation methods</a>.</li>
 <li>Test your URL with the Shoutrrr CLI:
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span>-u<span class="w"> </span>&lt;URL&gt;<span class="w"> </span>-m<span class="w"> </span><span class="s2">"Test message"</span>
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>shoutrrr<span class="w"> </span>send<span class="w"> </span>-u<span class="w"> </span><span class="s2">"NOTIFICATION_URL"</span><span class="w"> </span>-m<span class="w"> </span><span class="s2">"Test message"</span>
 </code></pre></div></li>
 </ul>
+<p>Replace <em><code>NOTIFICATION_URL</code></em> with the <code>smtp://</code> URL to test.</p>
 </li>
 <li>
 <p><strong>Proxy Issues</strong>:</p>
 <ul>
-<li>If using a Docker proxy (e.g., <code>tcp://dockerproxy:2375</code>), ensure it allows outbound connections to <code>${SMTP_HOST}:${SMTP_PORT}</code>.</li>
-<li>Test connectivity with <code>telnet ${SMTP_HOST} ${SMTP_PORT}</code> inside the container.</li>
+<li>If using a Docker proxy (e.g., <code>tcp://dockerproxy:2375</code>), ensure it allows outbound connections to your SMTP server's host and port.</li>
+<li>Test connectivity with <code>telnet SMTP_HOST SMTP_PORT</code> inside the container. Replace <em><code>SMTP_HOST</code></em> with your SMTP server's host name and <em><code>SMTP_PORT</code></em> with its port.</li>
 </ul>
 </li>
 </ul>
@@ -3223,7 +3271,7 @@ If you don't or you want to bring up Watchtower with your own simple SMTP relay,
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 09:03:50 UTC"><span class="timeago" datetime="2026-11-12T09:03:50+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 09:03:50 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

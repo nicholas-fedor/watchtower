@@ -3533,11 +3533,17 @@ If you rely on cooldown as a supply-chain defense, ensure that no-pull mode is n
     class A,B,D,E,F,G,H step
     class C decision</code></pre>
 <ol>
-<li><strong>Manifest fetch</strong>: Watchtower sends a <code>GET</code> request to <code>/v2/&lt;image&gt;/manifests/&lt;tag&gt;</code> with <code>Accept</code> headers covering both OCI and Docker manifest formats.</li>
+<li><strong>Manifest fetch</strong>: Watchtower sends a <code>GET</code> request to <code>/v2/IMAGE/manifests/TAG</code> with <code>Accept</code> headers covering both OCI and Docker manifest formats.</li>
 <li><strong>Platform selection</strong>: For multi-platform images (manifest lists or OCI indexes), Watchtower selects the manifest matching the runtime OS and architecture. Cross-platform monitoring can be configured via <code>WATCHTOWER_COOLDOWN_PLATFORM_OS</code> and <code>WATCHTOWER_COOLDOWN_PLATFORM_ARCH</code>. For ARM images with multiple variants (e.g., <code>v7</code>, <code>v8</code>), specify <code>WATCHTOWER_COOLDOWN_PLATFORM_VARIANT</code> to disambiguate.</li>
-<li><strong>Config blob fetch</strong>: The manifest's config digest is used to fetch <code>/v2/&lt;image&gt;/blobs/&lt;digest&gt;</code>. This is a small JSON document (typically &lt;15 KB).</li>
+<li><strong>Config blob fetch</strong>: The manifest's config digest is used to fetch <code>/v2/IMAGE/blobs/DIGEST</code>. This is a small JSON document (typically &lt;15 KB).</li>
 <li><strong>Timestamp extraction</strong>: The <code>created</code> field from the config JSON is parsed as the image creation time.</li>
 </ol>
+<p>These requests include the following values:</p>
+<ul>
+<li><em><code>IMAGE</code></em>: the image repository, such as <code>library/nginx</code></li>
+<li><em><code>TAG</code></em>: the image tag</li>
+<li><em><code>DIGEST</code></em>: the config digest from the manifest</li>
+</ul>
 <p>No image layers are downloaded during this process.</p>
 <p><strong>Supported registries:</strong></p>
 <ul>
@@ -3850,7 +3856,7 @@ The output varies depending on the outcome:</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 31, 2026 00:40:55 UTC"><span class="timeago" datetime="2026-10-31T00:40:55+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 31, 2026 00:40:55 UTC">2026-10-31</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

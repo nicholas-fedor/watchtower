@@ -3595,15 +3595,15 @@ Results are cached per session, so sibling containers on the same image only pay
 <tbody>
 <tr>
 <td style="text-align: left;"><code>Found new Git revision</code></td>
-<td style="text-align: left;"><code>Found new Git revision: &lt;host/path&gt;@&lt;tag or branch&gt; (&lt;12-char sha&gt;)</code></td>
+<td style="text-align: left;"><code>Found new Git revision: REVISION (SHORT_COMMIT)</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Built image from Git URL context</code></td>
-<td style="text-align: left;"><code>Built image: &lt;name:git-shortsha&gt; (&lt;short image id&gt;)</code></td>
+<td style="text-align: left;"><code>Built image: IMAGE (IMAGE_ID)</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Built Compose project</code></td>
-<td style="text-align: left;"><code>Built Compose project: &lt;project&gt; (&lt;services&gt;)</code>, only when containers are not restarted</td>
+<td style="text-align: left;"><code>Built Compose project: PROJECT (SERVICES)</code>, only when containers are not restarted</td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Git build failed. Leaving running container untouched</code></td>
@@ -3615,18 +3615,28 @@ Results are cached per session, so sibling containers on the same image only pay
 </tr>
 <tr>
 <td style="text-align: left;"><code>Compose project directory is not readable. Leaving the running container untouched</code></td>
-<td style="text-align: left;"><code>Skipped &lt;container&gt;: compose directory is not readable</code></td>
+<td style="text-align: left;"><code>Skipped CONTAINER: compose directory is not readable</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Skipped container with an invalid git semver policy</code></td>
-<td style="text-align: left;"><code>Skipped &lt;container&gt;: invalid git semver policy</code></td>
+<td style="text-align: left;"><code>Skipped CONTAINER: invalid git semver policy</code></td>
 </tr>
 <tr>
 <td style="text-align: left;"><code>Skipped container with an invalid git-host</code></td>
-<td style="text-align: left;"><code>Skipped &lt;container&gt;: invalid git-host</code></td>
+<td style="text-align: left;"><code>Skipped CONTAINER: invalid git-host</code></td>
 </tr>
 </tbody>
 </table>
+<p>These lines include the following values:</p>
+<ul>
+<li><em><code>REVISION</code></em>: the repository path and the tag or branch, such as <code>github.com/org/app@v1.2.3</code></li>
+<li><em><code>SHORT_COMMIT</code></em>: the first 12 characters of the commit</li>
+<li><em><code>IMAGE</code></em>: the built image, such as <code>app:git-0123456789ab</code></li>
+<li><em><code>IMAGE_ID</code></em>: the short ID of the built image</li>
+<li><em><code>PROJECT</code></em>: the Compose project</li>
+<li><em><code>SERVICES</code></em>: the Compose services that were built, separated by commas</li>
+<li><em><code>CONTAINER</code></em>: the container name</li>
+</ul>
 <p>The log fields are <code>container</code>, <code>image</code>, <code>repo</code>, <code>ref</code>, <code>commit</code>, <code>changelog</code>, <code>project</code>, <code>dir</code>, and <code>error</code>. A custom simple template reads them from <code>.Data</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>{{- $sep := "" -}}
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>{{- range . -}}
@@ -3716,7 +3726,7 @@ They are empty, or the zero time, on a container that no cooldown holds back.</p
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 7, 2026 23:13:48 UTC"><span class="timeago" datetime="2026-11-07T23:13:48+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 7, 2026 23:13:48 UTC">2026-11-07</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

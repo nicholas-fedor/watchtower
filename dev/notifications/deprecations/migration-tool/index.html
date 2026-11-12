@@ -3011,8 +3011,8 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user@example.com</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">USERNAME</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="s">'PASSWORD'</span>
 <a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
@@ -3026,8 +3026,8 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>USERNAME<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span><span class="s1">'PASSWORD'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
@@ -3043,14 +3043,20 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span>--notifications<span class="w"> </span>email<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">  </span>--notification-email-server<span class="w"> </span>smtp.example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">  </span>--notification-email-server-port<span class="w"> </span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span>--notification-email-server-user<span class="w"> </span>user@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span>--notification-email-server-password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">  </span>--notification-email-server-user<span class="w"> </span>USERNAME<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">  </span>--notification-email-server-password<span class="w"> </span><span class="s1">'PASSWORD'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">  </span>--notification-email-from<span class="w"> </span>sender@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">  </span>--notification-email-to<span class="w"> </span>recipient@example.com
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>USERNAME</code></em>: the user name for your SMTP server. <code>notify-upgrade</code> writes an <code>@</code> in it as <code>%40</code>.</li>
+<li><em><code>PASSWORD</code></em>: the password for your SMTP server, inside the single quotes. In a Compose file, write each <code>'</code> in it as <code>''</code> and each <code>$</code> as <code>$$</code>. In a shell command, write each <code>'</code> as <code>'\''</code>.</li>
+</ul>
+<p>Use your SMTP server's host name in place of <code>smtp.example.com</code> and your own addresses in place of <code>sender@example.com</code> and <code>recipient@example.com</code>.</p>
 </div>
 <div class="tabbed-block">
 <div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Docker Compose</label><label for="__tabbed_3_2">Docker CLI (Env Vars)</label><label for="__tabbed_3_3">Docker CLI (Flags)</label></div>
@@ -3062,8 +3068,8 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify-upgrade</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotify</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://my.gotify.tld/"</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">"SuperSecretToken"</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://gotify.example.com/"</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">"TOKEN"</span>
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
@@ -3074,8 +3080,8 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower-notify-upgrade<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">"https://my.gotify.tld/"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">"SuperSecretToken"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">"https://gotify.example.com/"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">"TOKEN"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">  </span>notify-upgrade
@@ -3088,13 +3094,14 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">  </span>notify-upgrade<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">  </span>--notifications<span class="w"> </span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span>--notification-gotify-url<span class="w"> </span><span class="s2">"https://my.gotify.tld/"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span>--notification-gotify-token<span class="w"> </span><span class="s2">"SuperSecretToken"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">  </span>--notification-gotify-url<span class="w"> </span><span class="s2">"https://gotify.example.com/"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">  </span>--notification-gotify-token<span class="w"> </span><span class="s2">"TOKEN"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">  </span>--notification-gotify-tls-skip-verify
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>Replace <em><code>TOKEN</code></em> with the application token from your Gotify server and <code>gotify.example.com</code> with your server's host name.</p>
 </div>
 <div class="tabbed-block">
 <div class="tabbed-set tabbed-alternate" data-tabs="4:3"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><input id="__tabbed_4_3" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Docker Compose</label><label for="__tabbed_4_2">Docker CLI (Env Vars)</label><label for="__tabbed_4_3">Docker CLI (Flags)</label></div>
@@ -3106,7 +3113,7 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify-upgrade</span>
 <a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">    </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://hooks.slack.com/services/AAA/BBB/CCC"</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN"</span>
 <a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">      </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">watchtower-server-1</span>
 <a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
@@ -3117,7 +3124,7 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower-notify-upgrade<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>slack<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="o">=</span><span class="s2">"https://hooks.slack.com/services/AAA/BBB/CCC"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="o">=</span><span class="s2">"https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="o">=</span>watchtower-server-1<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span>notify-upgrade
@@ -3130,12 +3137,18 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 <a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">  </span>notify-upgrade<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>--notifications<span class="w"> </span>slack<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--notification-slack-hook-url<span class="w"> </span><span class="s2">"https://hooks.slack.com/services/AAA/BBB/CCC"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--notification-slack-hook-url<span class="w"> </span><span class="s2">"https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span>--notification-slack-identifier<span class="w"> </span>watchtower-server-1<span class="w"> </span><span class="se">\</span>
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>Replace the following with the parts of your Slack webhook URL:</p>
+<ul>
+<li><em><code>WORKSPACE_ID</code></em>: the workspace ID, which starts with <code>T</code></li>
+<li><em><code>WEBHOOK_ID</code></em>: the webhook ID, which starts with <code>B</code></li>
+<li><em><code>WEBHOOK_TOKEN</code></em>: the webhook token</li>
+</ul>
 </div>
 <div class="tabbed-block">
 <div class="tabbed-set tabbed-alternate" data-tabs="5:3"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><input id="__tabbed_5_3" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Docker Compose</label><label for="__tabbed_5_2">Docker CLI (Env Vars)</label><label for="__tabbed_5_3">Docker CLI (Flags)</label></div>
@@ -3174,6 +3187,13 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 </div>
 </div>
 </div>
+<p>Replace the following with the parts of the webhook URL that your workflow's trigger shows:</p>
+<ul>
+<li><em><code>ENVIRONMENT</code></em>: the Power Platform environment</li>
+<li><em><code>WORKFLOW_ID</code></em>: the workflow ID</li>
+<li><em><code>SIGNATURE</code></em>: the value of the <code>sig</code> parameter</li>
+</ul>
+<p>An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows.</p>
 </div>
 </div>
 </div>
@@ -3183,12 +3203,17 @@ The only side effect is that the <code>notify-upgrade</code> process will stay a
 The <code>notify-upgrade</code> command inspects the container's current configuration, so it must be started with your legacy notification settings.</p>
 </div>
 <h3 id="retrieving_the_generated_file">Retrieving the Generated File<a class="headerlink" href="#retrieving_the_generated_file" title="Permanent link">&para;</a></h3>
-<p>After running <code>notify-upgrade</code>, the converted Shoutrrr URL is written to a temporary file in the container's working directory, with a filename like <code>watchtower-notif-urls-XXXXXX</code>.</p>
-<p>The command logs the exact container path and prints a copy command, for example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>INFO To get the environment file, use: docker cp abc123:watchtower-notif-urls-123456789 ./watchtower-notifications.env
+<p>After running <code>notify-upgrade</code>, the converted Shoutrrr URL is written to a temporary file in the container's working directory. Its name starts with <code>watchtower-notif-urls-</code> and ends in a random number.</p>
+<p>The command logs a copy command with the container and the file name:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>INFO To get the environment file, use: docker cp CONTAINER_ID:FILE_NAME ./watchtower-notifications.env
 </code></pre></div>
-<p>Copy it to your local machine with:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
+<p>This output includes the following values:</p>
+<ul>
+<li><em><code>CONTAINER_ID</code></em>: the ID of the container that ran <code>notify-upgrade</code>. When <code>notify-upgrade</code> cannot find its own container ID, the line shows <code>&lt;CONTAINER&gt;</code> instead. Replace it with the container's name or ID before you run the command, because a shell reads <code>&lt;</code> and <code>&gt;</code> as redirections.</li>
+<li><em><code>FILE_NAME</code></em>: the name of the temporary file, such as <code>watchtower-notif-urls-1234567890</code></li>
+</ul>
+<p>Run that command to copy the file to your local machine:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>CONTAINER_ID:FILE_NAME<span class="w"> </span>./watchtower-notifications.env
 </code></pre></div>
 <p>The temporary file is automatically removed after <strong>5 minutes</strong> or when the container stops, so copy it promptly after generation.
 If you are running <code>notify-upgrade</code> as a one-off command (<code>docker run --rm ...</code>), the process will wait up to 5 minutes before exiting.
@@ -3212,8 +3237,8 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">email</span>
 <a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp.example.com</span>
 <a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">587</span>
-<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">user@example.com</span>
-<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">secret</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">USERNAME</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="p">:</span><span class="w"> </span><span class="s">'PASSWORD'</span>
 <a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sender@example.com</span>
 <a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">recipient@example.com</span>
 <a id="__codelineno-15-12" name="__codelineno-15-12" href="#__codelineno-15-12"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
@@ -3229,8 +3254,8 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>email<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER</span><span class="o">=</span>smtp.example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT</span><span class="o">=</span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>user@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER</span><span class="o">=</span>USERNAME<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD</span><span class="o">=</span><span class="s1">'PASSWORD'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_FROM</span><span class="o">=</span>sender@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_TO</span><span class="o">=</span>recipient@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_EMAIL_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
@@ -3246,8 +3271,8 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">  </span>--notifications<span class="w"> </span>email<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span>--notification-email-server<span class="w"> </span>smtp.example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">  </span>--notification-email-server-port<span class="w"> </span><span class="m">587</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span>--notification-email-server-user<span class="w"> </span>user@example.com<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">  </span>--notification-email-server-password<span class="w"> </span>secret<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span>--notification-email-server-user<span class="w"> </span>USERNAME<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">  </span>--notification-email-server-password<span class="w"> </span><span class="s1">'PASSWORD'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">  </span>--notification-email-from<span class="w"> </span>sender@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a><span class="w">  </span>--notification-email-to<span class="w"> </span>recipient@example.com<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a><span class="w">  </span>--notification-email-delay<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
@@ -3256,18 +3281,24 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 </div>
 </div>
 </div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>USERNAME</code></em>: the user name for your SMTP server. <code>notify-upgrade</code> writes an <code>@</code> in it as <code>%40</code>.</li>
+<li><em><code>PASSWORD</code></em>: the password for your SMTP server, inside the single quotes. In a Compose file, write each <code>'</code> in it as <code>''</code> and each <code>$</code> as <code>$$</code>. In a shell command, write each <code>'</code> as <code>'\''</code>.</li>
+</ul>
+<p>Use your SMTP server's host name in place of <code>smtp.example.com</code> and your own addresses in place of <code>sender@example.com</code> and <code>recipient@example.com</code>.</p>
 </li>
 <li>
 <p>With the container running, execute the <code>notify-upgrade</code> command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>watchtower<span class="w"> </span>/watchtower<span class="w"> </span>notify-upgrade
 </code></pre></div>
-<p>Then copy the resulting file out of the container:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
+<p>Then copy the resulting file out of the container with the command that <code>notify-upgrade</code> logs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>CONTAINER_ID:FILE_NAME<span class="w"> </span>./watchtower-notifications.env
 </code></pre></div>
 </li>
 <li>
 <p>The following converted Shoutrrr URL should be produced:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&amp;clienthost=localhost&amp;encryption=Auto&amp;fromaddress=sender%40example.com&amp;fromname=Watchtower&amp;subject=&amp;toaddresses=recipient%40example.com&amp;usehtml=No&amp;usestarttls=Yes&amp;timeout=10s
 </code></pre></div>
 </li>
 <li>
@@ -3279,7 +3310,7 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="s">'smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&amp;clienthost=localhost&amp;encryption=Auto&amp;fromaddress=sender%40example.com&amp;fromname=Watchtower&amp;subject=&amp;toaddresses=recipient%40example.com&amp;usehtml=No&amp;usestarttls=Yes&amp;timeout=10s'</span>
 <a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATIONS_DELAY</span><span class="p">:</span><span class="w"> </span><span class="s">"10"</span>
 <a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_TITLE_TAG</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Watchtower</span>
 <a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
@@ -3290,7 +3321,7 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="s2">"WATCHTOWER_NOTIFICATION_URL=smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="s1">'WATCHTOWER_NOTIFICATION_URL=smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&amp;clienthost=localhost&amp;encryption=Auto&amp;fromaddress=sender%40example.com&amp;fromname=Watchtower&amp;subject=&amp;toaddresses=recipient%40example.com&amp;usehtml=No&amp;usestarttls=Yes&amp;timeout=10s'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS_DELAY</span><span class="o">=</span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_TITLE_TAG</span><span class="o">=</span>Watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="w">  </span>nickfedor/watchtower
@@ -3301,13 +3332,14 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"smtp://user@example.com:secret@smtp.example.com:587/?fromaddress=sender@example.com&amp;toaddresses=recipient@example.com&amp;encryption=ExplicitTLS&amp;usestarttls=yes"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s1">'smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&amp;clienthost=localhost&amp;encryption=Auto&amp;fromaddress=sender%40example.com&amp;fromname=Watchtower&amp;subject=&amp;toaddresses=recipient%40example.com&amp;usehtml=No&amp;usestarttls=Yes&amp;timeout=10s'</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="w">  </span>--notifications-delay<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a><span class="w">  </span>--notification-title-tag<span class="w"> </span>Watchtower
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>The single quotes keep YAML and the shell from changing the URL. <code>notify-upgrade</code> writes a <code>'</code> in the password as <code>%27</code> but leaves a <code>$</code> as it is. In a Compose file, write each <code>$</code> in the URL as <code>$$</code>.</p>
 </li>
 </ol>
 <div class="admonition note">
@@ -3330,8 +3362,8 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">gotify</span>
-<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://my.gotify.tld/"</span>
-<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">"SuperSecretToken"</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://gotify.example.com/"</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="p">:</span><span class="w"> </span><span class="s">"TOKEN"</span>
 <a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
 <a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
@@ -3342,8 +3374,8 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATIONS</span><span class="o">=</span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">"https://my.gotify.tld/"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">"SuperSecretToken"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_URL</span><span class="o">=</span><span class="s2">"https://gotify.example.com/"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN</span><span class="o">=</span><span class="s2">"TOKEN"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
@@ -3354,25 +3386,26 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a><span class="w">  </span>--notifications<span class="w"> </span>gotify<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">  </span>--notification-gotify-url<span class="w"> </span><span class="s2">"https://my.gotify.tld/"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">  </span>--notification-gotify-token<span class="w"> </span><span class="s2">"SuperSecretToken"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-6" name="__codelineno-26-6" href="#__codelineno-26-6"></a><span class="w">  </span>--notification-gotify-url<span class="w"> </span><span class="s2">"https://gotify.example.com/"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a><span class="w">  </span>--notification-gotify-token<span class="w"> </span><span class="s2">"TOKEN"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a><span class="w">  </span>--notification-gotify-tls-skip-verify
 </code></pre></div>
 </div>
 </div>
 </div>
+<p>Replace <em><code>TOKEN</code></em> with the application token from your Gotify server and <code>gotify.example.com</code> with your server's host name.</p>
 </li>
 <li>
 <p>With the container running, execute the <code>notify-upgrade</code> command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>watchtower<span class="w"> </span>/watchtower<span class="w"> </span>notify-upgrade
 </code></pre></div>
-<p>Then copy the resulting file out of the container:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
+<p>Then copy the resulting file out of the container with the command that <code>notify-upgrade</code> logs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>CONTAINER_ID:FILE_NAME<span class="w"> </span>./watchtower-notifications.env
 </code></pre></div>
 </li>
 <li>
 <p>The following converted Shoutrrr URL should be produced:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>gotify://my.gotify.tld/SuperSecretToken?title=
+<div class="highlight"><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>gotify://gotify.example.com/TOKEN?skiptlsverify=Yes&amp;title=
 </code></pre></div>
 </li>
 <li>
@@ -3384,7 +3417,7 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"gotify://my.gotify.tld/SuperSecretToken?title="</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"gotify://gotify.example.com/TOKEN?skiptlsverify=Yes&amp;title="</span>
 <a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
@@ -3393,7 +3426,7 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"gotify://my.gotify.tld/SuperSecretToken?title="</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"gotify://gotify.example.com/TOKEN?skiptlsverify=Yes&amp;title="</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-31-5" name="__codelineno-31-5" href="#__codelineno-31-5"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
@@ -3402,7 +3435,7 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"gotify://my.gotify.tld/SuperSecretToken?title="</span>
+<a id="__codelineno-32-5" name="__codelineno-32-5" href="#__codelineno-32-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"gotify://gotify.example.com/TOKEN?skiptlsverify=Yes&amp;title="</span>
 </code></pre></div>
 </div>
 </div>
@@ -3422,7 +3455,7 @@ When the conversion fails, <code>notify-upgrade</code> logs the error and exits 
 <a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATIONS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack</span>
-<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://hooks.slack.com/services/AAA/BBB/CCC"</span>
+<a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN"</span>
 <a id="__codelineno-33-7" name="__codelineno-33-7" href="#__codelineno-33-7"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">watchtower-server-1</span>
 <a id="__codelineno-33-8" name="__codelineno-33-8" href="#__codelineno-33-8"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-33-9" name="__codelineno-33-9" href="#__codelineno-33-9"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
@@ -3437,7 +3470,7 @@ docker run -d \
 </div>
 </div>
 </div>
-<p>-e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="<a href="https://hooks.slack.com/services/AAA/BBB/CCC">https://hooks.slack.com/services/AAA/BBB/CCC</a>" \
+<p>-e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="<a href="https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN">https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN</a>" \
   -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
       nickfedor/watchtower
     ```</p>
@@ -3450,24 +3483,30 @@ docker run -d \
   -v /var/run/docker.sock:/var/run/docker.sock \
   nickfedor/watchtower \
   --notifications slack \
-  --notification-slack-hook-url "<a href="https://hooks.slack.com/services/AAA/BBB/CCC">https://hooks.slack.com/services/AAA/BBB/CCC</a>" \</p>
+  --notification-slack-hook-url "<a href="https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN">https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN</a>" \</p>
 </div>
 </div>
 </div>
 <p>--notification-slack-identifier watchtower-server-1 \
     ```</p>
+<p>Replace the following with the parts of your Slack webhook URL:</p>
+<ul>
+<li><em><code>WORKSPACE_ID</code></em>: the workspace ID, which starts with <code>T</code></li>
+<li><em><code>WEBHOOK_ID</code></em>: the webhook ID, which starts with <code>B</code></li>
+<li><em><code>WEBHOOK_TOKEN</code></em>: the webhook token</li>
+</ul>
 </li>
 <li>
 <p>With the container running, execute the <code>notify-upgrade</code> command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>watchtower<span class="w"> </span>/watchtower<span class="w"> </span>notify-upgrade
 </code></pre></div>
-<p>Then copy the resulting file out of the container:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
+<p>Then copy the resulting file out of the container with the command that <code>notify-upgrade</code> logs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>CONTAINER_ID:FILE_NAME<span class="w"> </span>./watchtower-notifications.env
 </code></pre></div>
 </li>
 <li>
 <p>The following converted Shoutrrr URL should be produced:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&amp;color=%23406170
+<div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>slack://hook:WORKSPACE_ID-WEBHOOK_ID-WEBHOOK_TOKEN@webhook?botname=watchtower-server-1&amp;color=%23406170
 </code></pre></div>
 </li>
 <li>
@@ -3479,7 +3518,7 @@ docker run -d \
 <a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-37-3" name="__codelineno-37-3" href="#__codelineno-37-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-37-4" name="__codelineno-37-4" href="#__codelineno-37-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&amp;color=%23406170"</span>
+<a id="__codelineno-37-5" name="__codelineno-37-5" href="#__codelineno-37-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="s">"slack://hook:WORKSPACE_ID-WEBHOOK_ID-WEBHOOK_TOKEN@webhook?botname=watchtower-server-1&amp;color=%23406170"</span>
 <a id="__codelineno-37-6" name="__codelineno-37-6" href="#__codelineno-37-6"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-37-7" name="__codelineno-37-7" href="#__codelineno-37-7"></a><span class="w">        </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 </code></pre></div>
@@ -3488,7 +3527,7 @@ docker run -d \
 <div class="highlight"><pre><span></span><code><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-38-2" name="__codelineno-38-2" href="#__codelineno-38-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&amp;color=%23406170"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-38-4" name="__codelineno-38-4" href="#__codelineno-38-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"slack://hook:WORKSPACE_ID-WEBHOOK_ID-WEBHOOK_TOKEN@webhook?botname=watchtower-server-1&amp;color=%23406170"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a><span class="w">  </span>nickfedor/watchtower
 </code></pre></div>
 </div>
@@ -3497,7 +3536,7 @@ docker run -d \
 <a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-39-3" name="__codelineno-39-3" href="#__codelineno-39-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-39-4" name="__codelineno-39-4" href="#__codelineno-39-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"slack://hook:AAA-BBB-CCC@webhook?botname=watchtower&amp;color=%23406170"</span>
+<a id="__codelineno-39-5" name="__codelineno-39-5" href="#__codelineno-39-5"></a><span class="w">  </span>--notification-url<span class="w"> </span><span class="s2">"slack://hook:WORKSPACE_ID-WEBHOOK_ID-WEBHOOK_TOKEN@webhook?botname=watchtower-server-1&amp;color=%23406170"</span>
 </code></pre></div>
 </div>
 </div>
@@ -3542,13 +3581,20 @@ docker run -d \
 </div>
 </div>
 </div>
+<p>Replace the following with the parts of the webhook URL that your workflow's trigger shows:</p>
+<ul>
+<li><em><code>ENVIRONMENT</code></em>: the Power Platform environment</li>
+<li><em><code>WORKFLOW_ID</code></em>: the workflow ID</li>
+<li><em><code>SIGNATURE</code></em>: the value of the <code>sig</code> parameter</li>
+</ul>
+<p>An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows.</p>
 </li>
 <li>
 <p>With the container running, execute the <code>notify-upgrade</code> command:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>docker<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>watchtower<span class="w"> </span>/watchtower<span class="w"> </span>notify-upgrade
 </code></pre></div>
-<p>Then copy the resulting file out of the container:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>&lt;CONTAINER&gt;:&lt;FILE_PATH&gt;<span class="w"> </span>./watchtower-notifications.env
+<p>Then copy the resulting file out of the container with the command that <code>notify-upgrade</code> logs:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>docker<span class="w"> </span>cp<span class="w"> </span>CONTAINER_ID:FILE_NAME<span class="w"> </span>./watchtower-notifications.env
 </code></pre></div>
 </li>
 <li>
@@ -3646,7 +3692,7 @@ docker run -d \
 <ul>
 <li>The service must already be defined in <code>docker-compose.yaml</code> with your legacy notification environment variables. The script assumes the service name defaults to <code>watchtower</code>.</li>
 <li>The command will self-cleanup after 5 minutes or when the script exits.</li>
-<li><code>notify-upgrade</code> keeps a Slack channel only when it is a Slack channel ID, such as <code>C0123456789</code>. A channel name such as <code>#ops</code> or a user such as <code>@alice</code> cannot be carried into the Shoutrrr URL, so the generated URL uses the webhook's own channel and <code>notify-upgrade</code> logs a warning. Webhooks created by a Slack app always post to their own channel.</li>
+<li><code>notify-upgrade</code> keeps a Slack channel only when it is a Slack channel ID, such as <code>C0123456789</code>. A channel name such as <code>#ops</code> or a user such as <code>@dana</code> cannot be carried into the Shoutrrr URL, so the generated URL uses the webhook's own channel and <code>notify-upgrade</code> logs a warning. Webhooks created by a Slack app always post to their own channel.</li>
 </ul>
 </div>
 
@@ -3671,7 +3717,7 @@ docker run -d \
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 09:03:50 UTC"><span class="timeago" datetime="2026-11-12T09:03:50+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 09:03:50 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

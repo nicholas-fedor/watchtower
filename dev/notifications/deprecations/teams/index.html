@@ -2822,7 +2822,7 @@
 </div>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
 <p>Watchtower can use Shoutrrr's <a href="https://shoutrrr.nickfedor.com/latest/services/chat/teams/" rel="noopener noreferrer" target="_blank">Teams service</a> to send <a href="https://www.microsoft.com/en-us/microsoft-teams" rel="noopener noreferrer" target="_blank">Microsoft Teams</a> notifications.</p>
-<p>The webhook URL comes from a Power Automate workflow with the "When a Teams webhook request is received" trigger or from an Azure Logic Apps workflow. In Power Automate, set the trigger's "Who can trigger the flow?" option to "Anyone". Watchtower sends with the URL's <code>sig</code> signature and cannot sign in to your tenant. Copy the whole URL from the trigger. In the examples, <code>ENVIRONMENT</code>, <code>WORKFLOW_ID</code> and <code>SIGNATURE</code> stand for the parts of that URL.</p>
+<p>The webhook URL comes from a Power Automate workflow with the "When a Teams webhook request is received" trigger or from an Azure Logic Apps workflow. In Power Automate, set the trigger's "Who can trigger the flow?" option to "Anyone". Watchtower sends with the URL's <code>sig</code> signature and cannot sign in to your tenant. Copy the whole URL from the trigger.</p>
 <p>Watchtower checks the webhook URL at startup through Shoutrrr, whether it is set in a <code>teams://</code> URL or in the legacy option. It must use <code>https://</code> and carry a <code>sig</code> signature. Its host must be one that Microsoft issues for workflows. Watchtower refuses to start with any other URL, such as a retired Office 365 connector URL on <code>webhook.office.com</code>. Shoutrrr's <a href="https://shoutrrr.nickfedor.com/latest/services/chat/teams/#webhook_url" rel="noopener noreferrer" target="_blank">webhook URL rules</a> list the accepted hosts.</p>
 <div class="admonition note">
 <p class="admonition-title">Power Automate URLs on <code>logic.azure.com</code></p>
@@ -2853,6 +2853,13 @@
 </div>
 </div>
 </div>
+<p>Replace the following with the parts of the webhook URL that your workflow's trigger shows:</p>
+<ul>
+<li><em><code>ENVIRONMENT</code></em>: the Power Platform environment</li>
+<li><em><code>WORKFLOW_ID</code></em>: the workflow ID</li>
+<li><em><code>SIGNATURE</code></em>: the value of the <code>sig</code> parameter</li>
+</ul>
+<p>An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows, percent-encoded for the <code>host</code> value.</p>
 <details class="warning">
 <summary>The following legacy Microsoft Teams examples are deprecated and will be removed with the release of Watchtower v2.</summary>
 <div class="tabbed-set tabbed-alternate" data-tabs="2:3"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><input id="__tabbed_2_3" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Docker Compose</label><label for="__tabbed_2_2">Docker CLI (Env Vars)</label><label for="__tabbed_2_3">Docker CLI (Flags)</label></div>
@@ -2911,7 +2918,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 09:03:50 UTC"><span class="timeago" datetime="2026-11-12T09:03:50+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 09:03:50 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

@@ -3008,17 +3008,18 @@ A Git-watched container is not checked. The Git remote is not contacted, and the
 <h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
 <h3 id="image_name">Image Name<a class="headerlink" href="#image_name" title="Permanent link">&para;</a></h3>
 <p>The <code>image</code> parameter filters the check to only include containers running specific image names.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer mytoken"</span><span class="w"> </span><span class="s2">"localhost:8080/v1/check?image=foo/bar:1.0"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer API_TOKEN"</span><span class="w"> </span><span class="s2">"localhost:8080/v1/check?image=org/app:1.0"</span>
 </code></pre></div>
+<p>Replace <em><code>API_TOKEN</code></em> with your HTTP API token.</p>
 <h3 id="container_name">Container Name<a class="headerlink" href="#container_name" title="Permanent link">&para;</a></h3>
 <p>The <code>container</code> parameter filters the check to only include specific containers by container name.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer mytoken"</span><span class="w"> </span><span class="s2">"localhost:8080/v1/check?container=nginx"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer API_TOKEN"</span><span class="w"> </span><span class="s2">"localhost:8080/v1/check?container=nginx"</span>
 </code></pre></div>
 <h3 id="timeout">Timeout<a class="headerlink" href="#timeout" title="Permanent link">&para;</a></h3>
 <p>The <code>timeout</code> parameter overrides the per-request timeout for this check.
 It accepts Go durations such as <code>30s</code>, <code>2m</code>, or <code>5m</code>.
 The value is capped by the configured check API timeout (<code>--http-api-check-timeout</code> / <code>WATCHTOWER_HTTP_API_CHECK_TIMEOUT</code>, default <code>5m</code>).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer mytoken"</span><span class="w"> </span><span class="s2">"localhost:8080/v1/check?timeout=2m"</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>curl<span class="w"> </span>-X<span class="w"> </span>POST<span class="w"> </span>-H<span class="w"> </span><span class="s2">"Authorization: Bearer API_TOKEN"</span><span class="w"> </span><span class="s2">"localhost:8080/v1/check?timeout=2m"</span>
 </code></pre></div>
 <h2 id="response_format">Response Format<a class="headerlink" href="#response_format" title="Permanent link">&para;</a></h2>
 <p>The <code>/v1/check</code> endpoint returns a JSON array of container check results:</p>
@@ -3129,7 +3130,7 @@ The <code>failed</code> field counts containers whose per-container check return
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="September 30, 2026 22:25:05 UTC"><span class="timeago" datetime="2026-09-30T22:25:05+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="September 30, 2026 22:25:05 UTC">2026-09-30</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     

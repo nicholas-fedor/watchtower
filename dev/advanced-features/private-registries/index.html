@@ -2959,24 +2959,28 @@ The credentials can be provided to Watchtower in a configuration file called <co
 <p>There are two ways to generate this configuration file:</p>
 <ol>
 <li>The configuration file can be created manually.</li>
-<li>Call <code>docker login &lt;REGISTRY_NAME&gt;</code> and share the resulting configuration file.</li>
+<li>Call <code>docker login REGISTRY_NAME</code> and share the resulting configuration file.</li>
 </ol>
 <h2 id="creating_the_configuration_file_manually">Creating the configuration file manually<a class="headerlink" href="#creating_the_configuration_file_manually" title="Permanent link">&para;</a></h2>
 <p>Create a new configuration file with the following syntax and a base64 encoded username and password <code>auth</code> string:</p>
 <div class="highlight"><span class="filename">config.json</span><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="nt">"auths"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">        </span><span class="nt">"&lt;REGISTRY_NAME&gt;"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">            </span><span class="nt">"auth"</span><span class="p">:</span><span class="w"> </span><span class="s2">"XXXXXXX"</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">        </span><span class="nt">"REGISTRY_NAME"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">            </span><span class="nt">"auth"</span><span class="p">:</span><span class="w"> </span><span class="s2">"BASE64_CREDENTIALS"</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">        </span><span class="p">}</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="p">}</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">}</span>
 </code></pre></div>
-<p><code>&lt;REGISTRY_NAME&gt;</code> needs to be replaced by the name of your private registry (e.g., <code>my-private-registry.example.org</code>).</p>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>REGISTRY_NAME</code></em>: the name of your private registry, such as <code>registry.example.org</code></li>
+<li><em><code>BASE64_CREDENTIALS</code></em>: the base64 encoding of <code>USERNAME:PASSWORD</code>, your user name and password for the registry joined by a colon</li>
+</ul>
 <h3 id="using_private_docker_hub_images">Using Private Docker Hub Images<a class="headerlink" href="#using_private_docker_hub_images" title="Permanent link">&para;</a></h3>
-<p>To access private repositories on Docker Hub, <code>&lt;REGISTRY_NAME&gt;</code> should be <code>https://index.docker.io/v1/</code>.
+<p>To access private repositories on Docker Hub, <em><code>REGISTRY_NAME</code></em> should be <code>https://index.docker.io/v1/</code>.
 The registry domain does not have to be specified in <code>docker run</code> or <code>docker-compose</code>.</p>
 <p>Like Docker, Watchtower will use the Docker Hub registry and its credentials when no registry domain is specified.
-Watchtower will recognize credentials with <code>&lt;REGISTRY_NAME&gt;</code> <code>index.docker.io</code>, but the Docker CLI will not.</p>
+Watchtower will recognize credentials with <em><code>REGISTRY_NAME</code></em> set to <code>index.docker.io</code>, but the Docker CLI will not.</p>
 <h3 id="using_a_private_registry_on_a_local_host">Using a Private Registry on a Local Host<a class="headerlink" href="#using_a_private_registry_on_a_local_host" title="Permanent link">&para;</a></h3>
 <p>To use a private registry hosted locally, make sure to correctly specify the registry host in both <code>config.json</code> and the <code>docker run</code> command or <code>docker-compose</code> file.
 Valid hosts are <code>localhost[:PORT]</code>, <code>HOST:PORT</code>, or any multi-part <code>domain.name</code> or IP-address with or without a port.</p>
@@ -2984,37 +2988,41 @@ Valid hosts are <code>localhost[:PORT]</code>, <code>HOST:PORT</code>, or any mu
 <ul>
 <li><code>localhost</code> -&gt; <code>localhost/myimage</code></li>
 <li><code>127.0.0.1</code> -&gt; <code>127.0.0.1/myimage:mytag</code></li>
-<li><code>host.domain</code> -&gt; <code>host.domain/myorganization/myimage</code></li>
+<li><code>registry.example.com</code> -&gt; <code>registry.example.com/myorganization/myimage</code></li>
 <li><code>other-lan-host:80</code> -&gt; <code>other-lan-host:80/imagename:latest</code></li>
 </ul>
 <p>The required <code>auth</code> string can be generated as follows:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="s1">'username:password'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>base64
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="s1">'USERNAME:PASSWORD'</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>base64
 </code></pre></div>
+<p>Replace <em><code>USERNAME</code></em> and <em><code>PASSWORD</code></em> with your user name and password for the registry.</p>
 <div class="admonition info">
 <p class="admonition-title">Username and Password for GCloud</p>
 <p>For gcloud, we'll use <code>_json_key</code> as our username and the content of <code>gcloudauth.json</code> as the password.
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>bash<span class="w"> </span><span class="nb">echo</span><span class="w"> </span>-n<span class="w"> </span><span class="s2">"_json_key:</span><span class="k">$(</span>cat<span class="w"> </span>gcloudauth.json<span class="k">)</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>base64<span class="w"> </span>-w0
 </code></pre></div></p>
 </div>
-<p>When the Watchtower Docker container is started, the created configuration file (<code>&lt;PATH&gt;/config.json</code> in this example) needs to be passed to the container:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>...<span class="o">]</span><span class="w"> </span>-v<span class="w"> </span>&lt;PATH&gt;/config.json:/config.json<span class="w"> </span>nickfedor/watchtower
+<p>When the Watchtower Docker container is started, the created configuration file needs to be passed to the container:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>...<span class="o">]</span><span class="w"> </span>-v<span class="w"> </span>CONFIG_DIR/config.json:/config.json<span class="w"> </span>nickfedor/watchtower
 </code></pre></div>
+<p>Replace <em><code>CONFIG_DIR</code></em> with the directory that holds the configuration file.</p>
 <h2 id="sharing_the_docker_configuration_file">Sharing the Docker Configuration File<a class="headerlink" href="#sharing_the_docker_configuration_file" title="Permanent link">&para;</a></h2>
 <p>To pull an image from a private registry, <code>docker login</code> needs to be called first, to get access to the registry.
-The provided credentials are stored in a configuration file called <code>&lt;PATH_TO_HOME_DIR&gt;/.docker/config.json</code>.
+The provided credentials are stored in a configuration file called <code>.docker/config.json</code> in your home directory.
 This configuration file can be directly used by Watchtower. In this case, the creation of an additional configuration file is not necessary.</p>
 <p>When the Docker container is started, pass the configuration file to Watchtower:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>...<span class="o">]</span><span class="w"> </span>-v<span class="w"> </span>&lt;PATH_TO_HOME_DIR&gt;/.docker/config.json:/config.json<span class="w"> </span>nickfedor/watchtower
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>...<span class="o">]</span><span class="w"> </span>-v<span class="w"> </span>HOME_DIR/.docker/config.json:/config.json<span class="w"> </span>nickfedor/watchtower
 </code></pre></div>
+<p>Replace <em><code>HOME_DIR</code></em> with your home directory.</p>
 <p>When creating the Watchtower container via Docker Compose, use the following lines:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">services</span><span class="p">:</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">    </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower:latest</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;PATH_TO_HOME_DIR&gt;/.docker/config.json:/config.json</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HOME_DIR/.docker/config.json:/config.json</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span>
 </code></pre></div>
+<p>Replace <em><code>HOME_DIR</code></em> with your home directory.</p>
 <h3 id="docker_config_path">Docker Config path<a class="headerlink" href="#docker_config_path" title="Permanent link">&para;</a></h3>
 <p>By default, Watchtower will look for the <code>config.json</code> file in <code>/</code>, but this can be changed by setting the <code>DOCKER_CONFIG</code> environment variable to the directory path where your config is located.
 This is useful for setups where the config.json file is changed while the Watchtower instance is running, as the changes will not be picked up for a mounted file if the inode changes.</p>
@@ -3079,17 +3087,17 @@ helper in a separate container and mount it using volumes.</p>
 </li>
 <li>
 <p>Create a configuration file for Docker, and store it in <code>$HOME/.docker/config.json</code>.
-   Replace the <AWS_ACCOUNT_ID> placeholders with your <code>AWS Account ID</code> and <AWS_ECR_REGION> with your <code>AWS ECR Region</code>:</p>
+   Replace <em><code>AWS_ACCOUNT_ID</code></em> with your AWS account ID and <em><code>AWS_ECR_REGION</code></em> with the AWS Region of your Amazon ECR registry:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="p">{</span>
 <a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="w">   </span><span class="nt">"credsStore"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"ecr-login"</span><span class="p">,</span>
 <a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="w">   </span><span class="nt">"HttpHeaders"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">     </span><span class="nt">"User-Agent"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"Docker-Client/19.03.1 (XXXXXX)"</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="w">     </span><span class="nt">"User-Agent"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"Docker-Client/19.03.1 (linux)"</span>
 <a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="w">   </span><span class="p">},</span>
 <a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="w">   </span><span class="nt">"auths"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">     </span><span class="nt">"&lt;AWS_ACCOUNT_ID&gt;.dkr.ecr.&lt;AWS_ECR_REGION&gt;.amazonaws.com"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="w">     </span><span class="nt">"AWS_ACCOUNT_ID.dkr.ecr.AWS_ECR_REGION.amazonaws.com"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="p">{}</span>
 <a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a><span class="w">   </span><span class="p">},</span>
 <a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a><span class="w">   </span><span class="nt">"credHelpers"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">     </span><span class="nt">"&lt;AWS_ACCOUNT_ID&gt;.dkr.ecr.&lt;AWS_ECR_REGION&gt;.amazonaws.com"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"ecr-login"</span>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="w">     </span><span class="nt">"AWS_ACCOUNT_ID.dkr.ecr.AWS_ECR_REGION.amazonaws.com"</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="s2">"ecr-login"</span>
 <a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a><span class="w">   </span><span class="p">}</span>
 <a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a><span class="p">}</span>
 </code></pre></div>
@@ -3147,7 +3155,7 @@ helper in a separate container and mount it using volumes.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="August 21, 2025 22:51:24 UTC"><span class="timeago" datetime="2025-08-21T22:51:24+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="August 21, 2025 22:51:24 UTC">2025-08-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
   </span>
 
     
