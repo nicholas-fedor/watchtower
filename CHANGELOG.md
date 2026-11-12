@@ -127,6 +127,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to 4dd740f by @renovate[bot] in [#3732](https://github.com/nicholas-fedor/watchtower/pull/3732)
+- Update golang.org/x/exp digest to d10d3b4 by @renovate[bot] in [#3731](https://github.com/nicholas-fedor/watchtower/pull/3731)
 - Update module github.com/prometheus/common to v0.74.0 by @renovate[bot] in [#3729](https://github.com/nicholas-fedor/watchtower/pull/3729)
 - Update module gopkg.in/ini.v1 to v1.68.0 by @renovate[bot] in [#3721](https://github.com/nicholas-fedor/watchtower/pull/3721)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.24.0 by @renovate[bot] in [#3720](https://github.com/nicholas-fedor/watchtower/pull/3720)
