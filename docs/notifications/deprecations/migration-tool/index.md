@@ -179,7 +179,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
             command: notify-upgrade
             environment:
               WATCHTOWER_NOTIFICATIONS: msteams
-              WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-00&sp=/triggers/manual/run&sv=1.0&sig=XXXXXXXX"
+              WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://ENVIRONMENT.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/WORKFLOW_ID/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATURE"
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
         ```
@@ -189,7 +189,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           --name watchtower-notify-upgrade \
           -v /var/run/docker.sock:/var/run/docker.sock \
           -e WATCHTOWER_NOTIFICATIONS=msteams \
-          -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-00&sp=/triggers/manual/run&sv=1.0&sig=XXXXXXXX" \
+          -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://ENVIRONMENT.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/WORKFLOW_ID/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATURE" \
           nickfedor/watchtower \
           notify-upgrade
         ```
@@ -201,7 +201,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           nickfedor/watchtower \
           notify-upgrade \
           --notifications msteams \
-          --notification-msteams-hook "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-00&sp=/triggers/manual/run&sv=1.0&sig=XXXXXXXX"
+          --notification-msteams-hook "https://ENVIRONMENT.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/WORKFLOW_ID/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATURE"
         ```
 
 !!! Important
@@ -527,7 +527,7 @@ Select the tab that matches your legacy notification service.
                     image: nickfedor/watchtower:latest
                     environment:
                         WATCHTOWER_NOTIFICATIONS: msteams
-                        WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-00&sp=/triggers/manual/run&sv=1.0&sig=XXXXXXXX"
+                        WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL: "https://ENVIRONMENT.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/WORKFLOW_ID/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATURE"
                     volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
             ```
@@ -537,7 +537,7 @@ Select the tab that matches your legacy notification service.
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -e WATCHTOWER_NOTIFICATIONS=msteams \
-              -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-00&sp=/triggers/manual/run&sv=1.0&sig=XXXXXXXX" \
+              -e WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL="https://ENVIRONMENT.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/WORKFLOW_ID/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATURE" \
               nickfedor/watchtower
             ```
         === "Docker CLI (Flags)"
@@ -547,7 +547,7 @@ Select the tab that matches your legacy notification service.
               -v /var/run/docker.sock:/var/run/docker.sock \
               nickfedor/watchtower \
               --notifications msteams \
-              --notification-msteams-hook "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-00&sp=/triggers/manual/run&sv=1.0&sig=XXXXXXXX"
+              --notification-msteams-hook "https://ENVIRONMENT.environment.api.powerplatform.com:443/powerautomate/automations/direct/workflows/WORKFLOW_ID/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SIGNATURE"
             ```
 
     2. With the container running, execute the `notify-upgrade` command:
@@ -565,7 +565,7 @@ Select the tab that matches your legacy notification service.
     3. The following converted Shoutrrr URL should be produced:
 
         ```text
-        teams://?host=https%3A%2F%2Fprod-00.westus.logic.azure.com%3A443%2Fworkflows%2Fabc123%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D2016-06-00%26sp%3D%2Ftriggers%2Fmanual%2Frun%26sv%3D1.0%26sig%3DXXXXXXXX&color=%23406170
+        teams:?color=%23406170&host=https%3A%2F%2FENVIRONMENT.environment.api.powerplatform.com%3A443%2Fpowerautomate%2Fautomations%2Fdirect%2Fworkflows%2FWORKFLOW_ID%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D1%26sp%3D%252Ftriggers%252Fmanual%252Frun%26sv%3D1.0%26sig%3DSIGNATURE
         ```
 
     4. Replace the deprecated configuration with the converted Shoutrrr URL:
@@ -576,7 +576,7 @@ Select the tab that matches your legacy notification service.
                 watchtower:
                     image: nickfedor/watchtower:latest
                     environment:
-                        WATCHTOWER_NOTIFICATION_URL: "teams://?host=https%3A%2F%2Fprod-00.westus.logic.azure.com%3A443%2Fworkflows%2Fabc123%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D2016-06-00%26sp%3D%2Ftriggers%2Fmanual%2Frun%26sv%3D1.0%26sig%3DXXXXXXXX&color=%23406170"
+                        WATCHTOWER_NOTIFICATION_URL: "teams:?color=%23406170&host=https%3A%2F%2FENVIRONMENT.environment.api.powerplatform.com%3A443%2Fpowerautomate%2Fautomations%2Fdirect%2Fworkflows%2FWORKFLOW_ID%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D1%26sp%3D%252Ftriggers%252Fmanual%252Frun%26sv%3D1.0%26sig%3DSIGNATURE"
                     volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
             ```
@@ -585,7 +585,7 @@ Select the tab that matches your legacy notification service.
             docker run -d \
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -e WATCHTOWER_NOTIFICATION_URL="teams://?host=https%3A%2F%2Fprod-00.westus.logic.azure.com%3A443%2Fworkflows%2Fabc123%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D2016-06-00%26sp%3D%2Ftriggers%2Fmanual%2Frun%26sv%3D1.0%26sig%3DXXXXXXXX&color=%23406170" \
+              -e WATCHTOWER_NOTIFICATION_URL="teams:?color=%23406170&host=https%3A%2F%2FENVIRONMENT.environment.api.powerplatform.com%3A443%2Fpowerautomate%2Fautomations%2Fdirect%2Fworkflows%2FWORKFLOW_ID%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D1%26sp%3D%252Ftriggers%252Fmanual%252Frun%26sv%3D1.0%26sig%3DSIGNATURE" \
               nickfedor/watchtower
             ```
         === "Docker CLI (Flags)"
@@ -594,7 +594,7 @@ Select the tab that matches your legacy notification service.
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               nickfedor/watchtower \
-              --notification-url "teams://?host=https%3A%2F%2Fprod-00.westus.logic.azure.com%3A443%2Fworkflows%2Fabc123%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D2016-06-00%26sp%3D%2Ftriggers%2Fmanual%2Frun%26sv%3D1.0%26sig%3DXXXXXXXX&color=%23406170"
+              --notification-url "teams:?color=%23406170&host=https%3A%2F%2FENVIRONMENT.environment.api.powerplatform.com%3A443%2Fpowerautomate%2Fautomations%2Fdirect%2Fworkflows%2FWORKFLOW_ID%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D1%26sp%3D%252Ftriggers%252Fmanual%252Frun%26sv%3D1.0%26sig%3DSIGNATURE"
             ```
 
 ## Automated Migration Script
