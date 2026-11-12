@@ -11,7 +11,7 @@
 
 Watchtower can use Shoutrrr's [Teams service](https://shoutrrr.nickfedor.com/latest/services/chat/teams/){target="_blank" rel="noopener noreferrer"} to send [Microsoft Teams](https://www.microsoft.com/en-us/microsoft-teams){target="_blank" rel="noopener noreferrer"} notifications.
 
-The webhook URL comes from a Power Automate workflow with the "When a Teams webhook request is received" trigger or from an Azure Logic Apps workflow. Copy the whole URL from the trigger. In the examples, `ENVIRONMENT`, `WORKFLOW_ID` and `SIGNATURE` stand for the parts of that URL.
+The webhook URL comes from a Power Automate workflow with the "When a Teams webhook request is received" trigger or from an Azure Logic Apps workflow. In Power Automate, set the trigger's "Who can trigger the flow?" option to "Anyone". Watchtower sends with the URL's `sig` signature and cannot sign in to your tenant. Copy the whole URL from the trigger. In the examples, `ENVIRONMENT`, `WORKFLOW_ID` and `SIGNATURE` stand for the parts of that URL.
 
 Watchtower checks the webhook URL at startup through Shoutrrr, whether it is set in a `teams://` URL or in the legacy option. It must use `https://` and carry a `sig` signature. Its host must be one that Microsoft issues for workflows. Watchtower refuses to start with any other URL, such as a retired Office 365 connector URL on `webhook.office.com`. Shoutrrr's [webhook URL rules](https://shoutrrr.nickfedor.com/latest/services/chat/teams/#webhook_url){target="_blank" rel="noopener noreferrer"} list the accepted hosts.
 
@@ -21,6 +21,8 @@ Watchtower checks the webhook URL at startup through Shoutrrr, whether it is set
     Watchtower still accepts `logic.azure.com` URLs because Azure Logic Apps workflows use that domain.
 
 ## Examples
+
+In a `teams://` URL, the `host` value is the whole webhook URL, percent-encoded as in the examples below. Encode its percent signs too, so `%2F` becomes `%252F`. A raw `&` would end the `host` value early. The legacy option takes the webhook URL unencoded.
 
 === "Docker Compose"
 
