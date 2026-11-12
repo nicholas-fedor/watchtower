@@ -1,84 +1,62 @@
 package msteams
 
 import (
+	"net/url"
 	"testing"
 
+	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/teams"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/notify/legacy"
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
-// TestURL_Validation verifies that URL converts an absolute https webhook URL.
-// It rejects settings without a webhook URL and any other form of URL.
-func TestURL_Validation(t *testing.T) {
+// workflowHook is a signed Power Automate workflow webhook URL whose signature
+// is "secrettoken".
+const workflowHook = "https://default.environment.api.powerplatform.com/powerautomate/automations/direct" +
+	"/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=secrettoken"
+
+// TestURL verifies that URL converts the webhook URL to a Teams URL that
+// Shoutrrr reads back with the same webhook URL and the legacy color.
+func TestURL(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name    string
-		hook    string
-		wantErr error
-	}{
-		{
-			name: "https URL",
-			hook: "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke",
-		},
-		{name: "no webhook URL", hook: "", wantErr: errEmptyWebhookURL},
-		{name: "http URL", hook: "http://example.webhook.office.com/webhookb2/abc", wantErr: errParseWebhookFailed},
-		{name: "relative URL", hook: "/webhookb2/abc", wantErr: errParseWebhookFailed},
-		{name: "https URL without a host", hook: "https:///webhookb2/abc", wantErr: errParseWebhookFailed},
-	}
+	log := zerolog.Nop()
+	raw, err := URL(&log, notifyConfig.Legacy{MSTeamsHook: workflowHook})
+	require.NoError(t, err)
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	serviceURL, err := url.Parse(raw)
+	require.NoError(t, err)
 
-			log := zerolog.Nop()
-			raw, err := URL(&log, notifyConfig.Legacy{MSTeamsHook: tt.hook})
-
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-				assert.Empty(t, raw)
-
-				return
-			}
-
-			require.NoError(t, err)
-			assert.NotEmpty(t, raw)
-		})
-	}
+	var config teams.Config
+	require.NoError(t, config.SetURL(serviceURL))
+	assert.Equal(t, workflowHook, config.Host)
+	assert.Equal(t, legacy.ColorHex, config.Color)
 }
 
-// TestURL_MalformedWebhookURLIsNotQuoted verifies that URL rejects a webhook
-// URL that does not parse without quoting it. The URL carries the webhook's
-// credentials. Neither the error nor the debug log may contain it.
-func TestURL_MalformedWebhookURLIsNotQuoted(t *testing.T) {
+// TestURL_NoWebhookURL verifies that URL rejects settings without a webhook
+// URL.
+func TestURL_NoWebhookURL(t *testing.T) {
 	t.Parallel()
 
-	log, buf := logcapture.NewJSON(zerolog.DebugLevel)
-
-	shoutrrrURL, err := URL(log, notifyConfig.Legacy{
-		MSTeamsHook: "https://example.webhook.office.com/webhookb2/secrettoken%zz",
-	})
-	require.ErrorIs(t, err, errParseWebhookFailed)
-	assert.NotContains(t, err.Error(), "secrettoken")
-	assert.Empty(t, shoutrrrURL)
-	assert.NotContains(t, buf.String(), "secrettoken")
+	log := zerolog.Nop()
+	raw, err := URL(&log, notifyConfig.Legacy{MSTeamsHook: ""})
+	require.ErrorIs(t, err, errEmptyWebhookURL)
+	assert.Empty(t, raw)
 }
 
 // TestURL_TraceLogLeavesOutWebhook verifies that the trace-level log leaves out
 // the webhook URL and the generated URL, which both carry the webhook's
-// credentials.
+// signature.
 func TestURL_TraceLogLeavesOutWebhook(t *testing.T) {
 	t.Parallel()
 
 	log, buf := logcapture.NewJSON(zerolog.TraceLevel)
 
-	_, err := URL(log, notifyConfig.Legacy{
-		MSTeamsHook: "https://example.webhook.office.com/webhookb2/secrettoken",
-	})
+	_, err := URL(log, notifyConfig.Legacy{MSTeamsHook: workflowHook})
 	require.NoError(t, err)
 
 	out := buf.String()

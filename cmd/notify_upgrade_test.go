@@ -129,7 +129,8 @@ func TestNotifyUpgrade_LegacyNotifiers(t *testing.T) {
 		"--notification-slack-identifier", "watchtower-bot",
 		"--notification-slack-icon-emoji", ":whale:",
 		"--notification-slack-channel", "#ops",
-		"--notification-msteams-hook", "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-01",
+		"--notification-msteams-hook", "https://prod-00.westus.logic.azure.com:443/workflows/abc123/triggers/manual/paths/invoke"+
+			"?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=XXXXXXXX",
 		"--notification-gotify-url", "https://gotify.example.com",
 		"--notification-gotify-token", "Agotifytoken123",
 		"--notification-gotify-tls-skip-verify",

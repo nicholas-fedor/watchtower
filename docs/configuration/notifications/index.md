@@ -349,8 +349,8 @@ Environment Variable: WATCHTOWER_NOTIFICATION_MSTEAMS_HOOK_URL
 ```
 
 !!! Warning
-    The value of `--notification-msteams-hook` **must** be an absolute URL using the `https://` scheme (including the host).
-    Relative URLs and non-HTTPS schemes are rejected at runtime.
+    The value of the `notification-msteams-hook` configuration option **must** be a Power Automate or Azure Logic Apps workflow webhook URL. It uses `https://` and carries a `sig` signature parameter.
+    Watchtower refuses to start with any other URL, such as a retired Office 365 connector URL on `webhook.office.com`.
 
 !!! Note "This option can also reference a file, in which case the contents of the file are used."
 
