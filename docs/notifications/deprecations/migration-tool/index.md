@@ -93,7 +93,9 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
     Replace the following:
 
     - *`USERNAME`*: the user name for your SMTP server. `notify-upgrade` writes an `@` in it as `%40`.
-    - *`PASSWORD`*: the password for your SMTP server
+    - *`PASSWORD`*: the password for your SMTP server. In a Compose file, write each `$` in it as `$$`.
+
+    Use your SMTP server's host name in place of `smtp.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
 
 === "Gotify"
 
@@ -136,7 +138,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           --notification-gotify-tls-skip-verify
         ```
 
-    Replace *`TOKEN`* with the application token from your Gotify server.
+    Replace *`TOKEN`* with the application token from your Gotify server and `gotify.example.com` with your server's host name.
 
 === "Slack"
 
@@ -223,6 +225,8 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
     - *`WORKFLOW_ID`*: the workflow ID
     - *`SIGNATURE`*: the value of the `sig` parameter
 
+    An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows.
+
 !!! Important
     Replace the example environment variables with your own legacy notification configuration.
     The `notify-upgrade` command inspects the container's current configuration, so it must be started with your legacy notification settings.
@@ -239,7 +243,7 @@ INFO To get the environment file, use: docker cp CONTAINER_ID:FILE_NAME ./watcht
 
 This output includes the following values:
 
-- *`CONTAINER_ID`*: the ID of the container that ran `notify-upgrade`
+- *`CONTAINER_ID`*: the ID of the container that ran `notify-upgrade`. When `notify-upgrade` cannot find its own container ID, the line shows `<CONTAINER>` instead. Replace it with the container's name or ID before you run the command, because a shell reads `<` and `>` as redirections.
 - *`FILE_NAME`*: the name of the temporary file, such as `watchtower-notif-urls-1234567890`
 
 Run that command to copy the file to your local machine:
@@ -315,7 +319,9 @@ Select the tab that matches your legacy notification service.
         Replace the following:
 
         - *`USERNAME`*: the user name for your SMTP server. `notify-upgrade` writes an `@` in it as `%40`.
-        - *`PASSWORD`*: the password for your SMTP server
+        - *`PASSWORD`*: the password for your SMTP server. In a Compose file, write each `$` in it as `$$`.
+
+        Use your SMTP server's host name in place of `smtp.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
 
     2. With the container running, execute the `notify-upgrade` command:
 
@@ -414,7 +420,7 @@ Select the tab that matches your legacy notification service.
               --notification-gotify-tls-skip-verify
             ```
 
-        Replace *`TOKEN`* with the application token from your Gotify server.
+        Replace *`TOKEN`* with the application token from your Gotify server and `gotify.example.com` with your server's host name.
 
     2. With the container running, execute the `notify-upgrade` command:
 
@@ -592,6 +598,8 @@ Select the tab that matches your legacy notification service.
         - *`ENVIRONMENT`*: the Power Platform environment
         - *`WORKFLOW_ID`*: the workflow ID
         - *`SIGNATURE`*: the value of the `sig` parameter
+
+        An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows.
 
     2. With the container running, execute the `notify-upgrade` command:
 

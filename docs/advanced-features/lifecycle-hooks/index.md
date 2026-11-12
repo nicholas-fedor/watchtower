@@ -627,7 +627,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
           postgres_data:
         ```
 
-        Replace *`DB_PASSWORD`* with a password for the database user.
+        Replace *`DB_PASSWORD`* with a password for the database user. Write each `$` in it as `$$`, because Compose reads a `$` as the start of a variable even inside quotes.
 
 === "Application Graceful Shutdown"
 

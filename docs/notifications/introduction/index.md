@@ -11,7 +11,7 @@ To send notifications, use the [`NOTIFICATION URL`](../../configuration/notifica
 The Shoutrrr URL follows the format:
 
 ```text
-SERVICE://CREDENTIALS[:MORE_CREDENTIALS]@HOST/PATH?KEY=VALUE&...
+SERVICE://[CREDENTIALS[:MORE_CREDENTIALS]@]HOST[/PATH][?KEY=VALUE[&KEY=VALUE...]]
 ```
 
 This format includes the following values:
@@ -23,7 +23,7 @@ This format includes the following values:
 - *`PATH`*: the path, for services that use one
 - `KEY` and `VALUE`: a query parameter and its value
 
-The format is the same for all services, but the parameters, path, and credentials vary between them.
+Parts in square brackets are optional. Which parts a service uses and what they hold depend on the service. A Gotify URL such as `gotify://gotify.example.com/TOKEN` has no credentials before its host.
 
 The [`NOTIFICATION URL`](../../configuration/notifications/index.md#notification_url) configuration option can also reference a file, in which case the contents of the file are used.
 

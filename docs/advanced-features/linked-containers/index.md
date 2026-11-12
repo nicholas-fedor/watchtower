@@ -276,7 +276,7 @@ Consider a classic WordPress setup with MySQL database:
           MYSQL_ROOT_PASSWORD: DB_ROOT_PASSWORD
     ```
 
-    Replace *`DB_ROOT_PASSWORD`* with a root password for the database.
+    Replace *`DB_ROOT_PASSWORD`* with a root password for the database. Write each `$` in it as `$$`, because Compose reads a `$` as the start of a variable even inside quotes.
 === "Update Process"
     When Watchtower detects a MySQL update:
 

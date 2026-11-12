@@ -27,7 +27,7 @@ This token can be provided in two formats:
 - **Query-parameter auth** — For browser `EventSource` API, which cannot send custom headers:
 
   ```javascript
-  const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=EVENTS_TOKEN');
+  const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=' + encodeURIComponent('EVENTS_TOKEN'));
 
   eventSource.addEventListener('scan_started', (e) => {
       console.log('Scan started:', JSON.parse(e.data));
@@ -39,7 +39,7 @@ This token can be provided in two formats:
   ```
 
   ```bash
-  curl -N "http://localhost:8080/v1/events?access_token=EVENTS_TOKEN"
+  curl -N -G --data-urlencode "access_token=EVENTS_TOKEN" "http://localhost:8080/v1/events"
   ```
 
 The events endpoint uses a separate token from the main API token to limit blast radius, since query parameters may appear in access logs, browser history, and proxy logs.

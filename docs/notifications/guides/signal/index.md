@@ -41,7 +41,7 @@ This is typically done using [signal-cli-rest-api](https://github.com/bbernhard/
       nickfedor/watchtower
     ```
 
-The examples send from `+18005550100` to `+18005550101` through a Signal API server on `localhost:8080`. [Shoutrrr's Signal URL Format](#shoutrrrs_signal_url_format) describes each part.
+The examples send from `+18005550100` to `+18005550101` through a Signal API server on `localhost:8080`. Replace the first number with your registered Signal number and the second with the number to send to. [Shoutrrr's Signal URL Format](#shoutrrrs_signal_url_format) describes each part.
 
 ## Setting up a Signal API Server
 

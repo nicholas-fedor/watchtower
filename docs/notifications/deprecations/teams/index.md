@@ -52,6 +52,8 @@ Replace the following with the parts of the webhook URL that your workflow's tri
 - *`WORKFLOW_ID`*: the workflow ID
 - *`SIGNATURE`*: the value of the `sig` parameter
 
+An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows, percent-encoded for the `host` value.
+
 /// details | The following legacy Microsoft Teams examples are deprecated and will be removed with the release of Watchtower v2.
     type: warning
 

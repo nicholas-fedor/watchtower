@@ -79,13 +79,13 @@ Replace *`EVENTS_TOKEN`* with your events token.
 Example using the query parameter:
 
 ```bash
-curl -N "http://localhost:8080/v1/events?access_token=EVENTS_TOKEN"
+curl -N -G --data-urlencode "access_token=EVENTS_TOKEN" "http://localhost:8080/v1/events"
 ```
 
 In JavaScript (for browsers):
 
 ```javascript
-const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=EVENTS_TOKEN');
+const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=' + encodeURIComponent('EVENTS_TOKEN'));
 ```
 
 !!! Important

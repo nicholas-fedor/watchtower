@@ -60,6 +60,8 @@ Replace the following:
 - *`USERNAME`*: the user name for your SMTP server, with an `@` in it written as `%40`
 - *`PASSWORD`*: the password for your SMTP server, percent-encoded
 
+Use your SMTP server's host name in place of `smtp.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
+
 /// details | The following legacy SMTP configuration examples are deprecated and will be removed with the release of Watchtower v2.
     type: warning
 
@@ -177,7 +179,9 @@ Replace the following:
 Replace the following:
 
 - *`USERNAME`*: the user name for your SMTP server
-- *`PASSWORD`*: the password for your SMTP server
+- *`PASSWORD`*: the password for your SMTP server. In a Compose file, write each `$` in it as `$$`.
+
+Use your SMTP server's or relay's host name in place of `smtp.example.com` or `relay.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
 
 ///
 
