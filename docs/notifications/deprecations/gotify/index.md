@@ -22,7 +22,7 @@ Watchtower can use Shoutrrr's [Gotify service](https://shoutrrr.nickfedor.com/la
       watchtower:
         image: nickfedor/watchtower:latest
         environment:
-          WATCHTOWER_NOTIFICATION_URL: "gotify://my.gotify.tld/SuperSecretToken"
+          WATCHTOWER_NOTIFICATION_URL: "gotify://gotify.example.com/TOKEN"
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
     ```
@@ -34,8 +34,10 @@ Watchtower can use Shoutrrr's [Gotify service](https://shoutrrr.nickfedor.com/la
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       nickfedor/watchtower \
-      --notification-url "gotify://my.gotify.tld/SuperSecretToken"
+      --notification-url "gotify://gotify.example.com/TOKEN"
     ```
+
+Replace *`TOKEN`* with the application token from your Gotify server. Use your server's host name in place of `gotify.example.com`.
 
 /// details | The following legacy Gotify configuration examples are deprecated and will be removed with the release of Watchtower v2.
     type: warning
@@ -48,8 +50,8 @@ Watchtower can use Shoutrrr's [Gotify service](https://shoutrrr.nickfedor.com/la
         image: nickfedor/watchtower:latest
         environment:
           WATCHTOWER_NOTIFICATIONS: gotify
-          WATCHTOWER_NOTIFICATION_GOTIFY_URL: "https://my.gotify.tld/"
-          WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN: "SuperSecretToken"
+          WATCHTOWER_NOTIFICATION_GOTIFY_URL: "https://gotify.example.com/"
+          WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN: "TOKEN"
           WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY: true
         volumes:
           - /var/run/docker.sock:/var/run/docker.sock
@@ -62,8 +64,8 @@ Watchtower can use Shoutrrr's [Gotify service](https://shoutrrr.nickfedor.com/la
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATIONS=gotify \
-      -e WATCHTOWER_NOTIFICATION_GOTIFY_URL="https://my.gotify.tld/" \
-      -e WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN="SuperSecretToken" \
+      -e WATCHTOWER_NOTIFICATION_GOTIFY_URL="https://gotify.example.com/" \
+      -e WATCHTOWER_NOTIFICATION_GOTIFY_TOKEN="TOKEN" \
       -e WATCHTOWER_NOTIFICATION_GOTIFY_TLS_SKIP_VERIFY=true \
       nickfedor/watchtower
     ```
@@ -76,8 +78,8 @@ Watchtower can use Shoutrrr's [Gotify service](https://shoutrrr.nickfedor.com/la
       -v /var/run/docker.sock:/var/run/docker.sock \
       nickfedor/watchtower \
       --notifications gotify \
-      --notification-gotify-url "https://my.gotify.tld/" \
-      --notification-gotify-token "SuperSecretToken" \
+      --notification-gotify-url "https://gotify.example.com/" \
+      --notification-gotify-token "TOKEN" \
       --notification-gotify-tls-skip-verify
     ```
 ///

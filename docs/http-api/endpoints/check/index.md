@@ -27,15 +27,17 @@ Include `check` in [`http-api-endpoints`](../../../configuration/http-api/index.
 The `image` parameter filters the check to only include containers running specific image names.
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/check?image=foo/bar:1.0"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/check?image=org/app:1.0"
 ```
+
+Replace *`API_TOKEN`* with your HTTP API token.
 
 ### Container Name
 
 The `container` parameter filters the check to only include specific containers by container name.
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/check?container=nginx"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/check?container=nginx"
 ```
 
 ### Timeout
@@ -45,7 +47,7 @@ It accepts Go durations such as `30s`, `2m`, or `5m`.
 The value is capped by the configured check API timeout (`--http-api-check-timeout` / `WATCHTOWER_HTTP_API_CHECK_TIMEOUT`, default `5m`).
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/check?timeout=2m"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/check?timeout=2m"
 ```
 
 ## Response Format

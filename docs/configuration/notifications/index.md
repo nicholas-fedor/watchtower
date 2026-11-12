@@ -23,8 +23,10 @@ Configures the notification service URL(s).
 !!! Note "Multiple Notification URLs"
     To send notifications to multiple services simultaneously, you can:
 
-    - Use comma-separated URLs: `--notification-url="discord://xxx,telegram://yyy"`
-    - Specify the flag multiple times: `--notification-url=discord://xxx --notification-url=telegram://yyy`
+    - Use comma-separated URLs: `--notification-url="DISCORD_URL,TELEGRAM_URL"`
+    - Specify the flag multiple times: `--notification-url=DISCORD_URL --notification-url=TELEGRAM_URL`
+
+    Replace *`DISCORD_URL`* and *`TELEGRAM_URL`* with the `discord://` and `telegram://` URLs of your services.
 
     See [Configuring Multiple Notification URLs](../../notifications/introduction/index.md#using_multiple_notification_services) for detailed examples.
 

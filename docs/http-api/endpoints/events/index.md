@@ -19,13 +19,15 @@ This token can be provided in two formats:
 - **Header-based auth** — For programmatic clients using `curl`, `fetch`, etc.:
 
   ```bash
-  curl -N -H "Authorization: Bearer my-events-token" "http://localhost:8080/v1/events"
+  curl -N -H "Authorization: Bearer EVENTS_TOKEN" "http://localhost:8080/v1/events"
   ```
+
+  Replace *`EVENTS_TOKEN`* with your events token.
 
 - **Query-parameter auth** — For browser `EventSource` API, which cannot send custom headers:
 
   ```javascript
-  const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=my-events-token');
+  const eventSource = new EventSource('http://localhost:8080/v1/events?access_token=EVENTS_TOKEN');
 
   eventSource.addEventListener('scan_started', (e) => {
       console.log('Scan started:', JSON.parse(e.data));
@@ -37,7 +39,7 @@ This token can be provided in two formats:
   ```
 
   ```bash
-  curl -N "http://localhost:8080/v1/events?access_token=my-events-token"
+  curl -N "http://localhost:8080/v1/events?access_token=EVENTS_TOKEN"
   ```
 
 The events endpoint uses a separate token from the main API token to limit blast radius, since query parameters may appear in access logs, browser history, and proxy logs.

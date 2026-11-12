@@ -299,14 +299,16 @@ To use Mike for local development and testing of versioned documentation:
      To build the documentation and commit the built files to a local Git branch (e.g., gh-pages) without pushing to a remote repository:
 
      ```bash
-     mike deploy <version> --config-file build/mkdocs/mkdocs.yaml
+     mike deploy VERSION --config-file build/mkdocs/mkdocs.yaml
      ```
 
-     Replace `<version>` with the desired version identifier (e.g., `1.0.0`, `dev`). You can also specify aliases:
+     Replace *`VERSION`* with the desired version identifier, such as `1.0.0` or `dev`. You can also specify aliases:
 
      ```bash
-     mike deploy <version> <alias> --config-file build/mkdocs/mkdocs.yaml
+     mike deploy VERSION ALIAS --config-file build/mkdocs/mkdocs.yaml
      ```
+
+     Replace *`ALIAS`* with the alias to point at that version, such as `latest`.
 
      Use `--update-aliases` to move an alias from another version if needed.
 

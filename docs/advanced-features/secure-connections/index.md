@@ -69,7 +69,7 @@ Environment Variable: DOCKER_HOST
             Argument: --api-version
 Environment Variable: DOCKER_API_VERSION
                 Type: String
-             Default: <Auto-negotiated>
+             Default: Auto-negotiated
 ```
 
 !!! Notes
@@ -207,10 +207,10 @@ Generate self-signed certificates for testing (replace with proper certificates 
 3. Sign the server CSR with the CA certificate, creating a server certificate valid for 365 days with the specified extensions, and save it to `server-cert.pem`:
 
     ```bash
-    echo "subjectAltName = DNS:$HOST,IP:10.10.10.20,IP:127.0.0.1" > extfile-server.cnf
+    echo "subjectAltName = DNS:$HOST,IP:192.0.2.20,IP:127.0.0.1" > extfile-server.cnf
     ```
 
-    !!! Tip "`IP:10.10.10.20` is an example IP. Replace with your host's actual IP."
+    !!! Tip "`IP:192.0.2.20` is an example IP. Replace it with your host's actual IP."
 
     !!! Tip "`$HOST` typically resolves to the hostname. Change this as necessary (i.e. `localhost` for testing) "
 

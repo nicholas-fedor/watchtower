@@ -117,7 +117,7 @@ Environment Variable: NO_PROXY / no_proxy
 
 !!! Note
     Proxies may require authentication.
-    Include it in the URL (e.g., `http://user:pass@proxy.example.com:3128`), but avoid exposing credentials in the command line by using Docker secrets or environment files instead.
+    Include it in the URL, such as `http://USERNAME:PASSWORD@proxy.example.com:3128` with your proxy user name and password, but avoid exposing credentials in the command line by using Docker secrets or environment files instead.
 
     If your proxy uses a self-signed certificate, combine with `--registry-tls-skip` to disable TLS verification (use cautiously).
 

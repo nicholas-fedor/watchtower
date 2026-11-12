@@ -183,7 +183,7 @@ A hook runs inside the container. Its output therefore comes from whatever runs 
     - Control characters other than newlines, tabs and carriage returns
     - Invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters
 - A carriage return directly before a newline is dropped. Any other carriage return becomes a newline, as do the Unicode line and paragraph separators.
-- It replaces the user information of URLs, such as the `user:token` in `https://user:token@host`, with `xxxxx`. Query values such as `?token=…` stay as printed.
+- It replaces the user information of URLs, such as the `dana:s3cret` in `https://dana:s3cret@git.example.com`, with `xxxxx`. Query values such as `?token=…` stay as printed.
 - It puts the output on one line, joining its lines with ` | `. No line of hook output can then pass for one of Watchtower's own notification lines.
 - The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.
 
@@ -604,7 +604,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
             environment:
               POSTGRES_DB: mydb
               POSTGRES_USER: user
-              POSTGRES_PASSWORD: pass
+              POSTGRES_PASSWORD: DB_PASSWORD
             volumes:
               - postgres_data:/var/lib/postgresql/data
               - ./backup.sh:/usr/local/bin/backup.sh:ro
@@ -626,6 +626,8 @@ Hook execution results are evaluated based on exit codes, with different behavio
         volumes:
           postgres_data:
         ```
+
+        Replace *`DB_PASSWORD`* with a password for the database user.
 
 === "Application Graceful Shutdown"
 

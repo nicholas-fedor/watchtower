@@ -9,7 +9,7 @@ The credentials can be provided to Watchtower in a configuration file called `co
 There are two ways to generate this configuration file:
 
 1. The configuration file can be created manually.
-2. Call `docker login <REGISTRY_NAME>` and share the resulting configuration file.
+2. Call `docker login REGISTRY_NAME` and share the resulting configuration file.
 
 ## Creating the configuration file manually
 
@@ -18,22 +18,25 @@ Create a new configuration file with the following syntax and a base64 encoded u
 ```json title="config.json"
 {
     "auths": {
-        "<REGISTRY_NAME>": {
-            "auth": "XXXXXXX"
+        "REGISTRY_NAME": {
+            "auth": "BASE64_CREDENTIALS"
         }
     }
 }
 ```
 
-`<REGISTRY_NAME>` needs to be replaced by the name of your private registry (e.g., `my-private-registry.example.org`).
+Replace the following:
+
+- *`REGISTRY_NAME`*: the name of your private registry, such as `registry.example.org`
+- *`BASE64_CREDENTIALS`*: the base64 encoding of `USERNAME:PASSWORD`, your user name and password for the registry joined by a colon
 
 ### Using Private Docker Hub Images
 
-To access private repositories on Docker Hub, `<REGISTRY_NAME>` should be `https://index.docker.io/v1/`.
+To access private repositories on Docker Hub, *`REGISTRY_NAME`* should be `https://index.docker.io/v1/`.
 The registry domain does not have to be specified in `docker run` or `docker-compose`.
 
 Like Docker, Watchtower will use the Docker Hub registry and its credentials when no registry domain is specified.
-Watchtower will recognize credentials with `<REGISTRY_NAME>` `index.docker.io`, but the Docker CLI will not.
+Watchtower will recognize credentials with *`REGISTRY_NAME`* set to `index.docker.io`, but the Docker CLI will not.
 
 ### Using a Private Registry on a Local Host
 
@@ -44,14 +47,16 @@ Examples:
 
 - `localhost` -> `localhost/myimage`
 - `127.0.0.1` -> `127.0.0.1/myimage:mytag`
-- `host.domain` -> `host.domain/myorganization/myimage`
+- `registry.example.com` -> `registry.example.com/myorganization/myimage`
 - `other-lan-host:80` -> `other-lan-host:80/imagename:latest`
 
 The required `auth` string can be generated as follows:
 
 ```bash
-echo -n 'username:password' | base64
+echo -n 'USERNAME:PASSWORD' | base64
 ```
+
+Replace *`USERNAME`* and *`PASSWORD`* with your user name and password for the registry.
 
 !!! Info "Username and Password for GCloud"
     For gcloud, we'll use `_json_key` as our username and the content of `gcloudauth.json` as the password.
@@ -59,23 +64,27 @@ echo -n 'username:password' | base64
     bash echo -n "_json_key:$(cat gcloudauth.json)" | base64 -w0
     ```
 
-When the Watchtower Docker container is started, the created configuration file (`<PATH>/config.json` in this example) needs to be passed to the container:
+When the Watchtower Docker container is started, the created configuration file needs to be passed to the container:
 
 ```bash
-docker run [...] -v <PATH>/config.json:/config.json nickfedor/watchtower
+docker run [...] -v CONFIG_DIR/config.json:/config.json nickfedor/watchtower
 ```
+
+Replace *`CONFIG_DIR`* with the directory that holds the configuration file.
 
 ## Sharing the Docker Configuration File
 
 To pull an image from a private registry, `docker login` needs to be called first, to get access to the registry.
-The provided credentials are stored in a configuration file called `<PATH_TO_HOME_DIR>/.docker/config.json`.
+The provided credentials are stored in a configuration file called `.docker/config.json` in your home directory.
 This configuration file can be directly used by Watchtower. In this case, the creation of an additional configuration file is not necessary.
 
 When the Docker container is started, pass the configuration file to Watchtower:
 
 ```bash
-docker run [...] -v <PATH_TO_HOME_DIR>/.docker/config.json:/config.json nickfedor/watchtower
+docker run [...] -v HOME_DIR/.docker/config.json:/config.json nickfedor/watchtower
 ```
+
+Replace *`HOME_DIR`* with your home directory.
 
 When creating the Watchtower container via Docker Compose, use the following lines:
 
@@ -85,9 +94,11 @@ services:
     image: nickfedor/watchtower:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - <PATH_TO_HOME_DIR>/.docker/config.json:/config.json
+      - HOME_DIR/.docker/config.json:/config.json
   ...
 ```
+
+Replace *`HOME_DIR`* with your home directory.
 
 ### Docker Config path
 
@@ -163,19 +174,19 @@ Use the Dockerfile below to build the `amazon-ecr-credential-helper` image in a 
         ```
 
 3. Create a configuration file for Docker, and store it in `$HOME/.docker/config.json`.
-   Replace the <AWS_ACCOUNT_ID> placeholders with your `AWS Account ID` and <AWS_ECR_REGION> with your `AWS ECR Region`:
+   Replace *`AWS_ACCOUNT_ID`* with your AWS account ID and *`AWS_ECR_REGION`* with the AWS Region of your Amazon ECR registry:
 
     ```json
     {
        "credsStore" : "ecr-login",
        "HttpHeaders" : {
-         "User-Agent" : "Docker-Client/19.03.1 (XXXXXX)"
+         "User-Agent" : "Docker-Client/19.03.1 (linux)"
        },
        "auths" : {
-         "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_ECR_REGION>.amazonaws.com" : {}
+         "AWS_ACCOUNT_ID.dkr.ecr.AWS_ECR_REGION.amazonaws.com" : {}
        },
        "credHelpers": {
-         "<AWS_ACCOUNT_ID>.dkr.ecr.<AWS_ECR_REGION>.amazonaws.com" : "ecr-login"
+         "AWS_ACCOUNT_ID.dkr.ecr.AWS_ECR_REGION.amazonaws.com" : "ecr-login"
        }
     }
     ```

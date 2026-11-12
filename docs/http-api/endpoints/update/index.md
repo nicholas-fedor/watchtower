@@ -21,27 +21,29 @@ Watchtower supports using the `image` URL query parameter to filter updates for 
 The following `curl` command would trigger an update of all container images monitored by Watchtower:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update"
 ```
+
+Replace *`API_TOKEN`* with your HTTP API token.
 
 #### Image Filtering with Tags
 
-You can specify image tags to target containers running a specific version (e.g., `foo/bar:1.0`).
+You can specify image tags to target containers running a specific version (e.g., `org/app:1.0`).
 
-For example, to update only containers using `foo/bar:1.0` and `foo/baz:latest`:
+For example, to update only containers using `org/app:1.0` and `org/worker:latest`:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?image=foo/bar:1.0,foo/baz:latest"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?image=org/app:1.0,org/worker:latest"
 ```
 
 #### Image Filtering without Tags
 
 If no tag is provided, Watchtower matches containers regardless of their tag.
 
-The following `curl` command would trigger an update for the images `foo/bar` and `foo/baz`:
+The following `curl` command would trigger an update for the images `org/app` and `org/worker`:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?image=foo/bar,foo/baz"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?image=org/app,org/worker"
 ```
 
 ### Container Name
@@ -55,7 +57,7 @@ You can specify exact container names or Go regex patterns to match containers.
 For example, to update only containers with names starting with `web-`:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?container=^web-.*"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?container=^web-.*"
 ```
 
 #### Multiple Container Patterns
@@ -63,7 +65,7 @@ curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?contai
 Use commas to specify multiple patterns:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?container=^web-.*,^api-.*"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?container=^web-.*,^api-.*"
 ```
 
 #### Regex Pattern Matching
@@ -84,7 +86,7 @@ It accepts Go durations such as `30s`, `2m`, or `10m`.
 The value is capped by the configured update API timeout (`--http-api-update-timeout` / `WATCHTOWER_HTTP_API_UPDATE_TIMEOUT`, default `10m`).
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?timeout=15m"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?timeout=15m"
 ```
 
 !!! Note
@@ -99,7 +101,7 @@ The `/v1/update` endpoint supports an `async` query parameter to trigger updates
 Adding the `?async=true` parameter to a POST request causes the handler to spawn the update in a background goroutine and return immediately with HTTP 202 Accepted.
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?async=true"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?async=true"
 ```
 
 Response:
@@ -112,7 +114,7 @@ Content-Type: application/json
 Equivalent example for a targeted async update:
 
 ```bash
-curl -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update?image=foo/bar:latest&async=true"
+curl -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update?image=org/app:latest&async=true"
 ```
 
 The same concurrency behavior applies to async requests: full updates return 429 if another update is already in progress, while targeted updates block until the lock is available before spawning the async goroutine.
@@ -130,7 +132,7 @@ The same concurrency behavior applies to async requests: full updates return 429
 The following example shows what happens when a full update is requested while another update is already running:
 
 ```bash
-curl -i -X POST -H "Authorization: Bearer mytoken" "localhost:8080/v1/update"
+curl -i -X POST -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/update"
 ```
 
 Response:
@@ -292,7 +294,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - WATCHTOWER_HTTP_API_TOKEN=mytoken
+      - WATCHTOWER_HTTP_API_TOKEN=API_TOKEN
       - WATCHTOWER_HTTP_API_ENDPOINTS=update,metrics
     labels:
       - "com.centurylinklabs.watchtower.enable=false"

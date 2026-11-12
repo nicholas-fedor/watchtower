@@ -55,5 +55,5 @@ If Watchtower is being run via a Docker container, then the `host:container` por
 - Listen on a specific IP and port:
 
   ```bash
-  --http-api-host=192.168.1.100 --http-api-port=9090
+  --http-api-host=192.0.2.100 --http-api-port=9090
   ```

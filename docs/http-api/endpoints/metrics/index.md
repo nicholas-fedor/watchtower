@@ -47,13 +47,13 @@ scrape_configs:
   - job_name: watchtower
     scrape_interval: 15s
     metrics_path: /v1/metrics
-    bearer_token: demotoken
+    bearer_token: API_TOKEN
     static_configs:
       - targets:
         - 'watchtower:8080'
 ```
 
-Replace `demotoken` with the Bearer token you have set accordingly.
+Replace *`API_TOKEN`* with your HTTP API token.
 
 ## Demo
 

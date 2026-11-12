@@ -37,16 +37,20 @@ The `/v1/images` endpoint returns a JSON object with image statuses, sorted by i
 The `name` parameter filters results to a specific image by exact name.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/images?name=nginx:latest"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/images?name=nginx:latest"
 ```
+
+Replace *`API_TOKEN`* with your HTTP API token.
 
 ### Image ID
 
 The `id` parameter filters results to a specific image by its image ID.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/images?id=sha256:1111..."
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/images?id=IMAGE_ID"
 ```
+
+Replace *`IMAGE_ID`* with the image ID, such as the value of `image_id` in a response.
 
 ## HTTP Status Codes
 

@@ -12,15 +12,17 @@ Include `history` in [`http-api-endpoints`](../../../configuration/http-api/inde
 The `since` parameter filters entries to those at or after the specified RFC3339 timestamp.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?since=2025-01-20T11:00:00Z"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/history?since=2025-01-20T11:00:00Z"
 ```
+
+Replace *`API_TOKEN`* with your HTTP API token.
 
 ### Until
 
 The `until` parameter filters entries to those at or before the specified RFC3339 timestamp.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?until=2025-01-20T12:00:00Z"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/history?until=2025-01-20T12:00:00Z"
 ```
 
 ### Limit
@@ -28,7 +30,7 @@ curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?until=2025-01
 The `limit` parameter restricts the maximum number of entries returned.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?limit=10"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/history?limit=10"
 ```
 
 ### Combining Parameters
@@ -36,7 +38,7 @@ curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?limit=10"
 Parameters can be combined to query a specific time range with a limit:
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/history?since=2025-01-20T11:00:00Z&until=2025-01-20T12:00:00Z&limit=50"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/history?since=2025-01-20T11:00:00Z&until=2025-01-20T12:00:00Z&limit=50"
 ```
 
 ## Response Format

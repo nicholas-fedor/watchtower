@@ -75,7 +75,7 @@ A single mirror used for Docker Hub:
 ```json title="/etc/docker/daemon.json"
 {
     "registry-mirrors": [
-        "https://docker-mirror.company.com"
+        "https://docker-mirror.example.com"
     ]
 }
 ```
@@ -88,8 +88,8 @@ If the first is unreachable, the next is used:
 ```json title="/etc/docker/daemon.json"
 {
     "registry-mirrors": [
-        "https://primary-mirror.company.com",
-        "https://backup-mirror.company.com"
+        "https://primary-mirror.example.com",
+        "https://backup-mirror.example.com"
     ]
 }
 ```
@@ -101,10 +101,10 @@ When using internal mirrors that may use self-signed certificates:
 ```json title="/etc/docker/daemon.json"
 {
     "registry-mirrors": [
-        "https://harbor.internal.company.com"
+        "https://harbor.example.com"
     ],
     "insecure-registries": [
-        "harbor.internal.company.com"
+        "harbor.example.com"
     ]
 }
 ```
@@ -139,7 +139,7 @@ For mirrors using self-signed or internal CA certificates, add them to the `inse
 
 ```json
 {
-  "insecure-registries": ["internal-mirror.company.com"]
+  "insecure-registries": ["internal-mirror.example.com"]
 }
 ```
 
