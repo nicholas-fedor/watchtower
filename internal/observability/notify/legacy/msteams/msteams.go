@@ -2,8 +2,6 @@ package msteams
 
 import (
 	"errors"
-	"fmt"
-	"net/url"
 
 	"github.com/nicholas-fedor/shoutrrr/pkg/services/chat/teams"
 	"github.com/rs/zerolog"
@@ -23,16 +21,14 @@ import (
 //nolint:godox
 const Type = "msteams"
 
-// Errors for Microsoft Teams notification configuration.
-var (
-	// errParseWebhookFailed indicates a failure to parse the Microsoft Teams webhook URL.
-	errParseWebhookFailed = errors.New("failed to parse Microsoft Teams webhook URL")
-	// errEmptyWebhookURL indicates that no Microsoft Teams webhook URL is set.
-	errEmptyWebhookURL = errors.New("the notification-msteams-hook configuration option is empty")
-)
+// errEmptyWebhookURL indicates that no Microsoft Teams webhook URL is set.
+var errEmptyWebhookURL = errors.New("the notification-msteams-hook configuration option is empty")
 
 // URL converts the legacy Microsoft Teams webhook setting to a Shoutrrr Teams
 // URL.
+//
+// Shoutrrr checks the webhook URL when it reads the returned URL. It rejects
+// one that is not a signed Power Automate or Azure Logic Apps workflow URL.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics.
@@ -40,8 +36,7 @@ var (
 //
 // Returns:
 //   - string: Teams service URL.
-//   - error: Non-nil when the webhook URL is empty. Also non-nil when it does
-//     not parse or is not an absolute https URL.
+//   - error: Non-nil when the webhook URL is empty.
 //
 // Deprecated: Legacy msteams notifier is deprecated.
 // Use --notification-url with a teams:// URL instead.
@@ -61,20 +56,6 @@ func URL(log *zerolog.Logger, cfg notifyConfig.Legacy) (string, error) {
 		log.Trace().
 			Str("url", redact.ServiceURL(webHookURL)).
 			Msg("Microsoft Teams webhook URL loaded")
-	}
-
-	// Validate the webhook URL is parseable and absolute.
-	// A parse error quotes the URL, which carries the webhook's credentials.
-	// Neither the log nor the returned error includes it.
-	parsed, err := url.Parse(webHookURL)
-	if err != nil {
-		log.Debug().Msg("Failed to parse Microsoft Teams webhook URL")
-
-		return "", errParseWebhookFailed
-	}
-
-	if parsed.Scheme != "https" || parsed.Host == "" {
-		return "", fmt.Errorf("%w: expected https URL", errParseWebhookFailed)
 	}
 
 	// Create Teams config with the full webhook URL as the host.
