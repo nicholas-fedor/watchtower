@@ -198,7 +198,7 @@ The Docker daemon clones the repository when `main` moves, builds the image, and
     ```
 
 6. Push a commit to `main`.
-    On the next session the daemon builds `https://github.com/org/app.git#<commit>`, Watchtower recreates `app`, and the replacement receives the stamp.
+    On the next session the daemon builds `https://github.com/org/app.git#COMMIT`, for the commit you pushed, shown here as *`COMMIT`*. Watchtower then recreates `app` and stamps the replacement.
 
     ```bash title="After the rebuild the stamp is that commit"
     docker inspect -f '{{index .Config.Labels "com.centurylinklabs.watchtower.git-last-commit"}}' app
@@ -398,7 +398,7 @@ They warn about a value they cannot read.
 Watchtower compares the hosted tip to the first known running revision it can find, in this order:
 
 1. Stamp labels on the container (`com.centurylinklabs.watchtower.git-last-commit`, `com.centurylinklabs.watchtower.git-last-tag`)
-2. Image identity (`org.opencontainers.image.revision`, a semver `org.opencontainers.image.version`, or a `name:git-<shortsha>` tag)
+2. Image identity (`org.opencontainers.image.revision`, a semver `org.opencontainers.image.version`, or a Git build tag such as `app:git-0123456789ab`)
 3. The remote tip remembered earlier in this Watchtower process
 
 ```mermaid
@@ -535,11 +535,11 @@ Use a [local path context](#local_path_context) when the compose file is the sou
 
 On a stale session:
 
-1. Watchtower builds a Docker Git URL context: `https://git.example.com/org/app.git#<commit>`, or `#<commit>:<subdir>` when `com.centurylinklabs.watchtower.git-context` or the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option is set.
+1. Watchtower builds a Docker Git URL context: `https://git.example.com/org/app.git#COMMIT`, or `#COMMIT:SUBDIRECTORY` when `com.centurylinklabs.watchtower.git-context` or the [Git Context](../../configuration/git-monitoring/index.md#git_context) configuration option is set. Here *`COMMIT`* is the commit to build and *`SUBDIRECTORY`* is the build context directory.
 2. The Docker daemon (BuildKit) performs a shallow clone of that commit.
     Watchtower does not clone the tree first.
 3. The Dockerfile is `com.centurylinklabs.watchtower.git-dockerfile`, or the [Git Dockerfile](../../configuration/git-monitoring/index.md#git_dockerfile) configuration option, defaulting to `Dockerfile`.
-4. The image is tagged `name:git-<shortsha>` (12 hex characters) and the original image name is retagged.
+4. Watchtower tags the image with its original name and with `NAME:git-SHORT_SHA`, where *`SHORT_SHA`* is the commit's first 12 hex characters.
 5. Watchtower recreates the container from the running inspect config.
 6. Stamp labels are written onto the new container.
 
@@ -714,8 +714,8 @@ Setting [Git Enable](../../configuration/git-monitoring/index.md#git_enable) to 
     Those releases also wrote the default ref, semver policy, Dockerfile, and context onto containers rebuilt through Compose.
     A container rebuilt that way treats them as its own labels.
     A later change to [Git Dockerfile](../../configuration/git-monitoring/index.md#git_dockerfile) or [Git Context](../../configuration/git-monitoring/index.md#git_context) does not reach it.
-    To check a container, run `docker inspect -f '{{json .Config.Labels}}' <container>` and look for `com.centurylinklabs.watchtower.git-dockerfile` and `com.centurylinklabs.watchtower.git-context`.
-    If you did not set them, recreate the container with `docker compose up -d --force-recreate <service>` so it starts from the labels in your Compose file.
+    To check a container, run `docker inspect -f '{{json .Config.Labels}}' CONTAINER` and look for `com.centurylinklabs.watchtower.git-dockerfile` and `com.centurylinklabs.watchtower.git-context`. Replace *`CONTAINER`* with the container name.
+    If you did not set them, recreate the container with `docker compose up -d --force-recreate SERVICE` so it starts from the labels in your Compose file. Replace *`SERVICE`* with the container's Compose service.
 
 ### Where Settings Come From
 
@@ -943,7 +943,7 @@ An HTTPS origin uses the token, or the username and password.
 ### Docker Secrets
 
 !!! Important "Prefer Docker Secrets for tokens and passwords"
-    Point the [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token) and [Git Password](../../configuration/git-monitoring/index.md#git_password) configuration options at a mounted file, typically `/run/secrets/<name>`.
+    Point the [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token) and [Git Password](../../configuration/git-monitoring/index.md#git_password) configuration options at a mounted file, typically `/run/secrets/SECRET_NAME`, where *`SECRET_NAME`* is the name of the Docker secret.
     Watchtower reads the file contents at startup.
     Do not put the value in the compose file or in the Watchtower process environment.
 

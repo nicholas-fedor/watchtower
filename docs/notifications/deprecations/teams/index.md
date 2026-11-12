@@ -11,7 +11,7 @@
 
 Watchtower can use Shoutrrr's [Teams service](https://shoutrrr.nickfedor.com/latest/services/chat/teams/){target="_blank" rel="noopener noreferrer"} to send [Microsoft Teams](https://www.microsoft.com/en-us/microsoft-teams){target="_blank" rel="noopener noreferrer"} notifications.
 
-The webhook URL comes from a Power Automate workflow with the "When a Teams webhook request is received" trigger or from an Azure Logic Apps workflow. In Power Automate, set the trigger's "Who can trigger the flow?" option to "Anyone". Watchtower sends with the URL's `sig` signature and cannot sign in to your tenant. Copy the whole URL from the trigger. In the examples, `ENVIRONMENT`, `WORKFLOW_ID` and `SIGNATURE` stand for the parts of that URL.
+The webhook URL comes from a Power Automate workflow with the "When a Teams webhook request is received" trigger or from an Azure Logic Apps workflow. In Power Automate, set the trigger's "Who can trigger the flow?" option to "Anyone". Watchtower sends with the URL's `sig` signature and cannot sign in to your tenant. Copy the whole URL from the trigger.
 
 Watchtower checks the webhook URL at startup through Shoutrrr, whether it is set in a `teams://` URL or in the legacy option. It must use `https://` and carry a `sig` signature. Its host must be one that Microsoft issues for workflows. Watchtower refuses to start with any other URL, such as a retired Office 365 connector URL on `webhook.office.com`. Shoutrrr's [webhook URL rules](https://shoutrrr.nickfedor.com/latest/services/chat/teams/#webhook_url){target="_blank" rel="noopener noreferrer"} list the accepted hosts.
 
@@ -45,6 +45,14 @@ In a `teams://` URL, the `host` value is the whole webhook URL, percent-encoded 
       nickfedor/watchtower \
       --notification-url "teams://?host=https%3A%2F%2FENVIRONMENT.environment.api.powerplatform.com%3A443%2Fpowerautomate%2Fautomations%2Fdirect%2Fworkflows%2FWORKFLOW_ID%2Ftriggers%2Fmanual%2Fpaths%2Finvoke%3Fapi-version%3D1%26sp%3D%252Ftriggers%252Fmanual%252Frun%26sv%3D1.0%26sig%3DSIGNATURE&title=Alert"
     ```
+
+Replace the following with the parts of the webhook URL that your workflow's trigger shows:
+
+- *`ENVIRONMENT`*: the Power Platform environment
+- *`WORKFLOW_ID`*: the workflow ID
+- *`SIGNATURE`*: the value of the `sig` parameter
+
+An Azure Logic Apps workflow's URL has a different form. Use the whole URL that its trigger shows, percent-encoded for the `host` value.
 
 /// details | The following legacy Microsoft Teams examples are deprecated and will be removed with the release of Watchtower v2.
     type: warning

@@ -31,7 +31,7 @@ An empty Watchtower depends-on label counts as absent, so the Docker Compose dep
 
 The Docker configuration always counts as well, whichever label is present:
 
-- **Docker links and network mode** (legacy Docker linking, `network_mode: service:<service-name>`, and `network_mode: container:<name-or-id>`)
+- **Docker links and network mode** (legacy Docker linking, `network_mode: service:SERVICE` for a Compose service, and `network_mode: container:CONTAINER` for a container name or ID)
 - **Volumes from another container** (`volumes_from` in Compose, `--volumes-from` in the Docker CLI)
 
 A container named by both a label and the Docker configuration is a single dependency.
@@ -92,15 +92,17 @@ The `com.docker.compose.depends_on` label is automatically set by Docker Compose
 
 #### Docker Links and Network Mode
 
-For legacy Docker links, and for containers that use another container's network (`network_mode: service:<service-name>` or `network_mode: container:<name-or-id>` in Compose, `--network container:<name-or-id>` in the Docker CLI), Watchtower treats these as implicit dependencies:
+For legacy Docker links, and for containers that use another container's network (`network_mode: service:SERVICE` or `network_mode: container:CONTAINER` in Compose, `--network container:CONTAINER` in the Docker CLI), Watchtower treats these as implicit dependencies:
 
 ```dockerfile title="Legacy Docker linking"
 # Container with explicit link
 docker run --link database:db nginx
 
 # Container using another container's network
-docker run --network container:<name-or-id> nginx
+docker run --network container:CONTAINER nginx
 ```
+
+Replace *`CONTAINER`* with the name or ID of the container whose network to use.
 
 These count as dependencies even when a depends-on or Compose `depends_on` label names other containers, because the container cannot run without the container whose network it uses.
 The same applies to `volumes_from` (`--volumes-from`): the container is always ordered after the container whose volumes it uses.
@@ -158,7 +160,7 @@ In most cases, no additional configuration is required. Watchtower automatically
 
 - Docker Compose `depends_on` declarations
 - Existing Docker links
-- `network_mode: service:<service-name>` and `network_mode: container:<name-or-id>` configurations
+- `network_mode: service:SERVICE` and `network_mode: container:CONTAINER` configurations
 - `volumes_from` configurations
 
 !!! Note "Docker Compose Considerations"
@@ -194,7 +196,7 @@ This disables parsing of the `com.docker.compose.depends_on` label while still h
 
 - Watchtower's explicit `com.centurylinklabs.watchtower.depends-on` label
 - Legacy Docker links
-- Network mode dependencies (`network_mode: service:<service-name>` and `network_mode: container:<name-or-id>`)
+- Network mode dependencies (`network_mode: service:SERVICE` and `network_mode: container:CONTAINER`)
 - Volumes from another container (`volumes_from`)
 
 ### Explicit Dependencies
@@ -271,8 +273,11 @@ Consider a classic WordPress setup with MySQL database:
       mysql:
         image: mysql:8.0
         environment:
-          MYSQL_ROOT_PASSWORD: example
+          MYSQL_ROOT_PASSWORD: 'DB_ROOT_PASSWORD'
     ```
+
+    Replace *`DB_ROOT_PASSWORD`* with a root password for the database, inside the single quotes so that YAML reads every character as part of it. Inside the quotes, write each `'` as `''`. Write each `$` as `$$`, because Compose reads a `$` as the start of a variable even inside quotes.
+
 === "Update Process"
     When Watchtower detects a MySQL update:
 
@@ -344,7 +349,7 @@ For applications using traditional Docker linking:
 
 ### Network Mode Dependencies
 
-Containers using `network_mode: service:<service-name>`:
+Containers using `network_mode: service:SERVICE`:
 
 === "Docker Compose"
 

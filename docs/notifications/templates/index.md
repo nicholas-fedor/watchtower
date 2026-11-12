@@ -411,14 +411,24 @@ With [notification report](../../configuration/notifications/index.md#notificati
 
 | Message                                                                      | What the notification says                            |
 |:-----------------------------------------------------------------------------|:------------------------------------------------------|
-| `Found new Git revision`                                                     | `Found new Git revision: <host/path>@<tag or branch> (<12-char sha>)` |
-| `Built image from Git URL context`                                           | `Built image: <name:git-shortsha> (<short image id>)` |
-| `Built Compose project`                                                      | `Built Compose project: <project> (<services>)`, only when containers are not restarted |
+| `Found new Git revision`                                                     | `Found new Git revision: REVISION (SHORT_COMMIT)` |
+| `Built image from Git URL context`                                           | `Built image: IMAGE (IMAGE_ID)` |
+| `Built Compose project`                                                      | `Built Compose project: PROJECT (SERVICES)`, only when containers are not restarted |
 | `Git build failed. Leaving running container untouched`                      | Container and the error. The running container was left in place. |
 | `Compose apply failed. Docker Compose may have partially recreated services` | Container and a short failure line. |
-| `Compose project directory is not readable. Leaving the running container untouched` | `Skipped <container>: compose directory is not readable` |
-| `Skipped container with an invalid git semver policy`                        | `Skipped <container>: invalid git semver policy` |
-| `Skipped container with an invalid git-host`                                 | `Skipped <container>: invalid git-host` |
+| `Compose project directory is not readable. Leaving the running container untouched` | `Skipped CONTAINER: compose directory is not readable` |
+| `Skipped container with an invalid git semver policy`                        | `Skipped CONTAINER: invalid git semver policy` |
+| `Skipped container with an invalid git-host`                                 | `Skipped CONTAINER: invalid git-host` |
+
+These lines include the following values:
+
+- *`REVISION`*: the repository path and the tag or branch, such as `github.com/org/app@v1.2.3`
+- *`SHORT_COMMIT`*: the first 12 characters of the commit
+- *`IMAGE`*: the built image, such as `app:git-0123456789ab`
+- *`IMAGE_ID`*: the short ID of the built image
+- *`PROJECT`*: the Compose project
+- *`SERVICES`*: the Compose services that were built, separated by commas
+- *`CONTAINER`*: the container name
 
 The log fields are `container`, `image`, `repo`, `ref`, `commit`, `changelog`, `project`, `dir`, and `error`. A custom simple template reads them from `.Data`:
 

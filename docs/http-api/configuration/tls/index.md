@@ -81,7 +81,7 @@ Mount the certificate directory into the container, enable the metrics API (prov
                 - /var/run/docker.sock:/var/run/docker.sock
                 - /opt/watchtower/certs:/certs:ro
             environment:
-                - WATCHTOWER_HTTP_API_TOKEN=your-secure-token
+                - WATCHTOWER_HTTP_API_TOKEN=API_TOKEN
                 # Enables the /v1/metrics endpoint (used in Step 4)
                 - WATCHTOWER_HTTP_API_ENDPOINTS=metrics
                 - WATCHTOWER_HTTP_API_TLS_CERT=/certs/watchtower.crt
@@ -98,7 +98,7 @@ Mount the certificate directory into the container, enable the metrics API (prov
         --name watchtower \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v /opt/watchtower/certs:/certs:ro \
-        -e WATCHTOWER_HTTP_API_TOKEN=your-secure-token \
+        -e WATCHTOWER_HTTP_API_TOKEN=API_TOKEN \
         -e WATCHTOWER_HTTP_API_ENDPOINTS=metrics \
         -e WATCHTOWER_HTTP_API_TLS_CERT=/certs/watchtower.crt \
         -e WATCHTOWER_HTTP_API_TLS_KEY=/certs/watchtower.key \
@@ -107,12 +107,14 @@ Mount the certificate directory into the container, enable the metrics API (prov
         nickfedor/watchtower
     ```
 
+Replace *`API_TOKEN`* with the token that clients must send to the HTTP API.
+
 ### Step 4: Connect Using HTTPS
 
 Clients must use `https://` when connecting:
 
 ```bash
-curl -H "Authorization: Bearer your-secure-token" https://localhost:8080/v1/metrics
+curl -H "Authorization: Bearer API_TOKEN" https://localhost:8080/v1/metrics
 ```
 
 For self-signed certificates, you may need to:
@@ -123,7 +125,7 @@ For self-signed certificates, you may need to:
 Example with self-signed certificate:
 
 ```bash
-curl -k -H "Authorization: Bearer your-secure-token" https://localhost:8080/v1/metrics
+curl -k -H "Authorization: Bearer API_TOKEN" https://localhost:8080/v1/metrics
 ```
 
 ## Important Considerations

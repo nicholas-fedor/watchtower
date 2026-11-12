@@ -11,10 +11,19 @@ To send notifications, use the [`NOTIFICATION URL`](../../configuration/notifica
 The Shoutrrr URL follows the format:
 
 ```text
-<service>://<required-credentials>[:<optional-credentials>]@<required-service>/<required-path>?<key>=<value>&...
+SERVICE://[CREDENTIALS[:MORE_CREDENTIALS]@]HOST[/PATH][?KEY=VALUE[&KEY=VALUE...]]
 ```
 
-The format is the same for all services, but the parameters, path, and credentials vary between them.
+This format includes the following values:
+
+- *`SERVICE`*: the Shoutrrr service, such as `discord` or `telegram`
+- *`CREDENTIALS`*: the credentials the service needs, such as a token
+- *`MORE_CREDENTIALS`*: further credentials, for services that need them
+- *`HOST`*: the host or service part of the URL
+- *`PATH`*: the path, for services that use one
+- `KEY` and `VALUE`: a query parameter and its value
+
+Parts in square brackets are optional. Which parts a service uses and what they hold depend on the service. A Gotify URL such as `gotify://gotify.example.com/TOKEN` has no credentials before its host.
 
 The [`NOTIFICATION URL`](../../configuration/notifications/index.md#notification_url) configuration option can also reference a file, in which case the contents of the file are used.
 
@@ -40,8 +49,8 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
         This is the recommended method for providing Shoutrrr URLs, as they typically contain security-sensitive values.
 
         ```text
-        discord://token@webhookid
-        telegram://token@telegram?chats=@channel
+        discord://WEBHOOK_TOKEN@WEBHOOK_ID
+        telegram://BOT_TOKEN@telegram?chats=CHAT_ID
         ```
 
         ```yaml
@@ -70,7 +79,7 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
             watchtower:
                 image: nickfedor/watchtower:latest
                 environment:
-                    WATCHTOWER_NOTIFICATION_URL: "discord://token@webhookid,telegram://token@telegram?chats=@channel"
+                    WATCHTOWER_NOTIFICATION_URL: "discord://WEBHOOK_TOKEN@WEBHOOK_ID,telegram://BOT_TOKEN@telegram?chats=CHAT_ID"
                 volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
                 restart: unless-stopped
@@ -86,8 +95,8 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
                 image: nickfedor/watchtower:latest
                 environment:
                     WATCHTOWER_NOTIFICATION_URL: >
-                        discord://token@webhookid,
-                        telegram://token@telegram?chats=@channel
+                        discord://WEBHOOK_TOKEN@WEBHOOK_ID,
+                        telegram://BOT_TOKEN@telegram?chats=CHAT_ID
                 volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
                 restart: unless-stopped
@@ -100,8 +109,8 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
         ```yaml
         # WRONG - Only the second URL will be used:
         environment:
-        - WATCHTOWER_NOTIFICATION_URL=discord://xxx
-        - WATCHTOWER_NOTIFICATION_URL=telegram://xxx
+        - WATCHTOWER_NOTIFICATION_URL=discord://WEBHOOK_TOKEN@WEBHOOK_ID
+        - WATCHTOWER_NOTIFICATION_URL=telegram://BOT_TOKEN@telegram?chats=CHAT_ID
         ```
 
 === "Docker CLI"
@@ -114,7 +123,7 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
         docker run -d \
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -e WATCHTOWER_NOTIFICATION_URL="discord://token@webhookid,telegram://token@telegram?chats=@channel" \
+            -e WATCHTOWER_NOTIFICATION_URL="discord://WEBHOOK_TOKEN@WEBHOOK_ID,telegram://BOT_TOKEN@telegram?chats=CHAT_ID" \
             nickfedor/watchtower
         ```
 
@@ -127,9 +136,16 @@ Watchtower supports using multiple Shoutrrr URLs to send notifications to multip
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
             nickfedor/watchtower \
-            --notification-url "discord://token@webhookid" \
-            --notification-url "telegram://token@telegram?chats=@channel"
+            --notification-url "discord://WEBHOOK_TOKEN@WEBHOOK_ID" \
+            --notification-url "telegram://BOT_TOKEN@telegram?chats=CHAT_ID"
         ```
+
+Replace the following:
+
+- *`WEBHOOK_TOKEN`*: the token of your Discord webhook
+- *`WEBHOOK_ID`*: the ID of your Discord webhook
+- *`BOT_TOKEN`*: the token of your Telegram bot
+- *`CHAT_ID`*: the Telegram chat to send to, such as a chat ID or a channel name that starts with `@`
 
 !!! Note "CLI Flags vs Environment Variables"
     The CLI flag can be called multiple times as CLI arguments; however, defining the environment variable multiple times will NOT work and only the last value will be used.

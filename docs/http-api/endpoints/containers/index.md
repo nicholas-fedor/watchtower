@@ -13,15 +13,17 @@ Include `containers` in [`http-api-endpoints`](../../../configuration/http-api/i
 The `name` parameter filters results to a specific container by exact name.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/containers?name=nginx"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/containers?name=nginx"
 ```
+
+Replace *`API_TOKEN`* with your HTTP API token.
 
 ### Image Name
 
 The `image` parameter filters results to containers running a specific image.
 
 ```bash
-curl -H "Authorization: Bearer mytoken" "localhost:8080/v1/containers?image=nginx:latest"
+curl -H "Authorization: Bearer API_TOKEN" "localhost:8080/v1/containers?image=nginx:latest"
 ```
 
 ## Response Format

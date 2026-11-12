@@ -46,9 +46,11 @@ GitHub provides excellent resources for how to configure this:
 Do not place your code in the Go source path.
 
 ```bash
-git clone git@github.com:<your fork>/watchtower.git
+git clone git@github.com:USERNAME/watchtower.git
 cd watchtower
 ```
+
+Replace *`USERNAME`* with the GitHub account that holds your fork.
 
 ## Linting
 
@@ -230,6 +232,22 @@ For multi-architecture nightly images (amd64, i386, armhf, arm64v8, riscv64), us
 For stable images (with binaries/archives), use the stable config as above.
 
 The shared `build/docker/Dockerfile` is used for both, with COPY watchtower /watchtower matching GoReleaser's binary placement.
+
+## Documentation
+
+### Placeholders
+
+Examples in the documentation follow the [placeholder rules](https://developers.google.com/style/placeholders) and the [example values](https://developers.google.com/style/examples) of the Google developer documentation style guide.
+
+* Tokens, passwords, IDs, user names and any other value the reader supplies are uppercase placeholders with underscores between words, such as *`API_TOKEN`* or *`WEBHOOK_ID`*.
+* A placeholder names what it stands for. It never starts with `MY_` or `YOUR_` and is never a run of `x` characters.
+* In prose, a placeholder is italic code, written as `` *`PLACEHOLDER`* ``. In a code block, it is plain uppercase text.
+* Angle brackets never mark a placeholder, because Markdown can read them as HTML tags and a shell reads them as redirections.
+* Shell variable syntax such as `${USER}` never marks a placeholder, because a shell or Docker Compose expands it.
+* Hosts use the reserved example domains `example.com`, `example.org` and `example.net`. Phone numbers use the reserved range from `+18005550100` to `+18005550199`. IP addresses use the documentation ranges of RFC 5737 and RFC 3849.
+* Each placeholder is explained where it first appears. A single placeholder gets a sentence that starts with "Replace". Two or more get a "Replace the following:" list in the order they appear.
+* Placeholders in example output get a list introduced with "This output includes the following values:".
+* A realistic fictitious value fits in text that explains a format and in example output.
 
 ## Submitting Pull Requests
 
