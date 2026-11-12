@@ -654,6 +654,50 @@ func TestContainer_IsWatchtower(t *testing.T) {
 	}
 }
 
+// TestContainer_IsEphemeralOrchestrator verifies that only the exact value
+// "true" marks an orchestrator, since cleanup removes the containers it marks.
+func TestContainer_IsEphemeralOrchestrator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		containerLabels map[string]string
+		want            bool
+	}{
+		{name: "true", containerLabels: map[string]string{labels.EphemeralOrchestrator: "true"}, want: true},
+		{name: "false", containerLabels: map[string]string{labels.EphemeralOrchestrator: "false"}, want: false},
+		{name: "other spelling of true", containerLabels: map[string]string{labels.EphemeralOrchestrator: "TRUE"}, want: false},
+		{name: "label missing", containerLabels: map[string]string{labels.Watchtower: "true"}, want: false},
+		{name: "no labels", containerLabels: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := &Container{containerInfo: &dockerContainer.InspectResponse{
+				Config: &dockerContainer.Config{Labels: tt.containerLabels},
+			}}
+
+			assert.Equal(t, tt.want, c.IsEphemeralOrchestrator())
+		})
+	}
+
+	t.Run("no inspect data", func(t *testing.T) {
+		t.Parallel()
+
+		assert.False(t, (&Container{}).IsEphemeralOrchestrator())
+	})
+
+	t.Run("no config", func(t *testing.T) {
+		t.Parallel()
+
+		c := &Container{containerInfo: &dockerContainer.InspectResponse{}}
+
+		assert.False(t, c.IsEphemeralOrchestrator())
+	})
+}
+
 func TestContainer_StopSignal(t *testing.T) {
 	tests := []struct {
 		name string

@@ -12,6 +12,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
@@ -105,6 +106,10 @@ type dockerConnectionConfig struct {
 // CreateOrchestrator creates and starts the ephemeral orchestrator for
 // a self-update, and removes it again when it cannot be started.
 //
+// The orchestrator's name comes from the source container's ID, so an
+// orchestrator already holding it was left behind by an earlier attempt for
+// the same container. Such a leftover is replaced unless it is still running.
+//
 // Parameters:
 //   - log: Logger for the self-update.
 //   - ctx: Context for cancellation and timeout control.
@@ -165,15 +170,18 @@ func CreateOrchestrator(
 		Msg("Creating ephemeral orchestrator container")
 
 	// Create the container without specifying a platform.
-	resp, err := api.ContainerCreate(
-		ctx,
-		dockerClient.ContainerCreateOptions{
-			Config:           config,
-			HostConfig:       hostConfig,
-			NetworkingConfig: &dockerNetwork.NetworkingConfig{},
-			Name:             orchestratorName,
-		},
-	)
+	createOptions := dockerClient.ContainerCreateOptions{
+		Config:           config,
+		HostConfig:       hostConfig,
+		NetworkingConfig: &dockerNetwork.NetworkingConfig{},
+		Name:             orchestratorName,
+	}
+
+	resp, err := api.ContainerCreate(ctx, createOptions)
+	if cerrdefs.IsConflict(err) && removeLeftoverOrchestrator(clog, ctx, api, orchestratorName) {
+		resp, err = api.ContainerCreate(ctx, createOptions)
+	}
+
 	if err != nil {
 		clog.Debug().
 			Err(err).
@@ -224,6 +232,82 @@ func CreateOrchestrator(
 	}
 
 	return orchestratorID, nil
+}
+
+// removeLeftoverOrchestrator removes the container holding the name a new
+// orchestrator needs when it is an orchestrator that is not running.
+//
+// A running orchestrator may still be handing off, so it is kept. A container
+// without the orchestrator label is kept too. A holder that is already gone
+// leaves the name free.
+//
+// Parameters:
+//   - clog: Logger for the self-update.
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API that inspects and removes the container.
+//   - name: Name of the orchestrator to create.
+//
+// Returns:
+//   - bool: True when the leftover was removed and the name is free.
+func removeLeftoverOrchestrator(
+	clog *zerolog.Logger,
+	ctx context.Context,
+	api dockerClient.APIClient,
+	name string,
+) bool {
+	// The orchestrator removes itself on exit, so the holder can disappear
+	// between the create and this inspect.
+	inspect, err := api.ContainerInspect(ctx, name, dockerClient.ContainerInspectOptions{})
+	if cerrdefs.IsNotFound(err) {
+		clog.Debug().Msg("The container holding the orchestrator's name is already gone")
+
+		return true
+	}
+
+	if err != nil {
+		clog.Debug().Err(err).Msg("Could not inspect the container holding the orchestrator's name")
+
+		return false
+	}
+
+	leftover := container.NewContainer(clog, &inspect.Container, nil)
+	if !leftover.IsEphemeralOrchestrator() {
+		clog.Debug().Msg("Keeping a container that holds the orchestrator's name but is not an orchestrator")
+
+		return false
+	}
+
+	if leftover.IsRunning() {
+		clog.Debug().
+			Str("orchestrator_id", leftover.ID().ShortID()).
+			Msg("Keeping a running orchestrator that may still be handing off")
+
+		return false
+	}
+
+	_, err = api.ContainerRemove(ctx, string(leftover.ID()), dockerClient.ContainerRemoveOptions{Force: true})
+	if cerrdefs.IsNotFound(err) {
+		clog.Debug().
+			Str("orchestrator_id", leftover.ID().ShortID()).
+			Msg("The orchestrator left behind by an earlier self-update is already gone")
+
+		return true
+	}
+
+	if err != nil {
+		clog.Debug().
+			Err(err).
+			Str("orchestrator_id", leftover.ID().ShortID()).
+			Msg("Could not remove an orchestrator left behind by an earlier self-update")
+
+		return false
+	}
+
+	clog.Debug().
+		Str("orchestrator_id", leftover.ID().ShortID()).
+		Msg("Removed an orchestrator left behind by an earlier self-update")
+
+	return true
 }
 
 // buildOrchestratorConfig builds the Docker container configuration for the
