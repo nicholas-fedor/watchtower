@@ -127,6 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/prometheus/common to v0.74.0 by @renovate[bot] in [#3729](https://github.com/nicholas-fedor/watchtower/pull/3729)
 - Update module gopkg.in/ini.v1 to v1.68.0 by @renovate[bot] in [#3721](https://github.com/nicholas-fedor/watchtower/pull/3721)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.24.0 by @renovate[bot] in [#3720](https://github.com/nicholas-fedor/watchtower/pull/3720)
 - Update module github.com/moby/buildkit to v0.35.0 by @renovate[bot] in [#3713](https://github.com/nicholas-fedor/watchtower/pull/3713)
