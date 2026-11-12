@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Replace an ephemeral orchestrator left behind by a failed start by @nicholas-fedor in [#3718](https://github.com/nicholas-fedor/watchtower/pull/3718)
+- Report a failed self-update orchestrator once by @nicholas-fedor in [#3711](https://github.com/nicholas-fedor/watchtower/pull/3711)
 - Report a failed image pull as the engine's failure by @nicholas-fedor in [#3707](https://github.com/nicholas-fedor/watchtower/pull/3707)
 - Retire old instances through one sequence by @nicholas-fedor in [#3705](https://github.com/nicholas-fedor/watchtower/pull/3705)
 - Report orphan recoveries once in notifications by @nicholas-fedor in [#3700](https://github.com/nicholas-fedor/watchtower/pull/3700)
@@ -122,6 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/buildkit to v0.35.0 by @renovate[bot] in [#3713](https://github.com/nicholas-fedor/watchtower/pull/3713)
+- Update golang.org/x/tools digest to d4453b5 by @renovate[bot] in [#3712](https://github.com/nicholas-fedor/watchtower/pull/3712)
 - Update module golang.org/x/crypto to v0.59.0 by @renovate[bot] in [#3709](https://github.com/nicholas-fedor/watchtower/pull/3709)
 - Update module github.com/gofiber/utils/v2 to v2.6.5 by @renovate[bot] in [#3703](https://github.com/nicholas-fedor/watchtower/pull/3703)
 - Update module github.com/docker/compose/v5 to v5.7.1 by @renovate[bot] in [#3702](https://github.com/nicholas-fedor/watchtower/pull/3702)
