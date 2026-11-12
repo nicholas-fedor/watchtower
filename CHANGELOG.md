@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Leave legacy teams webhook checks to shoutrrr by @nicholas-fedor in [#3723](https://github.com/nicholas-fedor/watchtower/pull/3723)
 - Drop the unreachable chain check from IsSuperseded by @nicholas-fedor in [#3693](https://github.com/nicholas-fedor/watchtower/pull/3693)
 - Extract the old-instance check from update by @nicholas-fedor in [#3683](https://github.com/nicholas-fedor/watchtower/pull/3683)
 - Extract the dependency phase from update by @nicholas-fedor in [#3677](https://github.com/nicholas-fedor/watchtower/pull/3677)
