@@ -124,6 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module gopkg.in/ini.v1 to v1.68.0 by @renovate[bot] in [#3721](https://github.com/nicholas-fedor/watchtower/pull/3721)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.24.0 by @renovate[bot] in [#3720](https://github.com/nicholas-fedor/watchtower/pull/3720)
 - Update module github.com/moby/buildkit to v0.35.0 by @renovate[bot] in [#3713](https://github.com/nicholas-fedor/watchtower/pull/3713)
 - Update golang.org/x/tools digest to d4453b5 by @renovate[bot] in [#3712](https://github.com/nicholas-fedor/watchtower/pull/3712)
 - Update module golang.org/x/crypto to v0.59.0 by @renovate[bot] in [#3709](https://github.com/nicholas-fedor/watchtower/pull/3709)
