@@ -604,7 +604,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
             environment:
               POSTGRES_DB: mydb
               POSTGRES_USER: user
-              POSTGRES_PASSWORD: DB_PASSWORD
+              POSTGRES_PASSWORD: 'DB_PASSWORD'
             volumes:
               - postgres_data:/var/lib/postgresql/data
               - ./backup.sh:/usr/local/bin/backup.sh:ro
@@ -627,7 +627,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
           postgres_data:
         ```
 
-        Replace *`DB_PASSWORD`* with a password for the database user. Write each `$` in it as `$$`, because Compose reads a `$` as the start of a variable even inside quotes.
+        Replace *`DB_PASSWORD`* with a password for the database user, inside the single quotes so that YAML reads every character as part of it. Inside the quotes, write each `'` as `''`. Write each `$` as `$$`, because Compose reads a `$` as the start of a variable even inside quotes.
 
 === "Application Graceful Shutdown"
 

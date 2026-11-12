@@ -80,7 +80,7 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
             WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
             WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
             WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: USERNAME
-            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: PASSWORD
+            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: 'PASSWORD'
             WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
             volumes:
             - /var/run/docker.sock:/var/run/docker.sock
@@ -124,7 +124,7 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
         -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
         -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
         -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=USERNAME \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=PASSWORD \
+        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD='PASSWORD' \
         -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
         nickfedor/watchtower
         ```
@@ -142,7 +142,7 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
         --notification-email-server smtp.example.com \
         --notification-email-server-port 587 \
         --notification-email-server-user USERNAME \
-        --notification-email-server-password PASSWORD \
+        --notification-email-server-password 'PASSWORD' \
         --notification-email-delay 10
         ```
 
@@ -179,7 +179,7 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
 Replace the following:
 
 - *`USERNAME`*: the user name for your SMTP server
-- *`PASSWORD`*: the password for your SMTP server. In a Compose file, write each `$` in it as `$$`.
+- *`PASSWORD`*: the password for your SMTP server, inside the single quotes. In a Compose file, write each `'` in it as `''` and each `$` as `$$`. In a shell command, write each `'` as `'\''`.
 
 Use your SMTP server's or relay's host name in place of `smtp.example.com` or `relay.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
 

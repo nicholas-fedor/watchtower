@@ -53,7 +53,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
               WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
               WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
               WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: USERNAME
-              WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: PASSWORD
+              WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: 'PASSWORD'
               WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
               WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
             volumes:
@@ -68,7 +68,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
           -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
           -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=USERNAME \
-          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=PASSWORD \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD='PASSWORD' \
           -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
           -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
           nickfedor/watchtower \
@@ -85,7 +85,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           --notification-email-server smtp.example.com \
           --notification-email-server-port 587 \
           --notification-email-server-user USERNAME \
-          --notification-email-server-password PASSWORD \
+          --notification-email-server-password 'PASSWORD' \
           --notification-email-from sender@example.com \
           --notification-email-to recipient@example.com
         ```
@@ -93,7 +93,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
     Replace the following:
 
     - *`USERNAME`*: the user name for your SMTP server. `notify-upgrade` writes an `@` in it as `%40`.
-    - *`PASSWORD`*: the password for your SMTP server. In a Compose file, write each `$` in it as `$$`.
+    - *`PASSWORD`*: the password for your SMTP server, inside the single quotes. In a Compose file, write each `'` in it as `''` and each `$` as `$$`. In a shell command, write each `'` as `'\''`.
 
     Use your SMTP server's host name in place of `smtp.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
 
@@ -275,7 +275,7 @@ Select the tab that matches your legacy notification service.
                         WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
                         WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
                         WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: USERNAME
-                        WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: PASSWORD
+                        WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: 'PASSWORD'
                         WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
                         WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
                         WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
@@ -292,7 +292,7 @@ Select the tab that matches your legacy notification service.
               -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
               -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
               -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=USERNAME \
-              -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD=PASSWORD \
+              -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD='PASSWORD' \
               -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
               -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
               -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
@@ -309,7 +309,7 @@ Select the tab that matches your legacy notification service.
               --notification-email-server smtp.example.com \
               --notification-email-server-port 587 \
               --notification-email-server-user USERNAME \
-              --notification-email-server-password PASSWORD \
+              --notification-email-server-password 'PASSWORD' \
               --notification-email-from sender@example.com \
               --notification-email-to recipient@example.com \
               --notification-email-delay 10 \
@@ -319,7 +319,7 @@ Select the tab that matches your legacy notification service.
         Replace the following:
 
         - *`USERNAME`*: the user name for your SMTP server. `notify-upgrade` writes an `@` in it as `%40`.
-        - *`PASSWORD`*: the password for your SMTP server. In a Compose file, write each `$` in it as `$$`.
+        - *`PASSWORD`*: the password for your SMTP server, inside the single quotes. In a Compose file, write each `'` in it as `''` and each `$` as `$$`. In a shell command, write each `'` as `'\''`.
 
         Use your SMTP server's host name in place of `smtp.example.com` and your own addresses in place of `sender@example.com` and `recipient@example.com`.
 
@@ -349,7 +349,7 @@ Select the tab that matches your legacy notification service.
                 watchtower:
                     image: nickfedor/watchtower:latest
                     environment:
-                        WATCHTOWER_NOTIFICATION_URL: smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&clienthost=localhost&encryption=Auto&fromaddress=sender%40example.com&fromname=Watchtower&subject=&toaddresses=recipient%40example.com&usehtml=No&usestarttls=Yes&timeout=10s
+                        WATCHTOWER_NOTIFICATION_URL: 'smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&clienthost=localhost&encryption=Auto&fromaddress=sender%40example.com&fromname=Watchtower&subject=&toaddresses=recipient%40example.com&usehtml=No&usestarttls=Yes&timeout=10s'
                         WATCHTOWER_NOTIFICATIONS_DELAY: "10"
                         WATCHTOWER_NOTIFICATION_TITLE_TAG: Watchtower
                     volumes:
@@ -360,7 +360,7 @@ Select the tab that matches your legacy notification service.
             docker run -d \
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
-              -e "WATCHTOWER_NOTIFICATION_URL=smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&clienthost=localhost&encryption=Auto&fromaddress=sender%40example.com&fromname=Watchtower&subject=&toaddresses=recipient%40example.com&usehtml=No&usestarttls=Yes&timeout=10s" \
+              -e 'WATCHTOWER_NOTIFICATION_URL=smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&clienthost=localhost&encryption=Auto&fromaddress=sender%40example.com&fromname=Watchtower&subject=&toaddresses=recipient%40example.com&usehtml=No&usestarttls=Yes&timeout=10s' \
               -e WATCHTOWER_NOTIFICATIONS_DELAY=10 \
               -e WATCHTOWER_NOTIFICATION_TITLE_TAG=Watchtower \
               nickfedor/watchtower
@@ -371,10 +371,12 @@ Select the tab that matches your legacy notification service.
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               nickfedor/watchtower \
-              --notification-url "smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&clienthost=localhost&encryption=Auto&fromaddress=sender%40example.com&fromname=Watchtower&subject=&toaddresses=recipient%40example.com&usehtml=No&usestarttls=Yes&timeout=10s" \
+              --notification-url 'smtp://USERNAME:PASSWORD@smtp.example.com:587/?auth=Plain&clienthost=localhost&encryption=Auto&fromaddress=sender%40example.com&fromname=Watchtower&subject=&toaddresses=recipient%40example.com&usehtml=No&usestarttls=Yes&timeout=10s' \
               --notifications-delay 10 \
               --notification-title-tag Watchtower
             ```
+
+        The single quotes keep YAML and the shell from changing the URL. `notify-upgrade` writes a `'` in the password as `%27` but leaves a `$` as it is. In a Compose file, write each `$` in the URL as `$$`.
 
     !!! Note
         - Avoid using unrecognized flags like `WATCHTOWER_NOTIFICATION_EMAIL_SERVER_SSL`, as they are ignored and may cause confusion.
