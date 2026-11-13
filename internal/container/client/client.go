@@ -544,14 +544,8 @@ func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 //   - []*container.Container: The labeled containers.
 //   - error: Non-nil if listing fails, nil on success.
 func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error) {
-	filterArgs := make(dockerClient.Filters).
-		Add("label", label+"=true").
-		Add("status", "created", "running", "paused", "exited")
-
-	// Podman rejects the restarting status, which would fail the whole list.
-	if !c.isPodmanRuntime(ctx) {
-		filterArgs.Add("status", "restarting")
-	}
+	filterArgs := statusFilter(c.isPodmanRuntime(ctx), "created", "running", "paused", "exited", "restarting").
+		Add("label", label+"=true")
 
 	listOptions := dockerClient.ContainerListOptions{All: true, Filters: filterArgs}
 

@@ -688,18 +688,40 @@ func stopAndRemoveSourceContainer(log *zerolog.Logger,
 // Returns:
 //   - dockerClient.Filters: Arguments for filtering Docker containers
 func buildListFilterArgs(opts ClientOptions, isPodman bool) dockerClient.Filters {
-	filterArgs := make(dockerClient.Filters)
-
-	filterArgs.Add("status", "running")
+	statuses := []string{"running"}
 
 	if opts.IncludeStopped {
-		filterArgs.Add("status", "created")
-		filterArgs.Add("status", "exited")
+		statuses = append(statuses, "created", "exited")
 	}
 
-	// Podman doesn't have the "restarting" status
-	if opts.IncludeRestarting && !isPodman {
-		filterArgs.Add("status", "restarting")
+	if opts.IncludeRestarting {
+		statuses = append(statuses, "restarting")
+	}
+
+	return statusFilter(isPodman, statuses...)
+}
+
+// statusFilter returns a Docker list filter for containers in the given
+// states.
+//
+// The restarting state is left out on Podman. Podman has no restarting state
+// and rejects a listing that asks for it, which would fail the whole list.
+//
+// Parameters:
+//   - podmanRuntime: Whether the runtime is Podman.
+//   - statuses: The container states to list.
+//
+// Returns:
+//   - dockerClient.Filters: A filter with one status value per state.
+func statusFilter(podmanRuntime bool, statuses ...string) dockerClient.Filters {
+	filterArgs := make(dockerClient.Filters)
+
+	for _, status := range statuses {
+		if podmanRuntime && status == "restarting" {
+			continue
+		}
+
+		filterArgs.Add("status", status)
 	}
 
 	return filterArgs

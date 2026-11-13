@@ -280,6 +280,50 @@ func Test_buildListFilterArgs(t *testing.T) {
 	})
 }
 
+// TestStatusFilter verifies that a status filter lists the states it is given
+// and leaves out the restarting state on Podman, which rejects it.
+func TestStatusFilter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// podmanRuntime is whether the runtime is Podman.
+		podmanRuntime bool
+		// statuses are the states asked for.
+		statuses []string
+		// want is the filter built for them.
+		want dockerClient.Filters
+	}{
+		{
+			name:     "Docker keeps every state",
+			statuses: []string{"running", "restarting"},
+			want:     dockerClient.Filters{"status": {"running": true, "restarting": true}},
+		},
+		{
+			name:          "Podman leaves out restarting",
+			podmanRuntime: true,
+			statuses:      []string{"running", "exited", "restarting"},
+			want:          dockerClient.Filters{"status": {"running": true, "exited": true}},
+		},
+		{
+			name:          "Podman keeps the other states",
+			podmanRuntime: true,
+			statuses:      []string{"created", "running", "paused", "exited"},
+			want: dockerClient.Filters{
+				"status": {"created": true, "running": true, "paused": true, "exited": true},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, statusFilter(tt.podmanRuntime, tt.statuses...))
+		})
+	}
+}
+
 // sourceInspect returns the inspect response of a source container on
 // test-image:latest.
 //
