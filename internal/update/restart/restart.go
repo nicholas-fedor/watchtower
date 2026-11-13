@@ -62,6 +62,8 @@ var (
 	)
 	// errContainerGone indicates a container no longer existed when the update tried to stop it.
 	errContainerGone = errors.New("container no longer exists")
+	// errNameNotRestored indicates that a failed self-update left Watchtower under its "watchtower-old-" name.
+	errNameNotRestored = errors.New("could not restore Watchtower's container name")
 )
 
 const (
@@ -698,7 +700,7 @@ func restartContainersInSortedOrder(
 //
 // Returns:
 //   - container.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
-//   - bool: True if the container was renamed, false otherwise.
+//   - bool: True if the Watchtower container is left under its "watchtower-old-" name, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
 	log *zerolog.Logger,
@@ -730,6 +732,7 @@ func restartStaleContainer(
 	var (
 		renamed                bool
 		originalWatchtowerName string
+		oldWatchtowerName      string
 	)
 
 	// Rename Watchtower containers regardless of NoRestart flag,
@@ -776,6 +779,7 @@ func restartStaleContainer(
 			renamed = true
 		} else {
 			originalWatchtowerName = sourceContainer.Name()
+			oldWatchtowerName = targetOldName
 
 			err := client.RenameContainer(ctx, sourceContainer, targetOldName)
 			if err != nil {
@@ -821,41 +825,11 @@ func restartStaleContainer(
 			Fields(fields).
 			Msg("Failed to create container")
 
-		// Restore the original name so the running instance is not left only as
-		// watchtower-old-* with the canonical name free and unused.
-		// Use a fresh context here: detachedCtx may already be expired if the
-		// create call hit the timeout, and we do not want recovery to fail for
-		// the same reason.
-		if renamed && originalWatchtowerName != "" && sourceContainer.IsWatchtower() {
-			renameBackCtx, renameBackCancel := context.WithTimeout(
-				context.Background(),
-				config.DetachedTimeout(),
-			)
-			defer renameBackCancel()
-
-			//nolint:contextcheck // fresh context is intentional for recovery after timeout
-			renameBackErr := client.RenameContainer(
-				renameBackCtx,
-				sourceContainer,
-				originalWatchtowerName,
-			)
-			if renameBackErr != nil {
-				log.Debug().
-					Err(renameBackErr).
-					Fields(fields).
-					Str("original_name", originalWatchtowerName).
-					Msg("Failed to rename Watchtower container back after create failure")
-			} else {
-				renamed = false
-
-				log.Debug().
-					Fields(fields).
-					Str("original_name", originalWatchtowerName).
-					Msg("Restored Watchtower container name after create failure")
-			}
+		if originalWatchtowerName != "" {
+			renamed, err = restoreWatchtowerName(log, ctx, client, sourceContainer, oldWatchtowerName, originalWatchtowerName, config, err)
 		}
 
-		return "", renamed, err //nolint:wrapcheck // The client's error already names the failed create.
+		return "", renamed, err
 	}
 
 	// Start the new container based on restart settings:
@@ -876,7 +850,8 @@ func restartStaleContainer(
 
 			// On start failure after a Watchtower rename, remove the failed replacement
 			// container only. The renamed source still holds the running process and must
-			// remain so the host keeps a Watchtower instance.
+			// remain so the host keeps a Watchtower instance. It then takes its original
+			// name back, which the removed replacement held.
 			// Use a fresh context because detachedCtx may already be expired if the start
 			// call hit the timeout and we do not want cleanup to fail for the same reason.
 			if renamed && sourceContainer.IsWatchtower() {
@@ -916,9 +891,13 @@ func restartStaleContainer(
 							Msg("Failed to stop failed Watchtower container")
 					}
 				}
+
+				if originalWatchtowerName != "" {
+					renamed, err = restoreWatchtowerName(log, ctx, client, sourceContainer, oldWatchtowerName, originalWatchtowerName, config, err)
+				}
 			}
 
-			return "", renamed, err //nolint:wrapcheck // The client's error already names the failed start.
+			return "", renamed, err
 		}
 
 		log.Info().
@@ -953,4 +932,53 @@ func restartStaleContainer(
 	}
 
 	return newContainerID, renamed, nil
+}
+
+// restoreWatchtowerName gives the running Watchtower container its original
+// name back after a self-update failed to create or start a replacement under
+// that name.
+//
+// An instance left under the "watchtower-old-" name stops at its next update
+// check or restart. A failed rename is therefore added to the self-update's
+// error, which the update reports once with the container. A restored name
+// logs only at debug.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: The self-update's context. The rename keeps its values but not its
+//     cancellation or deadline, since the self-update may have run out of time.
+//   - client: Container client for Docker operations.
+//   - sourceContainer: The running Watchtower container, renamed for the self-update.
+//   - currentName: The "watchtower-old-" name the self-update gave the container.
+//   - originalName: The name to restore.
+//   - config: Update options. The rename gets the detached timeout.
+//   - cause: The error that failed the self-update.
+//
+// Returns:
+//   - bool: True when the container is still under its "watchtower-old-" name.
+//   - error: cause, joined with the failed rename when the name was not restored.
+func restoreWatchtowerName(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	sourceContainer *container.Container,
+	currentName string,
+	originalName string,
+	config updateParams.Params,
+	cause error,
+) (bool, error) {
+	renameCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
+	defer cancel()
+
+	err := client.RenameContainer(renameCtx, sourceContainer, originalName)
+	if err != nil {
+		return true, fmt.Errorf("%w, and %w %s from %s: %w", cause, errNameNotRestored, originalName, currentName, err)
+	}
+
+	log.Debug().
+		Str("container", originalName).
+		Str("old_name", currentName).
+		Msg("Restored Watchtower container name after a failed self-update")
+
+	return false, cause
 }
