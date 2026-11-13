@@ -372,38 +372,6 @@ func TestCreateTargetContainer(t *testing.T) {
 	})
 }
 
-// TestRenameTargetContainer verifies that a replacement container takes the
-// source container's name.
-func TestRenameTargetContainer(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should rename container successfully", func(t *testing.T) {
-		t.Parallel()
-
-		log, logOutput := logcapture.New(zerolog.DebugLevel)
-		api := mockContainer.NewMockAPIClient(t)
-		api.EXPECT().ContainerRename(mock.Anything, "test-id", dockerClient.ContainerRenameOptions{NewName: "new-name"}).
-			Return(dockerClient.ContainerRenameResult{}, nil).Once()
-
-		err := RenameTarget(log, t.Context(), api, modelfixture.Container(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
-		require.NoError(t, err)
-		assert.Contains(t, logOutput.String(), "Renamed container successfully")
-	})
-
-	t.Run("should return error when rename fails", func(t *testing.T) {
-		t.Parallel()
-
-		log, logOutput := logcapture.New(zerolog.DebugLevel)
-		api := mockContainer.NewMockAPIClient(t)
-		api.EXPECT().ContainerRename(mock.Anything, "test-id", dockerClient.ContainerRenameOptions{NewName: "new-name"}).
-			Return(dockerClient.ContainerRenameResult{}, errors.New("rename failed")).Once()
-
-		err := RenameTarget(log, t.Context(), api, modelfixture.Container(containerfixture.WithName("old-name"), containerfixture.WithID("test-id")), "new-name")
-		require.ErrorContains(t, err, "rename failed")
-		assert.Contains(t, logOutput.String(), "Failed to rename container")
-	})
-}
-
 // TestAttachNetworks verifies that a replacement container is connected to the
 // source container's additional networks.
 func TestAttachNetworks(t *testing.T) {

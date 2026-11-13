@@ -2029,22 +2029,26 @@ func TestClientWrappers(t *testing.T) {
 	t.Run("RenameContainer renames the container", func(t *testing.T) {
 		t.Parallel()
 
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := newDockerAPI(t)
 		api.EXPECT().ContainerRename(mock.Anything, mockContainerID, dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, nil).Once()
 
-		require.NoError(t, (&Client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name"))
+		require.NoError(t, (&Client{log: log, api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name"))
+		assert.Contains(t, logOutput.String(), "Renamed container successfully")
 	})
 
 	t.Run("RenameContainer names a failed rename once", func(t *testing.T) {
 		t.Parallel()
 
+		log, logOutput := logcapture.New(zerolog.DebugLevel)
 		api := newDockerAPI(t)
 		api.EXPECT().ContainerRename(mock.Anything, mockContainerID, dockerClient.ContainerRenameOptions{NewName: "new-name"}).
 			Return(dockerClient.ContainerRenameResult{}, daemonError("rename failed")).Once()
 
-		err := (&Client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name")
+		err := (&Client{log: log, api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name")
 		require.EqualError(t, err, "failed to rename container: Error response from daemon: rename failed")
+		assert.Equal(t, 1, strings.Count(logOutput.String(), "Failed to rename container"), "one log line carries the failure")
 	})
 
 	t.Run("Ping pings the daemon without negotiating the API version", func(t *testing.T) {
