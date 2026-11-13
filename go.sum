@@ -228,8 +228,8 @@ github.com/go-openapi/validate v1.0.1 h1:Z337eNvBb5KhZiKtjBKfpk2ZHPI8otENKyp/I60
 github.com/go-openapi/validate v1.0.1/go.mod h1:2ZKOLz7jBYipFCn3IDGwppZwtbUHlQTMuKfSWTO7Nqk=
 github.com/go-viper/mapstructure/v2 v2.5.0 h1:vM5IJoUAy3d7zRSVtIwQgBj7BiWtMPfmPEgAXnvj1Ro=
 github.com/go-viper/mapstructure/v2 v2.5.0/go.mod h1:oJDH3BJKyqBA2TXFhDsKDGDTlndYOZ6rGS0BRZIxGhM=
-github.com/gofiber/contrib/v3/swaggo v1.0.16 h1:Pd+AYpoXla2hrmuuYzxnQOYrPyK5hpXJ/qb81LVA0PE=
-github.com/gofiber/contrib/v3/swaggo v1.0.16/go.mod h1:N+HUQlfbkj/pnHm5KyAUBj6wUV4vzlr+hw0QMN+re6o=
+github.com/gofiber/contrib/v3/swaggo v1.0.17 h1:dKh54NdvpCEr38QoIEOzVEN2RMkSjUny4YyusWOLth4=
+github.com/gofiber/contrib/v3/swaggo v1.0.17/go.mod h1:byPIDBdFljWZ8n6I5GOpGC992G9MgLQoUQOwcvQQ12o=
 github.com/gofiber/contrib/v3/zerolog v1.1.11 h1:dKaBeucKVrPQEQ++iaNzjEYZxccVbeVk3Mw5z92KZDA=
 github.com/gofiber/contrib/v3/zerolog v1.1.11/go.mod h1:WSqqeiT2uOkm+0LfBYVCN2LCqo/bpMgKlDE5oyQr3CA=
 github.com/gofiber/fiber/v3 v3.7.0 h1:aF+GfB7nP9Dd0wVsv6wmr8675v66OGfjSyoDhPmvKEo=
