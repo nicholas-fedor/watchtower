@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -487,4 +488,80 @@ func addBrokenOrigin(t *testing.T, dir string) {
 		URLs: []string{"https://127.0.0.1:1/nope.git"},
 	})
 	require.NoError(t, err)
+}
+
+// TestCheckoutRecordsPriorHead verifies that Checkout reports the HEAD from
+// before the checkout through CheckoutOptions.Prior, which a caller uses to
+// put the worktree back when it does not apply the commit.
+func TestCheckoutRecordsPriorHead(t *testing.T) {
+	t.Parallel()
+
+	dir, first, second := initTwoCommitRepo(t)
+
+	var prior string
+
+	require.NoError(t, Checkout(t.Context(), dir, first, CheckoutOptions{Prior: &prior}))
+	assert.Equal(t, second, prior)
+}
+
+// TestCheckoutFailureRollsBack verifies that a checkout that fails part way
+// puts HEAD back and writes the stashed local files back.
+//
+// The target commit adds a file under a directory the worktree has made
+// read-only, so go-git cannot write it. The test is skipped for root and on
+// Windows because the directory mode stops neither.
+func TestCheckoutFailureRollsBack(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("directory permissions do not block writes here")
+	}
+
+	dir, _, second := initTwoCommitRepo(t)
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+
+	// The third commit changes a tracked file as well as adding one, so the
+	// test also shows that the rollback restores file contents.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services: {web: {}}\n"), 0o600))
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "config"), 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "config", "app.yaml"), []byte("app: {}\n"), 0o600))
+
+	_, err = worktree.Add("compose.yaml")
+	require.NoError(t, err)
+	_, err = worktree.Add("config/app.yaml")
+	require.NoError(t, err)
+
+	third, err := worktree.Commit("config", &goGit.CommitOptions{
+		Author: &object.Signature{Name: "t", Email: "t@example.com", When: time.Now()},
+	})
+	require.NoError(t, err)
+
+	// Go back to the second commit and leave an empty read-only config
+	// directory that the third commit cannot write into. Git does not track
+	// empty directories, so the worktree stays clean apart from the local .env
+	// file.
+	require.NoError(t, RestoreHead(dir, second, false))
+	require.NoError(t, os.RemoveAll(filepath.Join(dir, "config")))
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "config"), 0o500))
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(dir, "config"), 0o700) })
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=local\n"), 0o600))
+
+	err = Checkout(t.Context(), dir, third.String(), CheckoutOptions{Stash: true})
+	require.Error(t, err)
+
+	head, err := repo.Head()
+	require.NoError(t, err)
+	assert.Equal(t, second, head.Hash().String())
+
+	compose, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
+	require.NoError(t, err)
+	assert.Equal(t, "services: {api: {}}\n", string(compose))
+
+	got, err := os.ReadFile(filepath.Join(dir, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, "SECRET=local\n", string(got))
 }
