@@ -201,6 +201,24 @@ func (client FakeClient) ListContainers(ctx context.Context, filter ...filters.F
 	return containers, nil
 }
 
+// ListLabeledContainers returns the containers in TestData whose label is set
+// to "true".
+func (client FakeClient) ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error) {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return nil, err
+	}
+
+	var labeled []*container.Container
+
+	for _, c := range client.TestData.Containers {
+		if info := c.ContainerInfo(); info != nil && info.Config != nil && info.Config.Labels[label] == "true" {
+			labeled = append(labeled, c)
+		}
+	}
+
+	return labeled, nil
+}
+
 // StopContainer simulates stopping a container by marking it in the Stopped map.
 // It records the container's ID as stopped, increments the StopContainerCount,
 // and returns nil for simplicity.

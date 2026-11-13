@@ -523,6 +523,31 @@ func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 	return containers, nil
 }
 
+// ListLabeledContainers returns every container whose label is set to "true"
+// in any state, including created, exited and dead.
+//
+// The include-stopped and include-restarting configuration options do not
+// apply. They choose the containers Watchtower updates. Watchtower's own
+// containers matter in any state, such as an orchestrator that never started.
+// A listed container whose image is gone has no image info and is not logged.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - label: Key of the label that must be "true", such as the ephemeral
+//     orchestrator label.
+//
+// Returns:
+//   - []*container.Container: The labeled containers.
+//   - error: Non-nil if listing fails, nil on success.
+func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error) {
+	listOptions := dockerClient.ContainerListOptions{
+		All:     true,
+		Filters: make(dockerClient.Filters).Add("label", label+"=true"),
+	}
+
+	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
+}
+
 // GetContainer fetches detailed information about a specific container by its ID.
 //
 // Parameters:
