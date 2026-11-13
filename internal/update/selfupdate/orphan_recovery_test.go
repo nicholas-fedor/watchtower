@@ -13,6 +13,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -61,7 +62,7 @@ func recoveryContainer(id, name string, running bool, scope string) *container.C
 //   - client: Mocked container client.
 //   - containers: Containers the listing returns.
 func expectListed(client *mockSelfupdate.MockRecoveryClient, containers ...*container.Container) {
-	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(containers, nil).Once()
+	client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).Return(containers, nil).Once()
 }
 
 // TestRetireOldInstance verifies that retiring an old Watchtower container
@@ -103,7 +104,7 @@ func TestRetireOldInstance(t *testing.T) {
 				client.EXPECT().StartContainerByID(liveContext, orphan.ID()).Return(nil).Once()
 			}
 
-			client.EXPECT().ListContainers(liveContext, mock.Anything).Return(listed, nil).Once()
+			client.EXPECT().ListLabeledContainers(liveContext, labels.Watchtower).Return(listed, nil).Once()
 			client.EXPECT().SetRestartPolicy(liveContext, old.ID(),
 				dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
 
@@ -144,7 +145,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 			t.Parallel()
 
 			client := mockSelfupdate.NewMockRecoveryClient(t)
-			client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, context.DeadlineExceeded).Once()
+			client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).Return(nil, context.DeadlineExceeded).Once()
 
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
 

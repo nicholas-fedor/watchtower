@@ -833,7 +833,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		}
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{old}, nil).Once()
+		mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{old}, nil).Once()
 	case "orphan-recovery-by-old-instance", "orphan-recovery-with-rejected-notification-url":
 		args = []string{"--log-level", "info", "--notification-url", "logger://"}
 		if helperCase == "orphan-recovery-with-rejected-notification-url" {
@@ -854,7 +854,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 
 		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(old, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{old, orphan}, nil)
+		mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{old, orphan}, nil)
 		mockClient.EXPECT().StartContainerByID(mock.Anything, orphanID).Return(nil).Once()
 	case "rejected-notification-url":
 		args = []string{"--notification-url", "discord://secrettoken@notanumber"}

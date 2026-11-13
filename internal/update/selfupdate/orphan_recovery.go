@@ -9,14 +9,15 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // RecoveryClient finds and starts an orphaned replacement container.
 type RecoveryClient interface {
-	// ListContainers returns the containers that pass every filter.
-	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+	// ListLabeledContainers returns the containers in every state whose
+	// label is set to "true".
+	ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error)
 	// StartContainerByID starts an existing container.
 	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
 }
@@ -76,7 +77,9 @@ func RetireOldInstance(
 // creates a replacement container but fails to start it, leaving the old container
 // running and the new container never started.
 //
-// It lists all containers and starts the first container that
+// It lists the Watchtower containers in every state, whatever the
+// include-stopped configuration option says, since the replacement it looks
+// for was created but never started. It starts the first container that
 // [container.IsOrphanedReplacement] reports as an orphaned replacement of the
 // current container and that starts without error. A recovery is logged once,
 // at info. A start that fails is logged at error, since no Watchtower may run
@@ -93,7 +96,7 @@ func tryRecoverOrphanedContainer(
 	client RecoveryClient,
 	currentContainer *container.Container,
 ) {
-	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
+	candidates, err := client.ListLabeledContainers(ctx, labels.Watchtower)
 	if err != nil {
 		log.Debug().
 			Err(err).
@@ -102,7 +105,7 @@ func tryRecoverOrphanedContainer(
 		return
 	}
 
-	for _, c := range allContainers {
+	for _, c := range candidates {
 		if !container.IsOrphanedReplacement(c, currentContainer) {
 			continue
 		}

@@ -38,6 +38,8 @@ func TestRunUpdatesWithNotifications_OldSelfDetected(t *testing.T) {
 
 	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{oldSelf}, nil)
+	client.EXPECT().ListLabeledContainers(mock.Anything, "com.centurylinklabs.watchtower").
+		Return([]*container.Container{oldSelf}, nil)
 	client.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
 

@@ -8,7 +8,6 @@ import (
 	"context"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -48,79 +47,70 @@ func (_m *MockRecoveryClient) EXPECT() *MockRecoveryClient_Expecter {
 	return &MockRecoveryClient_Expecter{mock: &_m.Mock}
 }
 
-// ListContainers provides a mock function for the type MockRecoveryClient
-func (_mock *MockRecoveryClient) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
-	var tmpRet mock.Arguments
-	if len(filter) > 0 {
-		tmpRet = _mock.Called(ctx, filter)
-	} else {
-		tmpRet = _mock.Called(ctx)
-	}
-	ret := tmpRet
+// ListLabeledContainers provides a mock function for the type MockRecoveryClient
+func (_mock *MockRecoveryClient) ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error) {
+	ret := _mock.Called(ctx, label)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListContainers")
+		panic("no return value specified for ListLabeledContainers")
 	}
 
 	var r0 []*container.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, ...filters.Filter) ([]*container.Container, error)); ok {
-		return returnFunc(ctx, filter...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]*container.Container, error)); ok {
+		return returnFunc(ctx, label)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, ...filters.Filter) []*container.Container); ok {
-		r0 = returnFunc(ctx, filter...)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []*container.Container); ok {
+		r0 = returnFunc(ctx, label)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*container.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, ...filters.Filter) error); ok {
-		r1 = returnFunc(ctx, filter...)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, label)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockRecoveryClient_ListContainers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListContainers'
-type MockRecoveryClient_ListContainers_Call struct {
+// MockRecoveryClient_ListLabeledContainers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListLabeledContainers'
+type MockRecoveryClient_ListLabeledContainers_Call struct {
 	*mock.Call
 }
 
-// ListContainers is a helper method to define mock.On call
+// ListLabeledContainers is a helper method to define mock.On call
 //   - ctx context.Context
-//   - filter ...filters.Filter
-func (_e *MockRecoveryClient_Expecter) ListContainers(ctx any, filter ...any) *MockRecoveryClient_ListContainers_Call {
-	return &MockRecoveryClient_ListContainers_Call{Call: _e.mock.On("ListContainers",
-		append([]any{ctx}, filter...)...)}
+//   - label string
+func (_e *MockRecoveryClient_Expecter) ListLabeledContainers(ctx any, label any) *MockRecoveryClient_ListLabeledContainers_Call {
+	return &MockRecoveryClient_ListLabeledContainers_Call{Call: _e.mock.On("ListLabeledContainers", ctx, label)}
 }
 
-func (_c *MockRecoveryClient_ListContainers_Call) Run(run func(ctx context.Context, filter ...filters.Filter)) *MockRecoveryClient_ListContainers_Call {
+func (_c *MockRecoveryClient_ListLabeledContainers_Call) Run(run func(ctx context.Context, label string)) *MockRecoveryClient_ListLabeledContainers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 []filters.Filter
-		var variadicArgs []filters.Filter
-		if len(args) > 1 {
-			variadicArgs = args[1].([]filters.Filter)
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
 		}
-		arg1 = variadicArgs
 		run(
 			arg0,
-			arg1...,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockRecoveryClient_ListContainers_Call) Return(containers []*container.Container, err error) *MockRecoveryClient_ListContainers_Call {
+func (_c *MockRecoveryClient_ListLabeledContainers_Call) Return(containers []*container.Container, err error) *MockRecoveryClient_ListLabeledContainers_Call {
 	_c.Call.Return(containers, err)
 	return _c
 }
 
-func (_c *MockRecoveryClient_ListContainers_Call) RunAndReturn(run func(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)) *MockRecoveryClient_ListContainers_Call {
+func (_c *MockRecoveryClient_ListLabeledContainers_Call) RunAndReturn(run func(ctx context.Context, label string) ([]*container.Container, error)) *MockRecoveryClient_ListLabeledContainers_Call {
 	_c.Call.Return(run)
 	return _c
 }
