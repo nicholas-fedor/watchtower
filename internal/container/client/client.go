@@ -95,6 +95,8 @@ var (
 	errRecreateDockerClient = errors.New("failed to recreate Docker client")
 	// errSetRestartPolicyFailed indicates a failure to update a container's restart policy.
 	errSetRestartPolicyFailed = errors.New("failed to set restart policy")
+	// errRenameContainerFailed indicates a failure to rename an existing container.
+	errRenameContainerFailed = errors.New("failed to rename container")
 )
 
 // nopLog returns a fresh discarded logger for optional construction and fallbacks.
@@ -947,7 +949,33 @@ func (c *Client) RemoveContainer(ctx context.Context, target *container.Containe
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
 func (c *Client) RenameContainer(ctx context.Context, target *container.Container, newName string) error {
-	return recreate.RenameTarget(c.logger(), ctx, c.api, target, newName) //nolint:wrapcheck // The rename's error already names the failed rename.
+	clogVal := c.logger().With().
+		Str("container", target.Name()).
+		Str("id", target.ID().ShortID()).
+		Str("target_name", newName).
+		Logger()
+	clog := &clogVal
+
+	clog.Debug().Msg("Renaming container")
+
+	_, err := c.api.ContainerRename(
+		ctx,
+		string(target.ID()),
+		dockerClient.ContainerRenameOptions{
+			NewName: newName,
+		},
+	)
+	if err != nil {
+		clog.Debug().
+			Err(err).
+			Msg("Failed to rename container")
+
+		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)
+	}
+
+	clog.Debug().Msg("Renamed container successfully")
+
+	return nil
 }
 
 // IsContainerStale checks if a container's image is outdated.

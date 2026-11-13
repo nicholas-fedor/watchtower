@@ -37,7 +37,7 @@ var (
 	errInspectImageFailed = errors.New("failed to inspect image")
 	// errCreateContainerFailed indicates a failure to create a new container.
 	errCreateContainerFailed = errors.New("failed to create container")
-	// errRenameContainerFailed indicates a failure to rename an existing container.
+	// errRenameContainerFailed indicates a failure to give a created container the source container's name.
 	errRenameContainerFailed = errors.New("failed to rename container")
 )
 
@@ -459,52 +459,6 @@ func attachNetworks(
 				Msg("Successfully attached additional network")
 		}
 	}
-
-	return nil
-}
-
-// RenameTarget renames an existing container to the specified target name in Watchtower.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - api: Docker API client.
-//   - targetContainer: Container to be renamed.
-//   - targetName: New name for the container.
-//
-// Returns:
-//   - error: Non-nil if rename fails, nil on success.
-func RenameTarget(log *zerolog.Logger,
-	ctx context.Context,
-	api dockerClient.APIClient,
-	targetContainer *container.Container,
-	targetName string,
-) error {
-	clogVal := log.With().
-		Str("container", targetContainer.Name()).
-		Str("id", targetContainer.ID().ShortID()).
-		Str("target_name", targetName).
-		Logger()
-	clog := &clogVal
-
-	// Attempt to rename the container.
-	clog.Debug().Msg("Renaming container")
-
-	_, err := api.ContainerRename(
-		ctx,
-		string(targetContainer.ID()),
-		dockerClient.ContainerRenameOptions{
-			NewName: targetName,
-		},
-	)
-	if err != nil {
-		clog.Debug().
-			Err(err).
-			Msg("Failed to rename container")
-
-		return fmt.Errorf("%w: %w", errRenameContainerFailed, err)
-	}
-
-	clog.Debug().Msg("Renamed container successfully")
 
 	return nil
 }
