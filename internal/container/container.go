@@ -44,6 +44,10 @@ type Container struct {
 // Constants for container operations.
 const (
 	linkPartsCount = 2 // Number of parts expected in a link (name:alias)
+
+	// watchtowerOldPrefix starts the name a self-update gives the Watchtower
+	// container it replaces.
+	watchtowerOldPrefix = "watchtower-old-"
 )
 
 // nopLog returns a fresh discarded logger for optional construction and fallbacks.
@@ -229,6 +233,18 @@ func (c *Container) Name() string {
 	return c.normalizedName
 }
 
+// OldName returns the name a self-update gives this Watchtower container
+// before its replacement takes the original name.
+//
+// The name is "watchtower-old-" followed by the container's short ID, so
+// [IsOldContainer] reports it as old.
+//
+// Returns:
+//   - string: The container's old name.
+func (c *Container) OldName() string {
+	return watchtowerOldPrefix + c.ID().ShortID()
+}
+
 // ImageID returns the ID of the container's image.
 //
 // Returns:
@@ -411,7 +427,7 @@ func NormalizeContainerName(name string) string {
 // IsOldContainer reports whether the container's runtime name (from Name()
 // or raw inspect) indicates a predecessor renamed during Watchtower self-update.
 // It trims any leading '/' (as Docker names have) and checks for the
-// WatchtowerOldPrefix convention. Used for disambiguation in hostname
+// "watchtower-old-" prefix. Used for disambiguation in hostname
 // fallback, forcing cleanup of old containers, skipping redundant renames,
 // and suppressing notifs for self-cleanup of prior incarnations.
 //
@@ -427,5 +443,5 @@ func IsOldContainer(name string) bool {
 
 	n := strings.TrimLeft(name, "/")
 
-	return strings.HasPrefix(n, WatchtowerOldPrefix)
+	return strings.HasPrefix(n, watchtowerOldPrefix)
 }

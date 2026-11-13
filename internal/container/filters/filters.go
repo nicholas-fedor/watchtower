@@ -112,7 +112,7 @@ func excludeOldWatchtowerFilter(c FilterableContainer) bool {
 // Returns:
 //   - bool: True if the container is an old Watchtower container.
 func IsOldWatchtower(c FilterableContainer) bool {
-	return c.IsWatchtower() && strings.HasPrefix(strings.TrimLeft(c.Name(), "/"), container.WatchtowerOldPrefix)
+	return c.IsWatchtower() && container.IsOldContainer(c.Name())
 }
 
 // excludeOldWatchtowerFilterChain wraps a base filter with old

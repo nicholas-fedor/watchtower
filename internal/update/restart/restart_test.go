@@ -549,7 +549,7 @@ func TestDetachedContext(t *testing.T) {
 			// The removed replacement held the original name, so the source can
 			// take it back only after the removal.
 			assert.Equal(t,
-				[]string{container.WatchtowerOldPrefix + testContainer.ID().ShortID(), "watchtower"},
+				[]string{testContainer.OldName(), "watchtower"},
 				client.TestData.RenameTargets,
 			)
 
@@ -2209,7 +2209,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		source := newWatchtowerContainer()
 		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
-			RenameContainer(mock.Anything, source, container.WatchtowerOldPrefix+source.ID().ShortID()).
+			RenameContainer(mock.Anything, source, source.OldName()).
 			Return(clientErr)
 
 		_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
@@ -2239,73 +2239,6 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
-}
-
-// TestRestartStaleContainer_NameNotRestored verifies that a self-update whose
-// replacement fails to be created or started, and whose rename back to the
-// original name then fails too, adds the failed rename to its error.
-//
-// A Watchtower left under its "watchtower-old-" name stops at its next update
-// check or restart. Because the update reports the returned error with the
-// container in its "Could not update container" line and in the report, the
-// error names the container's original and current names. The restart
-// reports the source as still renamed.
-func TestRestartStaleContainer_NameNotRestored(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		// name describes the step that fails after the rename.
-		name string
-		// replacementErr is the error of the failed create or start.
-		replacementErr error
-		// expect sets up the calls between the rename and the rename back.
-		expect func(client *mockRestart.MockClient, source *container.Container, replacementErr error)
-	}{
-		{
-			name:           "create fails",
-			replacementErr: errors.New("failed to create container: daemon unavailable"),
-			expect: func(client *mockRestart.MockClient, source *container.Container, replacementErr error) {
-				client.EXPECT().CreateContainer(mock.Anything, source).Return("", replacementErr).Once()
-			},
-		},
-		{
-			name:           "start fails",
-			replacementErr: errors.New("failed to start container replacement-id: daemon unavailable"),
-			expect: func(client *mockRestart.MockClient, source *container.Container, replacementErr error) {
-				const newID = container.ContainerID("replacement-id")
-
-				failed := mockUpdate.CreateMockContainer(string(newID), "/watchtower", "watchtower:latest", time.Now())
-
-				client.EXPECT().CreateContainer(mock.Anything, source).Return(newID, nil).Once()
-				client.EXPECT().StartContainerByID(mock.Anything, newID).Return(replacementErr).Once()
-				client.EXPECT().GetContainer(mock.Anything, newID).Return(failed, nil).Once()
-				client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Duration(0)).Return(nil).Once()
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			source := newWatchtowerContainer()
-			oldName := container.WatchtowerOldPrefix + source.ID().ShortID()
-
-			client := mockRestart.NewMockClient(t)
-			client.EXPECT().RenameContainer(mock.Anything, source, oldName).Return(nil).Once()
-			tt.expect(client, source, tt.replacementErr)
-			client.EXPECT().RenameContainer(mock.Anything, source, "watchtower").
-				Return(errors.New("failed to rename container: daemon unavailable")).Once()
-
-			_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
-			require.ErrorIs(t, err, tt.replacementErr)
-			require.ErrorIs(t, err, errNameNotRestored)
-			require.EqualError(t, err, tt.replacementErr.Error()+
-				", and could not restore Watchtower's container name watchtower from "+oldName+
-				": failed to rename container: daemon unavailable")
-			assert.True(t, renamed, "the source still has its old name")
-		})
-	}
 }
 
 // TestRestartStaleContainer_AlreadyRenamedStartFails verifies that a failed
