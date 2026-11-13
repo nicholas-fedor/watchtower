@@ -95,6 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Correct the gotify host check comment by @nicholas-fedor in [#3740](https://github.com/nicholas-fedor/watchtower/pull/3740)
 - Fix compose and cli examples that do not run by @nicholas-fedor in [#3734](https://github.com/nicholas-fedor/watchtower/pull/3734)
 - Follow the google developer style guide for placeholders by @nicholas-fedor in [#3727](https://github.com/nicholas-fedor/watchtower/pull/3727)
 - Update microsoft 365 email and teams examples by @nicholas-fedor in [#3725](https://github.com/nicholas-fedor/watchtower/pull/3725)
