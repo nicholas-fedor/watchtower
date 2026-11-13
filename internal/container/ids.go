@@ -4,11 +4,6 @@ import (
 	"strings"
 )
 
-// WatchtowerOldPrefix is the prefix used when renaming Watchtower containers
-// during self-update. It is the single source of truth for both rename
-// generation and old-name detection to prevent cross-file protocol drift.
-const WatchtowerOldPrefix = "watchtower-old-"
-
 // ImageID is a hash string for a container image.
 type ImageID string
 

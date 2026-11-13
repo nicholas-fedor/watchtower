@@ -35,20 +35,16 @@ type OrchestratorCreator interface {
 
 // HandoffClient replaces the old Watchtower container with its successor.
 type HandoffClient interface {
-	// GetContainer returns the container with the given ID.
-	GetContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
+	Renamer
+	ReplacementRemover
+
 	// StopContainer stops the container. The stop waits up to timeout.
 	StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
-	// RenameContainer gives the container a new name.
-	RenameContainer(ctx context.Context, target *container.Container, newName string) error
 	// StartContainer creates and starts a container from the given container's
 	// configuration and returns the new container's ID.
 	StartContainer(ctx context.Context, target *container.Container) (container.ContainerID, error)
 	// StartContainerByID starts an existing container.
 	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
-	// StopAndRemoveContainer stops the container and removes it. The stop
-	// waits up to timeout.
-	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
 	// RemoveContainer removes the container.
 	RemoveContainer(ctx context.Context, target *container.Container) error
 	// RemoveImageByID removes the image. The image name is used in logs.
@@ -413,10 +409,10 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	}
 
 	if !oldGone {
-		// renamed controls whether a rename was performed (skip if already
-		// watchtower-old-*). Recovery uses !oldGone so a predecessor left under
-		// that prefix from an earlier attempt is still restored and restarted.
-		_, err = renameOldContainerForHandoff(ctx, client, clog, oldContainer, originalName)
+		// A predecessor that already has its old name from an earlier attempt
+		// is not renamed again. Recovery depends only on the predecessor still
+		// existing, so it restores and restarts that one too.
+		_, err = renameToOldName(clog, ctx, client, oldContainer)
 		if err != nil {
 			// The old container keeps its name, so starting it again leaves
 			// a Watchtower instance running.
@@ -444,7 +440,10 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 
 	err = ensureContainerRunning(ctx, client, clog, newContainerID)
 	if err != nil {
-		cleanupFailedNewContainer(ctx, client, clog, oldContainer, newContainerID)
+		// A stop timeout set on the container takes precedence over the 30
+		// seconds passed to the stop, so the removal's bound follows the longer.
+		removeFailedReplacement(clog, ctx, client, oldContainer, newContainerID,
+			updateParams.Params{Timeout: orchestratorStopTimeout})
 
 		if !oldGone {
 			restoreAndStartOldContainer(ctx, client, clog, oldContainer, originalName)
@@ -498,43 +497,6 @@ func pinContainerCreateImage(oldContainer *container.Container, newImage string,
 	clog.Debug().
 		Str("pinned_image", newImage).
 		Msg("Pinned create image for ephemeral self-update")
-}
-
-// renameOldContainerForHandoff renames the stopped old container off its original
-// name so StartContainer can claim that name. The container is kept for recovery.
-//
-// Returns:
-//   - renamed: True when a rename was performed.
-//   - error: Non-nil if rename fails.
-func renameOldContainerForHandoff(
-	ctx context.Context,
-	client HandoffClient,
-	clog *zerolog.Logger,
-	oldContainer *container.Container,
-	originalName string,
-) (bool, error) {
-	if container.IsOldContainer(oldContainer.Name()) {
-		clog.Debug().Msg("Old container already has a watchtower-old name. Skipping rename")
-
-		return false, nil
-	}
-
-	targetName := container.WatchtowerOldPrefix + oldContainer.ID().ShortID()
-	clog.Debug().
-		Str("target_name", targetName).
-		Msg("Renaming stopped Watchtower container to free original name")
-
-	err := client.RenameContainer(ctx, oldContainer, targetName)
-	if err != nil {
-		return false, err //nolint:wrapcheck // The client's error already names the failed rename.
-	}
-
-	clog.Debug().
-		Str("original_name", originalName).
-		Str("target_name", targetName).
-		Msg("Renamed stopped Watchtower container for handoff")
-
-	return true, nil
 }
 
 // restoreAndStartOldContainer renames the predecessor back to originalName and
@@ -618,57 +580,6 @@ func restartOldContainer(
 	}
 
 	clog.Info().Msg("Restarted old Watchtower container after rename failure")
-}
-
-// cleanupFailedNewContainer best-effort removes a new container that failed
-// verification so the original name can be restored on the predecessor.
-//
-// Parameters:
-//   - ctx: Orchestration context. Its values carry over to recovery, but its
-//     cancellation and deadline do not.
-//   - client: Container client for Docker operations.
-//   - clog: Logger with container context fields.
-//   - oldContainer: The container the replacement was created from. The
-//     replacement has its configuration, so its stop waits as long.
-//   - newContainerID: ID of the failed replacement container to remove.
-func cleanupFailedNewContainer(
-	ctx context.Context,
-	client HandoffClient,
-	clog *zerolog.Logger,
-	oldContainer *container.Container,
-	newContainerID container.ContainerID,
-) {
-	if newContainerID == "" {
-		return
-	}
-
-	// A stop timeout set on the container takes precedence over the 30 seconds
-	// passed to the stop, so the bound follows the longer of the two.
-	stopParams := updateParams.Params{Timeout: orchestratorStopTimeout}
-
-	recoveryCtx, cancel := context.WithTimeout(
-		context.WithoutCancel(ctx),
-		stopParams.DetachedStopTimeout(oldContainer),
-	)
-	defer cancel()
-
-	failedNew, err := client.GetContainer(recoveryCtx, newContainerID)
-	if err != nil {
-		clog.Debug().
-			Err(err).
-			Str("new_id", newContainerID.ShortID()).
-			Msg("Failed to inspect failed new container for cleanup")
-
-		return
-	}
-
-	cleanupErr := client.StopAndRemoveContainer(recoveryCtx, failedNew, orchestratorStopTimeout)
-	if cleanupErr != nil && !cerrdefs.IsNotFound(cleanupErr) {
-		clog.Debug().
-			Err(cleanupErr).
-			Str("new_id", newContainerID.ShortID()).
-			Msg("Failed to remove failed new container after verify error")
-	}
 }
 
 // inspectOldContainer retrieves the old container's configuration and propagates

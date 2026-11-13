@@ -1861,6 +1861,21 @@ func TestIsOldContainer(t *testing.T) {
 	}
 }
 
+// TestContainer_OldName verifies that the old name of a Watchtower container
+// is the watchtower-old- prefix and its short ID, which IsOldContainer
+// reports as old.
+func TestContainer_OldName(t *testing.T) {
+	t.Parallel()
+
+	c := MockContainer(
+		containerfixture.WithID("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"),
+		containerfixture.WithName("/watchtower"),
+	)
+
+	assert.Equal(t, "watchtower-old-0123456789ab", c.OldName())
+	assert.True(t, IsOldContainer(c.OldName()))
+}
+
 // TestNormalizeContainerName_WithLeadingSlash verifies that NormalizeContainerName removes leading slash.
 func TestNormalizeContainerName_WithLeadingSlash(t *testing.T) {
 	t.Parallel()
