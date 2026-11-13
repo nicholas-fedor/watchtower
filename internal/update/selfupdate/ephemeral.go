@@ -154,14 +154,7 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 	// Compute the container chain for lineage tracking. The orchestrator will
 	// set this on the new container's labels via the WT_ORCHESTRATOR_CONTAINER_CHAIN
 	// environment variable. This preserves the cleanup behavior used in the rename path.
-	existingChain, _ := sourceContainer.GetContainerChain()
-
-	var newChain string
-	if existingChain != "" {
-		newChain = existingChain + "," + string(sourceContainer.ID())
-	} else {
-		newChain = string(sourceContainer.ID())
-	}
+	newChain := sourceContainer.SuccessorChain()
 
 	clog.Debug().
 		Str("container_chain", newChain).

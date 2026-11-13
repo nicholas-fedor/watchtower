@@ -1419,6 +1419,43 @@ func TestContainer_GetContainerChain(t *testing.T) {
 	}
 }
 
+// TestContainer_SuccessorChain verifies that a replacement's chain lists the
+// replaced container's chain followed by that container's own ID.
+func TestContainer_SuccessorChain(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// chain is the replaced container's chain label, or empty for none.
+		chain string
+		want  string
+	}{
+		{name: "first self-update", want: "current-id"},
+		{name: "later self-update", chain: "first-id,second-id", want: "first-id,second-id,current-id"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			containerLabels := map[string]string{}
+			if tt.chain != "" {
+				containerLabels[labels.ContainerChain] = tt.chain
+			}
+
+			c := &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ID:     "current-id",
+					Name:   "/watchtower",
+					Config: &dockerContainer.Config{Labels: containerLabels},
+				},
+			}
+
+			assert.Equal(t, tt.want, c.SuccessorChain())
+		})
+	}
+}
+
 func TestGetEffectiveScope(t *testing.T) {
 	tests := []struct {
 		name          string

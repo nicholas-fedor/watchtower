@@ -320,10 +320,6 @@ linters:
         linters:
           - gocyclo
         text: "of func `Checkout` is high"
-      - path: "internal/update/restart/restart.go"
-        linters:
-          - gocyclo
-        text: "of func `restartStaleContainer` is high"
       - path: "internal/registry/digest/digest.go"
         linters:
           - gocyclo

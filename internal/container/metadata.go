@@ -533,6 +533,22 @@ func (c *Container) GetContainerChain() (string, bool) {
 	return c.getLabelValue(labels.ContainerChain)
 }
 
+// SuccessorChain returns the container chain label value for a container that
+// replaces this one in a self-update.
+//
+// The value is this container's chain followed by its own ID.
+//
+// Returns:
+//   - string: The comma-separated IDs of the instances the successor replaces.
+func (c *Container) SuccessorChain() string {
+	chain, _ := c.GetContainerChain()
+	if chain == "" {
+		return string(c.ID())
+	}
+
+	return chain + "," + string(c.ID())
+}
+
 // IsWatchtower identifies if this is the Watchtower container.
 //
 // Returns:
