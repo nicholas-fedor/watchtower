@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
@@ -21,8 +22,8 @@ import (
 type Client interface {
 	// ListContainers returns the containers that pass every filter.
 	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
-	// ListLabeledContainers returns the containers in every state whose
-	// label is set to "true".
+	// ListLabeledContainers returns the containers whose label is set to
+	// "true", stopped or not, except those being removed or left dead.
 	ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error)
 	// StopAndRemoveContainer stops the container and removes it. The stop
 	// waits up to timeout.
@@ -148,10 +149,12 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 // (which runs once at startup), this is designed to be called during each update
 // cycle to catch any old containers that the startup cleanup may have missed.
 //
-// It identifies containers matching the watchtower-old- prefix within the same
-// scope as the current container, stops them, and optionally cleans up their
-// images. This ensures that even if an old container survives the initial
-// cleanup (e.g., it was still stopping), it won't persist across update cycles.
+// It lists the Watchtower containers whatever the include-stopped
+// configuration option says, leaving out only those being removed or left
+// dead. It removes the predecessors named with the watchtower-old- prefix in
+// the current container's scope, running or stopped. It also removes a
+// replacement that a self-update left in the created state in that scope. With cleanupImages, their images are cleaned up too, as
+// removeImageInfos describes.
 //
 // The scope is read from the current container in the same listing. An unset
 // or empty scope is the scope "none". Nothing is removed when the current
@@ -180,16 +183,15 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		return 0, nil
 	}
 
-	// List all containers to find old instances
-	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
+	watchtowers, err := client.ListLabeledContainers(ctx, labels.Watchtower)
 	if err != nil {
-		return 0, fmt.Errorf("failed to list containers: %w", err)
+		return 0, fmt.Errorf("failed to list Watchtower containers: %w", err)
 	}
 
 	// The current container sets the scope to clean up.
 	var current *container.Container
 
-	for _, c := range allContainers {
+	for _, c := range watchtowers {
 		if c.ID() == currentContainerID {
 			current = c
 
@@ -216,15 +218,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	// Find old Watchtower containers within the same scope
 	var oldContainers []*container.Container
 
-	// Iterate all containers to find old Watchtower containers that
-	// should be cleaned up. Non-Watchtower containers and containers with
-	// normal names are skipped immediately.
-	for _, c := range allContainers {
-		// Skip non-Watchtower containers
-		if !c.IsWatchtower() {
-			continue
-		}
-
+	for _, c := range watchtowers {
 		// Skip containers that are not old predecessors
 		if !container.IsOldContainer(c.Name()) {
 			continue
@@ -243,10 +237,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 			continue
 		}
 
-		// The updater's self-detection handles the case where the current
-		// container is old (it exits before reaching this point), but
-		// we still guard here for safety in case this function is called from
-		// a different code path.
+		// Never remove the current container, even when it carries the old prefix.
 		if c.ID() == currentContainerID {
 			continue
 		}
@@ -254,13 +245,10 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		oldContainers = append(oldContainers, c)
 	}
 
-	// Find orphaned Watchtower containers that are stuck in the created state.
-	// These can be left behind when a self-update creates a replacement but
-	// fails to start it. The new container never runs and the old instance
-	// may already be running under its original name.
+	// Add replacements that an interrupted self-update left in the created state.
 	var orphanedCreatedContainers []*container.Container
 
-	for _, c := range allContainers {
+	for _, c := range watchtowers {
 		if container.IsOrphanedReplacement(c, current) {
 			orphanedCreatedContainers = append(orphanedCreatedContainers, c)
 		}

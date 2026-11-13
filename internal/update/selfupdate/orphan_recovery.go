@@ -15,8 +15,8 @@ import (
 
 // RecoveryClient finds and starts an orphaned replacement container.
 type RecoveryClient interface {
-	// ListLabeledContainers returns the containers in every state whose
-	// label is set to "true".
+	// ListLabeledContainers returns the containers whose label is set to
+	// "true", stopped or not, except those being removed or left dead.
 	ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error)
 	// StartContainerByID starts an existing container.
 	StartContainerByID(ctx context.Context, containerID container.ContainerID) error
@@ -77,9 +77,9 @@ func RetireOldInstance(
 // creates a replacement container but fails to start it, leaving the old container
 // running and the new container never started.
 //
-// It lists the Watchtower containers in every state, whatever the
-// include-stopped configuration option says, since the replacement it looks
-// for was created but never started. It starts the first container that
+// It lists the Watchtower containers whatever the include-stopped
+// configuration option says, since the replacement it looks for was created but
+// never started. It starts the first container that
 // [container.IsOrphanedReplacement] reports as an orphaned replacement of the
 // current container and that starts without error. A recovery is logged once,
 // at info. A start that fails is logged at error, since no Watchtower may run

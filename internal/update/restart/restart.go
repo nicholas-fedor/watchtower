@@ -280,9 +280,8 @@ func performRollingRestart(
 				}
 
 				if c.IsStale() && !renamed {
-					// Only collect cleaned image info for stale containers that were not renamed, as renamed
-					// containers (Watchtower self-updates) are cleaned up by cleanup.RemoveExcessWatchtowerInstances
-					// in the new container.
+					// Only collect cleaned image info for stale containers that were not renamed. The new
+					// Watchtower container removes a renamed predecessor and its image.
 					cleanup.AddImage(
 						cleanupImageInfos,
 						c.ImageID(),
@@ -668,9 +667,8 @@ func restartContainersInSortedOrder(
 					renamedContainers[c.ID()] = true
 				}
 				// Only collect cleaned image info for stale containers that were
-				// not renamed, as renamed containers (Watchtower self-updates)
-				// are cleaned up by cleanup.RemoveExcessWatchtowerInstances
-				// in the new container.
+				// not renamed. The new Watchtower container removes a renamed
+				// predecessor and its image.
 				if c.IsStale() && !renamedContainers[c.ID()] {
 					cleanup.AddImage(
 						cleanupImageInfos,

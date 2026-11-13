@@ -426,11 +426,11 @@ func TestRun_RunOnce(t *testing.T) {
 			want:       []string{"GetVersion", "ListContainers filtered"},
 		},
 		{
-			// The old-instance cleanup lists the containers again to find the
-			// current one's scope, and skips when it is not listed.
+			// The old-instance cleanup lists the Watchtower containers to find
+			// the current one's scope and skips when it is not listed.
 			name:    "in a container",
 			current: currentWatchtower(),
-			want:    []string{"GetVersion", "ListContainers filtered", "ListContainers filtered", "SetRestartPolicy c0c0 no"},
+			want:    []string{"GetVersion", "ListContainers filtered", "ListLabeledContainers", "SetRestartPolicy c0c0 no"},
 		},
 	}
 
@@ -439,6 +439,7 @@ func TestRun_RunOnce(t *testing.T) {
 			mockClient := mockCmd.NewMockDockerClient(t)
 			mockClient.EXPECT().GetVersion().Return("1.47")
 			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
+			mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return(nil, nil).Maybe()
 			mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
 			state := runTestState{client: mockClient, current: tt.current}
@@ -650,6 +651,7 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 			mockClient := mockCmd.NewMockDockerClient(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
 			mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
+			mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{current}, nil)
 			mockClient.EXPECT().GetVersion().Return("1.47")
 
 			if tt.wantCheck {
@@ -677,6 +679,7 @@ func TestRun_ScheduledUpdate(t *testing.T) {
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
 		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, container.ImageID, string, error) {
@@ -724,6 +727,7 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 	mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
 	mockClient.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
 		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
@@ -869,6 +873,7 @@ func TestRun_APISharesUpdateLock(t *testing.T) {
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{current}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	// The update at startup's staleness check waits for the test. A second
 	// update, which a separate lock would let run, finds the container fresh.

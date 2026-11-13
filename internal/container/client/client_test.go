@@ -1829,9 +1829,9 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 }
 
 // TestListLabeledContainers verifies that a labeled listing asks Docker for
-// containers in every state whose label is "true", so a stopped or
-// never-started container is listed even when stopped containers are
-// otherwise left out.
+// the containers whose label is "true" in every state except removing and
+// dead. A stopped or never-started container is listed even when stopped
+// containers are otherwise left out.
 func TestListLabeledContainers(t *testing.T) {
 	t.Parallel()
 
@@ -1839,7 +1839,8 @@ func TestListLabeledContainers(t *testing.T) {
 	api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
 		All: true,
 		Filters: dockerClient.Filters{
-			"label": {"com.centurylinklabs.watchtower.ephemeral-orchestrator=true": true},
+			"label":  {"com.centurylinklabs.watchtower.ephemeral-orchestrator=true": true},
+			"status": {"created": true, "restarting": true, "running": true, "paused": true, "exited": true},
 		},
 	}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
 		{ID: string(fixtureStopped.id)},
