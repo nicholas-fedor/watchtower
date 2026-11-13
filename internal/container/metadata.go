@@ -533,6 +533,27 @@ func (c *Container) GetContainerChain() (string, bool) {
 	return c.getLabelValue(labels.ContainerChain)
 }
 
+// ChainIDs returns the IDs in the container's chain label, which name the
+// Watchtower instances a self-update replaced with this container.
+//
+// Each ID is trimmed of surrounding whitespace, and empty entries are left out.
+//
+// Returns:
+//   - []ContainerID: The replaced instances, oldest first, or nil without a chain.
+func (c *Container) ChainIDs() []ContainerID {
+	chain, _ := c.GetContainerChain()
+
+	var ids []ContainerID
+
+	for id := range strings.SplitSeq(chain, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, ContainerID(id))
+		}
+	}
+
+	return ids
+}
+
 // SuccessorChain returns the container chain label value for a container that
 // replaces this one in a self-update.
 //
@@ -909,32 +930,6 @@ func (c *Container) DeleteLabel(key string) {
 		delete(labels, key)
 		info.Config.Labels = labels
 	})
-}
-
-// IsWatchtowerParent checks if the current container ID exists in the comma-separated container-chain label values.
-//
-// It handles edge cases like empty chain or invalid IDs by returning false appropriately.
-// The chain values are trimmed of whitespace before comparison.
-//
-// Parameters:
-//   - currentID: The container ID to check for in the chain.
-//   - chain: Comma-separated string of container IDs from the container-chain label.
-//
-// Returns:
-//   - bool: True if currentID is found in the chain, false otherwise.
-func IsWatchtowerParent(currentID ContainerID, chain string) bool {
-	if currentID == "" || chain == "" {
-		return false
-	}
-
-	ids := strings.SplitSeq(chain, ",")
-	for id := range ids {
-		if strings.TrimSpace(id) == string(currentID) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // IsSuperseded reports whether a container is a Watchtower instance that a
