@@ -42,8 +42,10 @@ Create a template file named `custom-template.txt` with your desired template co
                 WATCHTOWER_NOTIFICATION_TEMPLATE_FILE: "/custom-template.txt"
             volumes:
                 - /var/run/docker.sock:/var/run/docker.sock
-                - /path/to/custom-template.txt:/custom-template.txt
+                - TEMPLATE_FILE:/custom-template.txt
     ```
+
+    Replace *`TEMPLATE_FILE`* with the path of the template file on the Docker host. A relative path starts with `./` and is read from the directory of the Compose file.
 
 === "Docker CLI (Env Vars)"
 
@@ -51,10 +53,12 @@ Create a template file named `custom-template.txt` with your desired template co
     docker run -d \
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
-      -v /path/to/custom-template.txt:/custom-template.txt \
+      -v TEMPLATE_FILE:/custom-template.txt \
       -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
       nickfedor/watchtower:latest
     ```
+
+    Replace *`TEMPLATE_FILE`* with the absolute path of the template file on the Docker host.
 
 ### Notification Report
 
@@ -208,8 +212,8 @@ Logs:
             environment:
                 WATCHTOWER_NOTIFICATION_REPORT: "true"
                 WATCHTOWER_NOTIFICATION_URL: >
-                    discord://token@channel
-                    slack://watchtower@token-a/token-b/token-c
+                    discord://DISCORD_WEBHOOK_TOKEN@DISCORD_WEBHOOK_ID
+                    slack://hook:SLACK_WORKSPACE_ID-SLACK_WEBHOOK_ID-SLACK_WEBHOOK_TOKEN@webhook?botname=watchtower
                 WATCHTOWER_NOTIFICATION_TEMPLATE: |
                     {{- if .Report -}}
                       {{- with .Report -}}
@@ -244,6 +248,14 @@ Logs:
                     {{- end -}}
     ```
 
+    Replace the following:
+
+    - *`DISCORD_WEBHOOK_TOKEN`*: the token of your Discord webhook
+    - *`DISCORD_WEBHOOK_ID`*: the ID of your Discord webhook
+    - *`SLACK_WORKSPACE_ID`*: the workspace ID of your Slack webhook URL, which starts with `T`
+    - *`SLACK_WEBHOOK_ID`*: the webhook ID of your Slack webhook URL, which starts with `B`
+    - *`SLACK_WEBHOOK_TOKEN`*: the webhook token of your Slack webhook URL
+
 === "Docker CLI"
 
     ```bash
@@ -251,7 +263,7 @@ Logs:
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
       -e WATCHTOWER_NOTIFICATION_REPORT="true" \
-      -e WATCHTOWER_NOTIFICATION_URL="discord://token@channel" \
+      -e WATCHTOWER_NOTIFICATION_URL="discord://DISCORD_WEBHOOK_TOKEN@DISCORD_WEBHOOK_ID" \
       -e WATCHTOWER_NOTIFICATION_TEMPLATE="\
     {{- if .Report -}}
       {{- with .Report -}}
@@ -287,6 +299,11 @@ Logs:
     " \
       nickfedor/watchtower:latest
     ```
+
+    Replace the following:
+
+    - *`DISCORD_WEBHOOK_TOKEN`*: the token of your Discord webhook
+    - *`DISCORD_WEBHOOK_ID`*: the ID of your Discord webhook
 
 <!-- markdownlint-restore -->
 Example output for a session with one updated container, one restarted container, and one error log:
