@@ -743,11 +743,7 @@ func (c *Client) CreateContainer(ctx context.Context, target *container.Containe
 		isPodman,
 	)
 	if err != nil {
-		clog.Debug().
-			Err(err).
-			Msg("Failed to create new container")
-
-		return "", fmt.Errorf("create replacement container: %w", err)
+		return "", err //nolint:wrapcheck // The recreation's error already names the step that failed.
 	}
 
 	err = c.injectStoredCopyFiles(ctx, target, newID)
@@ -788,10 +784,6 @@ func (c *Client) StartContainer(ctx context.Context, target *container.Container
 
 	newID, err := c.CreateContainer(ctx, target)
 	if err != nil {
-		clog.Debug().
-			Err(err).
-			Msg("Failed to start new container")
-
 		return "", err
 	}
 
