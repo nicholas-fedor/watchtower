@@ -216,7 +216,7 @@ require (
 	mellium.im/xmlstream v0.15.4 // indirect
 	mellium.im/xmpp v0.23.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
-	tags.cncf.io/container-device-interface v1.1.1 // indirect
+	tags.cncf.io/container-device-interface v1.1.2 // indirect
 )
 
 tool (
