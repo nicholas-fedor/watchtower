@@ -67,7 +67,7 @@ Replace *`USERNAME`* and *`PASSWORD`* with your user name and password for the r
 When the Watchtower Docker container is started, the created configuration file needs to be passed to the container:
 
 ```bash
-docker run [...] -v CONFIG_DIR/config.json:/config.json nickfedor/watchtower
+docker run [...] -v "CONFIG_DIR/config.json:/config.json" nickfedor/watchtower
 ```
 
 Replace *`CONFIG_DIR`* with the absolute path of the directory that holds the configuration file. Docker reads a relative path as the name of a volume.
@@ -81,7 +81,7 @@ This configuration file can be directly used by Watchtower. In this case, the cr
 When the Docker container is started, pass the configuration file to Watchtower:
 
 ```bash
-docker run [...] -v HOME_DIR/.docker/config.json:/config.json nickfedor/watchtower
+docker run [...] -v "HOME_DIR/.docker/config.json:/config.json" nickfedor/watchtower
 ```
 
 Replace *`HOME_DIR`* with the absolute path of your home directory, such as `/home/dana`.

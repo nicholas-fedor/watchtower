@@ -73,7 +73,7 @@ Instead you can run `docker login` to store your credentials in `$HOME/.docker/c
 ```bash
 docker run -d \
   --name watchtower \
-  -v $HOME/.docker/config.json:/config.json \
+  -v "$HOME/.docker/config.json:/config.json" \
   -v /var/run/docker.sock:/var/run/docker.sock \
   --restart unless-stopped \
   nickfedor/watchtower container_to_watch --debug

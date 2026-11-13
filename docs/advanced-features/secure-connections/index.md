@@ -80,22 +80,22 @@ Environment Variable: DOCKER_API_VERSION
 
 Replace the following:
 
-- *`CERT_DIR`*: the absolute path of the directory that holds the client's `ca.pem`, `cert.pem` and `key.pem` files
-- *`HOST`*: the host name or IP address of the Docker host, as named in its server certificate
+- *`CERT_DIR`*: the absolute path of a directory that holds only the client's `ca.pem`, `cert.pem` and `key.pem` files
+- *`HOST`*: the host name or IP address of the Docker host, as named in its server certificate. Enclose an IPv6 address in brackets, such as `[2001:db8::1]`.
 
 === "Docker CLI"
 
     ```bash
     docker run -d \
       --name watchtower \
-      -v CERT_DIR:/etc/ssl/docker:ro \
+      -v "CERT_DIR:/etc/ssl/docker:ro" \
       nickfedor/watchtower --host tcp://HOST:2376 --cert-path /etc/ssl/docker --tlsverify
     ```
 
     | Parameter                              | Description                                                                            |
     |----------------------------------------|----------------------------------------------------------------------------------------|
     | `--name watchtower`                    | Assigns the name "watchtower" to the container for easy identification and management. |
-    | `-v CERT_DIR:/etc/ssl/docker:ro`       | Mounts the local certificate directory to the container's SSL directory as read-only.  |
+    | `-v "CERT_DIR:/etc/ssl/docker:ro"`     | Mounts the local certificate directory to the container's SSL directory as read-only.  |
     | `nickfedor/watchtower`                 | Specifies the Docker image to run, which is the Watchtower container image.            |
     | `--host tcp://HOST:2376`               | Sets the Docker host to connect to via TCP on port 2376.                               |
     | `--cert-path /etc/ssl/docker`          | Defines the path inside the container where TLS certificates are located.              |
@@ -375,14 +375,14 @@ Generate self-signed certificates for testing (replace with proper certificates 
     ```bash
     docker run -d \
       --name watchtower \
-      -v CERT_DIR:/etc/ssl/docker:ro \
+      -v "CERT_DIR:/etc/ssl/docker:ro" \
       nickfedor/watchtower --host tcp://HOST:2376 --cert-path /etc/ssl/docker --tlsverify
     ```
 
 Replace the following:
 
-- *`HOST`*: the host name or IP address of the Docker host, as named in its server certificate
-- *`CERT_DIR`*: the absolute path of the directory that holds the client's `ca.pem`, `cert.pem` and `key.pem` files, such as `/etc/docker/certs` when Watchtower runs on the Docker host
+- *`HOST`*: the host name or IP address of the Docker host, as named in its server certificate. Enclose an IPv6 address in brackets, such as `[2001:db8::1]`.
+- *`CERT_DIR`*: the absolute path of a directory that holds only the client's `ca.pem`, `cert.pem` and `key.pem` files. Do not use `/etc/docker/certs`, which also holds the CA and server private keys.
 
 ## Troubleshooting
 

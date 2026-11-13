@@ -45,7 +45,7 @@ Create a template file named `custom-template.txt` with your desired template co
                 - TEMPLATE_FILE:/custom-template.txt
     ```
 
-    Replace *`TEMPLATE_FILE`* with the path of the template file on the Docker host. A relative path starts with `./` and is read from the directory of the Compose file.
+    Replace *`TEMPLATE_FILE`* with the path of the template file on the Docker host. A relative path starts with `./` and is read from the Compose project directory, which is the directory of the first Compose file unless you set `--project-directory`.
 
 === "Docker CLI (Env Vars)"
 
@@ -53,7 +53,7 @@ Create a template file named `custom-template.txt` with your desired template co
     docker run -d \
       --name watchtower \
       -v /var/run/docker.sock:/var/run/docker.sock \
-      -v TEMPLATE_FILE:/custom-template.txt \
+      -v "TEMPLATE_FILE:/custom-template.txt" \
       -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
       nickfedor/watchtower:latest
     ```
