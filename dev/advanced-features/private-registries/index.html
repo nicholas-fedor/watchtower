@@ -3004,7 +3004,7 @@ Valid hosts are <code>localhost[:PORT]</code>, <code>HOST:PORT</code>, or any mu
 <p>When the Watchtower Docker container is started, the created configuration file needs to be passed to the container:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>...<span class="o">]</span><span class="w"> </span>-v<span class="w"> </span>CONFIG_DIR/config.json:/config.json<span class="w"> </span>nickfedor/watchtower
 </code></pre></div>
-<p>Replace <em><code>CONFIG_DIR</code></em> with the directory that holds the configuration file.</p>
+<p>Replace <em><code>CONFIG_DIR</code></em> with the absolute path of the directory that holds the configuration file. Docker reads a relative path as the name of a volume.</p>
 <h2 id="sharing_the_docker_configuration_file">Sharing the Docker Configuration File<a class="headerlink" href="#sharing_the_docker_configuration_file" title="Permanent link">&para;</a></h2>
 <p>To pull an image from a private registry, <code>docker login</code> needs to be called first, to get access to the registry.
 The provided credentials are stored in a configuration file called <code>.docker/config.json</code> in your home directory.
@@ -3012,7 +3012,7 @@ This configuration file can be directly used by Watchtower. In this case, the cr
 <p>When the Docker container is started, pass the configuration file to Watchtower:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span><span class="o">[</span>...<span class="o">]</span><span class="w"> </span>-v<span class="w"> </span>HOME_DIR/.docker/config.json:/config.json<span class="w"> </span>nickfedor/watchtower
 </code></pre></div>
-<p>Replace <em><code>HOME_DIR</code></em> with your home directory.</p>
+<p>Replace <em><code>HOME_DIR</code></em> with the absolute path of your home directory, such as <code>/home/dana</code>.</p>
 <p>When creating the Watchtower container via Docker Compose, use the following lines:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">services</span><span class="p">:</span>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">watchtower</span><span class="p">:</span>
@@ -3020,9 +3020,9 @@ This configuration file can be directly used by Watchtower. In this case, the cr
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">HOME_DIR/.docker/config.json:/config.json</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">  </span><span class="c1"># ...</span>
 </code></pre></div>
-<p>Replace <em><code>HOME_DIR</code></em> with your home directory.</p>
+<p>Replace <em><code>HOME_DIR</code></em> with the absolute path of your home directory, such as <code>/home/dana</code>.</p>
 <h3 id="docker_config_path">Docker Config path<a class="headerlink" href="#docker_config_path" title="Permanent link">&para;</a></h3>
 <p>By default, Watchtower will look for the <code>config.json</code> file in <code>/</code>, but this can be changed by setting the <code>DOCKER_CONFIG</code> environment variable to the directory path where your config is located.
 This is useful for setups where the config.json file is changed while the Watchtower instance is running, as the changes will not be picked up for a mounted file if the inode changes.</p>
@@ -3155,7 +3155,7 @@ helper in a separate container and mount it using volumes.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 01:06:00 UTC"><span class="timeago" datetime="2026-11-13T01:06:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 01:06:00 UTC">2026-11-13</span>
   </span>
 
     
