@@ -137,8 +137,11 @@ func parseGotifyURL(log *zerolog.Logger, gotifyURL string) (*url.URL, error) {
 		return nil, errInvalidURL
 	}
 
-	// Without a host name, the generated Gotify URL would read the token as its
-	// host. Shoutrrr would then reject it with a misleading error.
+	// A server URL without a host name and path, such as "https://", would give
+	// a Gotify URL that Shoutrrr reads with the token as its host. Shoutrrr
+	// would then reject the token rather than the missing host. Checking every
+	// URL here gives one clear error, including for the URLs that Shoutrrr
+	// reports as missing a host.
 	if apiURL.Hostname() == "" {
 		clog.Debug().Msg("Gotify URL has no host")
 
