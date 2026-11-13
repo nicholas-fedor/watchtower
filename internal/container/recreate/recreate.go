@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"slices"
 	"time"
 
 	"github.com/moby/moby/client/pkg/versions"
@@ -40,69 +39,6 @@ var (
 	// errRenameContainerFailed indicates a failure to give a created container the source container's name.
 	errRenameContainerFailed = errors.New("failed to rename container")
 )
-
-// ResolveVolumesFrom rewrites HostConfig.VolumesFrom IDs to live container names.
-//
-// Inspect stores volumes-from as the source container ID. Recreate must use a
-// name so Docker can find the replacement after the source is recreated.
-// Unresolved sources stay as stored. Mode suffixes such as :rw are preserved.
-//
-// Parameters:
-//   - ctx: Context for cancellation and timeout control.
-//   - api: Docker API client.
-//   - clog: Logger for warn and debug output.
-//   - containerInfo: Inspected container whose HostConfig.VolumesFrom is rewritten.
-func ResolveVolumesFrom(
-	ctx context.Context,
-	api dockerClient.APIClient,
-	clog *zerolog.Logger,
-	containerInfo *dockerContainer.InspectResponse,
-) {
-	if containerInfo.HostConfig == nil || len(containerInfo.HostConfig.VolumesFrom) == 0 {
-		return
-	}
-
-	rewritten := slices.Clone(containerInfo.HostConfig.VolumesFrom)
-	containerName := container.NormalizeContainerName(containerInfo.Name)
-
-	for i, spec := range rewritten {
-		name, mode := container.ParseVolumesFromSpec(spec)
-		if name == "" {
-			continue
-		}
-
-		sourceResult, err := api.ContainerInspect(
-			ctx,
-			name,
-			dockerClient.ContainerInspectOptions{},
-		)
-		if err != nil {
-			// Leave the stored ID so create fails with a clear missing-container
-			// error instead of inventing a name.
-			clog.Warn().
-				Err(err).
-				Str("container", containerName).
-				Str("volumes_from", name).
-				Msg("Unable to resolve volumes-from container")
-
-			continue
-		}
-
-		resolved := container.NormalizeContainerName(sourceResult.Container.Name)
-		if mode != "" {
-			// Keep :ro/:rw/SELinux flags from the original spec.
-			resolved = resolved + ":" + mode
-		}
-
-		rewritten[i] = resolved
-		clog.Debug().
-			Str("container", containerName).
-			Str("volumes_from", resolved).
-			Msg("Resolved volumes-from container name")
-	}
-
-	containerInfo.HostConfig.VolumesFrom = rewritten
-}
 
 // CreateTarget creates a new container based on the source container's
 // configuration but does not start it. It applies the provided network configuration,
