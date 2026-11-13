@@ -128,6 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/zerolog to v1.1.11 by @renovate[bot] in [#3737](https://github.com/nicholas-fedor/watchtower/pull/3737)
 - Update golang.org/x/tools digest to 4dd740f by @renovate[bot] in [#3732](https://github.com/nicholas-fedor/watchtower/pull/3732)
 - Update golang.org/x/exp digest to d10d3b4 by @renovate[bot] in [#3731](https://github.com/nicholas-fedor/watchtower/pull/3731)
 - Update module github.com/prometheus/common to v0.74.0 by @renovate[bot] in [#3729](https://github.com/nicholas-fedor/watchtower/pull/3729)
