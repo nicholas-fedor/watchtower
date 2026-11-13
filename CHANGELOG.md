@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Report each self-update orchestrator failure once by @nicholas-fedor in [#3765](https://github.com/nicholas-fedor/watchtower/pull/3765)
 - Restore Watchtower's name after a failed self-update start by @nicholas-fedor in [#3757](https://github.com/nicholas-fedor/watchtower/pull/3757)
 - Name a failed container create once by @nicholas-fedor in [#3751](https://github.com/nicholas-fedor/watchtower/pull/3751)
 - Name a failed self-update rename once by @nicholas-fedor in [#3749](https://github.com/nicholas-fedor/watchtower/pull/3749)
