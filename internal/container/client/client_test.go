@@ -1831,27 +1831,53 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 // TestListLabeledContainers verifies that a labeled listing asks Docker for
 // the containers whose label is "true" in every state except removing and
 // dead. A stopped or never-started container is listed even when stopped
-// containers are otherwise left out.
+// containers are otherwise left out. Podman rejects the restarting status, so
+// a Podman listing leaves it out.
 func TestListLabeledContainers(t *testing.T) {
 	t.Parallel()
 
-	api := newDockerAPI(t)
-	api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
-		All: true,
-		Filters: dockerClient.Filters{
-			"label":  {"com.centurylinklabs.watchtower.ephemeral-orchestrator=true": true},
-			"status": {"created": true, "restarting": true, "running": true, "paused": true, "exited": true},
+	tests := []struct {
+		name string
+		// podman is the detected runtime.
+		podman bool
+		// statuses are the states the listing asks for.
+		statuses map[string]bool
+	}{
+		{
+			name:     "Docker",
+			statuses: map[string]bool{"created": true, "running": true, "paused": true, "exited": true, "restarting": true},
 		},
-	}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
-		{ID: string(fixtureStopped.id)},
-	}}, nil).Once()
-	expectContainerFixtures(t, api, fixtureStopped)
+		{
+			name:     "Podman",
+			podman:   true,
+			statuses: map[string]bool{"created": true, "running": true, "paused": true, "exited": true},
+		},
+	}
 
-	labeled, err := (&Client{log: newTestLogger(t), api: api}).
-		ListLabeledContainers(t.Context(), "com.centurylinklabs.watchtower.ephemeral-orchestrator")
-	require.NoError(t, err)
-	require.Len(t, labeled, 1)
-	assert.Equal(t, fixtureStopped.id, labeled[0].ID())
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := newDockerAPI(t)
+			api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
+				All: true,
+				Filters: dockerClient.Filters{
+					"label":  {"com.centurylinklabs.watchtower.ephemeral-orchestrator=true": true},
+					"status": tt.statuses,
+				},
+			}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
+				{ID: string(fixtureStopped.id)},
+			}}, nil).Once()
+			expectContainerFixtures(t, api, fixtureStopped)
+
+			client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true, isPodman: tt.podman}
+
+			labeled, err := client.ListLabeledContainers(t.Context(), "com.centurylinklabs.watchtower.ephemeral-orchestrator")
+			require.NoError(t, err)
+			require.Len(t, labeled, 1)
+			assert.Equal(t, fixtureStopped.id, labeled[0].ID())
+		})
+	}
 }
 
 // TestCreateFailureNamedOnce verifies that a failed create, through

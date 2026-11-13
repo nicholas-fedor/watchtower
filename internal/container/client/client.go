@@ -524,7 +524,8 @@ func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 }
 
 // ListLabeledContainers returns the containers whose label is set to "true"
-// in the created, restarting, running, paused or exited state.
+// in the created, running, paused, exited or restarting state.
+// Podman has no restarting state, so it is left out of a Podman listing.
 //
 // The include-stopped and include-restarting configuration options do not
 // apply. They choose the containers Watchtower updates. Watchtower's own
@@ -543,12 +544,16 @@ func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 //   - []*container.Container: The labeled containers.
 //   - error: Non-nil if listing fails, nil on success.
 func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error) {
-	listOptions := dockerClient.ContainerListOptions{
-		All: true,
-		Filters: make(dockerClient.Filters).
-			Add("label", label+"=true").
-			Add("status", "created", "restarting", "running", "paused", "exited"),
+	filterArgs := make(dockerClient.Filters).
+		Add("label", label+"=true").
+		Add("status", "created", "running", "paused", "exited")
+
+	// Podman rejects the restarting status, which would fail the whole list.
+	if !c.getRuntime(ctx) {
+		filterArgs.Add("status", "restarting")
 	}
+
+	listOptions := dockerClient.ContainerListOptions{All: true, Filters: filterArgs}
 
 	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
 }
