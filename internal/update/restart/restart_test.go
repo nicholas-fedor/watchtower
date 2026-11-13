@@ -2308,6 +2308,41 @@ func TestRestartStaleContainer_NameNotRestored(t *testing.T) {
 	}
 }
 
+// TestRestartStaleContainer_AlreadyRenamedStartFails verifies that a failed
+// start of a replacement for a Watchtower already under its "watchtower-old-"
+// name removes the replacement and leaves the source's name alone.
+//
+// This restart did not rename the source, so it has no original name to give
+// back. The mock fails the test on any rename.
+func TestRestartStaleContainer_AlreadyRenamedStartFails(t *testing.T) {
+	t.Parallel()
+
+	const newID = container.ContainerID("replacement-id")
+
+	startErr := errors.New("failed to start container replacement-id: daemon unavailable")
+	source := mockUpdate.CreateMockContainerWithConfig(
+		"abc123def456",
+		"/watchtower-old-abc123def456",
+		"watchtower:latest",
+		true,
+		false,
+		time.Now(),
+		&dockerContainer.Config{Labels: map[string]string{"com.centurylinklabs.watchtower": "true"}},
+	)
+	failed := mockUpdate.CreateMockContainer(string(newID), "/watchtower-old-abc123def456", "watchtower:latest", time.Now())
+
+	client := mockRestart.NewMockClient(t)
+	client.EXPECT().CreateContainer(mock.Anything, source).Return(newID, nil).Once()
+	client.EXPECT().StartContainerByID(mock.Anything, newID).Return(startErr).Once()
+	client.EXPECT().GetContainer(mock.Anything, newID).Return(failed, nil).Once()
+	client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Duration(0)).Return(nil).Once()
+
+	newContainerID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
+	require.Same(t, startErr, err)
+	assert.Empty(t, newContainerID)
+	assert.True(t, renamed, "the source keeps its old name")
+}
+
 // TestRecordRestartOutcomes verifies that each failed restart is recorded and reported once.
 //
 // Each failure is logged at error level with its container, image and error,

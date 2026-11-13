@@ -52,6 +52,18 @@ type Client interface {
 	DiscardCopyFiles(containerID container.ContainerID)
 }
 
+// selfUpdateRename records how a rename-based self-update renamed the running
+// Watchtower container, so a failed replacement can undo it.
+type selfUpdateRename struct {
+	// originalName is the name the rename freed. It is empty when this restart
+	// did not rename the container.
+	originalName string
+	// oldName is the "watchtower-old-" name the container was given.
+	oldName string
+	// renamed is true while the container is under its "watchtower-old-" name.
+	renamed bool
+}
+
 // Errors for restarting containers.
 var (
 	// errVerifyConfigFailed indicates a failure to verify container configuration for recreation.
@@ -697,7 +709,8 @@ func restartContainersInSortedOrder(
 //   - config: Update options controlling restart and lifecycle hooks.
 //
 // Returns:
-//   - container.ContainerID: ID of the new container if started, original ID if renamed only, empty otherwise.
+//   - container.ContainerID: ID of the new container, or empty when a step fails or the ephemeral
+//     orchestrator takes over.
 //   - bool: True if the Watchtower container is left under its "watchtower-old-" name, false otherwise.
 //   - error: Non-nil if restart fails, nil on success.
 func restartStaleContainer(
@@ -727,11 +740,7 @@ func restartStaleContainer(
 		"image":     sourceContainer.ImageName(),
 	}
 
-	var (
-		renamed                bool
-		originalWatchtowerName string
-		oldWatchtowerName      string
-	)
+	var rename selfUpdateRename
 
 	// Rename Watchtower containers regardless of NoRestart flag,
 	// but skip in run-once mode as there's no need to avoid conflicts
@@ -764,54 +773,23 @@ func restartStaleContainer(
 			return "", renamed, nil
 		}
 
-		targetOldName := container.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
+		var err error
 
-		// Redundant rename guard: the lingering old instance already has the
-		// target name from a prior rename. Skip to avoid a same-name error.
-		if container.IsOldContainer(sourceContainer.Name()) {
-			log.Debug().
-				Fields(fields).
-				Str("target_name", targetOldName).
-				Msg("Skipping rename of already-renamed Watchtower container")
-
-			renamed = true
-		} else {
-			originalWatchtowerName = sourceContainer.Name()
-			oldWatchtowerName = targetOldName
-
-			err := client.RenameContainer(ctx, sourceContainer, targetOldName)
-			if err != nil {
-				return "", false, err //nolint:wrapcheck // The client's error already names the failed rename.
-			}
-
-			log.Debug().
-				Fields(fields).
-				Str("new_name", targetOldName).
-				Msg("Renamed Watchtower container")
-
-			renamed = true
+		rename, err = renameForSelfUpdate(log, ctx, client, sourceContainer, fields)
+		if err != nil {
+			return "", false, err
 		}
 	}
 
 	// For Watchtower self-updates, accumulate container ID chain in labels.
 	if sourceContainer.IsWatchtower() {
-		containerInfo := sourceContainer.ContainerInfo()
-		if containerInfo != nil && containerInfo.Config != nil {
-			existingChain, _ := sourceContainer.GetContainerChain()
+		newChain := sourceContainer.SuccessorChain()
 
-			var newChain string
-			if existingChain != "" {
-				newChain = existingChain + "," + string(sourceContainer.ID())
-			} else {
-				newChain = string(sourceContainer.ID())
-			}
-
-			sourceContainer.SetLabel(labels.ContainerChain, newChain)
-			log.Debug().
-				Fields(fields).
-				Str("container_chain", newChain).
-				Msg("Updated container chain label for Watchtower self-update")
-		}
+		sourceContainer.SetLabel(labels.ContainerChain, newChain)
+		log.Debug().
+			Fields(fields).
+			Str("container_chain", newChain).
+			Msg("Updated container chain label for Watchtower self-update")
 	}
 
 	// Create the new container with updated configuration.
@@ -823,104 +801,33 @@ func restartStaleContainer(
 			Fields(fields).
 			Msg("Failed to create container")
 
-		if originalWatchtowerName != "" {
-			renamed, err = restoreWatchtowerName(log, ctx, client, sourceContainer, oldWatchtowerName, originalWatchtowerName, config, err)
-		}
+		err = rename.restore(log, ctx, client, sourceContainer, config, err)
 
-		return "", renamed, err
+		return "", rename.renamed, err
 	}
 
 	// Start the new container based on restart settings:
 	//   - Watchtower containers bypass the NoRestart check
 	//   - All containers (including Watchtower) start only if they were running or ReviveStopped is enabled
 	if (!config.NoRestart || sourceContainer.IsWatchtower()) && (sourceContainer.IsRunning() || config.ReviveStopped) {
-		log.Debug().
-			Fields(fields).
-			Msg("Starting container with updated configuration")
-
 		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-		err = client.StartContainerByID(detachedCtx, newContainerID)
+		err = startReplacement(log, detachedCtx, client, sourceContainer, newContainerID, config, fields)
 		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Failed to start container")
+			// The renamed Watchtower container still runs this process, so the
+			// host keeps a Watchtower instance. When this restart renamed it, it
+			// takes back the original name that the removed replacement held.
+			if rename.renamed {
+				removeFailedReplacement(log, ctx, client, sourceContainer, newContainerID, config, fields)
 
-			// On start failure after a Watchtower rename, remove the failed replacement
-			// container only. The renamed source still holds the running process and must
-			// remain so the host keeps a Watchtower instance. It then takes its original
-			// name back, which the removed replacement held.
-			// Use a fresh context because detachedCtx may already be expired if the start
-			// call hit the timeout and we do not want cleanup to fail for the same reason.
-			if renamed && sourceContainer.IsWatchtower() {
-				log.Debug().
-					Fields(fields).
-					Str("new_id", newContainerID.ShortID()).
-					Msg("Cleaning up failed Watchtower container")
-
-				// The replacement copies the source's configuration, including
-				// a stop timeout set on the container, so its stop waits as long.
-				cleanupCtx, cleanupCancel := context.WithTimeout(
-					context.Background(),
-					config.DetachedStopTimeout(sourceContainer),
-				)
-				defer cleanupCancel()
-
-				//nolint:contextcheck // fresh context is intentional for cleanup after timeout
-				failedNew, getErr := client.GetContainer(cleanupCtx, newContainerID)
-				if getErr != nil {
-					log.Debug().
-						Err(getErr).
-						Fields(fields).
-						Str("new_id", newContainerID.ShortID()).
-						Msg("Failed to inspect failed Watchtower container for cleanup")
-				} else {
-					//nolint:contextcheck // fresh context is intentional for cleanup after timeout
-					cleanupErr := client.StopAndRemoveContainer(
-						cleanupCtx,
-						failedNew,
-						config.Timeout,
-					)
-					if cleanupErr != nil && !cerrdefs.IsNotFound(cleanupErr) {
-						log.Debug().
-							Err(cleanupErr).
-							Fields(fields).
-							Str("new_id", newContainerID.ShortID()).
-							Msg("Failed to stop failed Watchtower container")
-					}
-				}
-
-				if originalWatchtowerName != "" {
-					renamed, err = restoreWatchtowerName(log, ctx, client, sourceContainer, oldWatchtowerName, originalWatchtowerName, config, err)
-				}
+				err = rename.restore(log, ctx, client, sourceContainer, config, err)
 			}
 
-			return "", renamed, err
-		}
-
-		log.Info().
-			Fields(fields).
-			Str("new_id", newContainerID.ShortID()).
-			Msg(logging.StartedNewContainer)
-
-		// Run post-update lifecycle hooks for restarting containers if enabled.
-		if sourceContainer.ToRestart() && config.LifecycleHooks {
-			log.Debug().
-				Fields(fields).
-				Msg("Executing post-update command")
-			//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
-			hooks.ExecutePostUpdateCommand(log,
-				detachedCtx,
-				client,
-				newContainerID,
-				config.LifecycleUID,
-				config.LifecycleGID,
-			)
+			return "", rename.renamed, err
 		}
 	}
 
 	// For renamed Watchtower containers, update restart policy to "no" to prevent auto-restart.
-	if renamed && sourceContainer.IsWatchtower() {
+	if rename.renamed {
 		log.Debug().
 			Fields(fields).
 			Msg("Updating restart policy for old Watchtower container")
@@ -929,17 +836,68 @@ func restartStaleContainer(
 		selfupdate.DisableOldRestarts(log, detachedCtx, sourceContainer, client)
 	}
 
-	return newContainerID, renamed, nil
+	return newContainerID, rename.renamed, nil
 }
 
-// restoreWatchtowerName gives the running Watchtower container its original
-// name back after a self-update failed to create or start a replacement under
-// that name.
+// renameForSelfUpdate renames the running Watchtower container to its
+// "watchtower-old-" name, so its replacement can take the original name.
 //
-// An instance left under the "watchtower-old-" name stops at its next update
-// check or restart. A failed rename is therefore added to the self-update's
-// error, which the update reports once with the container. A restored name
-// logs only at debug.
+// A container that already has a "watchtower-old-" name, left by an earlier
+// self-update, is not renamed again.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client for Docker operations.
+//   - sourceContainer: The running Watchtower container.
+//   - fields: Log fields that name the container and image.
+//
+// Returns:
+//   - selfUpdateRename: How the container was renamed.
+//   - error: The client's error when the rename fails.
+func renameForSelfUpdate(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	sourceContainer *container.Container,
+	fields map[string]any,
+) (selfUpdateRename, error) {
+	targetOldName := container.WatchtowerOldPrefix + sourceContainer.ID().ShortID()
+
+	if container.IsOldContainer(sourceContainer.Name()) {
+		log.Debug().
+			Fields(fields).
+			Str("target_name", targetOldName).
+			Msg("Skipping rename of already-renamed Watchtower container")
+
+		return selfUpdateRename{renamed: true}, nil
+	}
+
+	err := client.RenameContainer(ctx, sourceContainer, targetOldName)
+	if err != nil {
+		return selfUpdateRename{}, err //nolint:wrapcheck // The client's error already names the failed rename.
+	}
+
+	log.Debug().
+		Fields(fields).
+		Str("new_name", targetOldName).
+		Msg("Renamed Watchtower container")
+
+	return selfUpdateRename{
+		originalName: sourceContainer.Name(),
+		oldName:      targetOldName,
+		renamed:      true,
+	}, nil
+}
+
+// restore gives the running Watchtower container its original name back
+// after a self-update failed to create or start a replacement under that name.
+//
+// It does nothing when this restart did not rename the container. An instance
+// left under the "watchtower-old-" name stops at its next update check or
+// restart. A failed rename is therefore added to the self-update's error,
+// which the update reports once with the container. A restored name logs only
+// at debug.
 //
 // Parameters:
 //   - log: Process logger.
@@ -947,36 +905,154 @@ func restartStaleContainer(
 //     cancellation or deadline, since the self-update may have run out of time.
 //   - client: Container client for Docker operations.
 //   - sourceContainer: The running Watchtower container, renamed for the self-update.
-//   - currentName: The "watchtower-old-" name the self-update gave the container.
-//   - originalName: The name to restore.
 //   - config: Update options. The rename gets the detached timeout.
 //   - cause: The error that failed the self-update.
 //
 // Returns:
-//   - bool: True when the container is still under its "watchtower-old-" name.
 //   - error: cause, joined with the failed rename when the name was not restored.
-func restoreWatchtowerName(
+func (r *selfUpdateRename) restore(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client Client,
 	sourceContainer *container.Container,
-	currentName string,
-	originalName string,
 	config updateParams.Params,
 	cause error,
-) (bool, error) {
+) error {
+	if r.originalName == "" {
+		return cause
+	}
+
 	renameCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
 	defer cancel()
 
-	err := client.RenameContainer(renameCtx, sourceContainer, originalName)
+	err := client.RenameContainer(renameCtx, sourceContainer, r.originalName)
 	if err != nil {
-		return true, fmt.Errorf("%w, and %w %s from %s: %w", cause, errNameNotRestored, originalName, currentName, err)
+		return fmt.Errorf("%w, and %w %s from %s: %w", cause, errNameNotRestored, r.originalName, r.oldName, err)
 	}
 
+	r.renamed = false
+
 	log.Debug().
-		Str("container", originalName).
-		Str("old_name", currentName).
+		Str("container", r.originalName).
+		Str("old_name", r.oldName).
 		Msg("Restored Watchtower container name after a failed self-update")
 
-	return false, cause
+	return cause
+}
+
+// startReplacement starts the replacement container and runs its post-update
+// hook.
+//
+// Parameters:
+//   - log: Process logger.
+//   - detachedCtx: Context for the start and the post-update hook, which
+//     survives the update's cancellation.
+//   - client: Container client for Docker operations.
+//   - sourceContainer: The container the replacement was created from.
+//   - newContainerID: ID of the replacement.
+//   - config: Update options controlling lifecycle hooks.
+//   - fields: Log fields that name the container and image.
+//
+// Returns:
+//   - error: The client's error when the start fails.
+func startReplacement(
+	log *zerolog.Logger,
+	detachedCtx context.Context,
+	client Client,
+	sourceContainer *container.Container,
+	newContainerID container.ContainerID,
+	config updateParams.Params,
+	fields map[string]any,
+) error {
+	log.Debug().
+		Fields(fields).
+		Msg("Starting container with updated configuration")
+
+	err := client.StartContainerByID(detachedCtx, newContainerID)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Msg("Failed to start container")
+
+		return err //nolint:wrapcheck // The client's error already names the failed start.
+	}
+
+	log.Info().
+		Fields(fields).
+		Str("new_id", newContainerID.ShortID()).
+		Msg(logging.StartedNewContainer)
+
+	// Run post-update lifecycle hooks for restarting containers if enabled.
+	if sourceContainer.ToRestart() && config.LifecycleHooks {
+		log.Debug().
+			Fields(fields).
+			Msg("Executing post-update command")
+		hooks.ExecutePostUpdateCommand(log,
+			detachedCtx,
+			client,
+			newContainerID,
+			config.LifecycleUID,
+			config.LifecycleGID,
+		)
+	}
+
+	return nil
+}
+
+// removeFailedReplacement stops and removes a Watchtower replacement that
+// failed to start.
+//
+// A failure to remove it is logged at debug only.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: The update's context. The cleanup keeps its values but gets its own
+//     deadline, since the start may have used up the detached context's time.
+//   - client: Container client for Docker operations.
+//   - sourceContainer: The running Watchtower container the replacement copies.
+//   - newContainerID: ID of the failed replacement.
+//   - config: Update options. The stop waits up to the stop timeout.
+//   - fields: Log fields that name the container and image.
+func removeFailedReplacement(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	sourceContainer *container.Container,
+	newContainerID container.ContainerID,
+	config updateParams.Params,
+	fields map[string]any,
+) {
+	log.Debug().
+		Fields(fields).
+		Str("new_id", newContainerID.ShortID()).
+		Msg("Cleaning up failed Watchtower container")
+
+	// The replacement copies the source's configuration, including
+	// a stop timeout set on the container, so its stop waits as long.
+	cleanupCtx, cleanupCancel := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		config.DetachedStopTimeout(sourceContainer),
+	)
+	defer cleanupCancel()
+
+	failedNew, err := client.GetContainer(cleanupCtx, newContainerID)
+	if err != nil {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Str("new_id", newContainerID.ShortID()).
+			Msg("Failed to inspect failed Watchtower container for cleanup")
+
+		return
+	}
+
+	err = client.StopAndRemoveContainer(cleanupCtx, failedNew, config.Timeout)
+	if err != nil && !cerrdefs.IsNotFound(err) {
+		log.Debug().
+			Err(err).
+			Fields(fields).
+			Str("new_id", newContainerID.ShortID()).
+			Msg("Failed to stop failed Watchtower container")
+	}
 }
