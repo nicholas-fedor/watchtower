@@ -12,6 +12,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/events"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
@@ -218,6 +219,8 @@ func TestUpdate_OldInstanceImageJoinsSessionCleanup(t *testing.T) {
 	// The mock fails the test on any image removal.
 	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{current, old}, nil)
+	client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).
+		Return([]*container.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
@@ -251,6 +254,8 @@ func TestUpdate_SortFailureKeepsOldInstanceImage(t *testing.T) {
 	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).
 		Return([]*container.Container{current, old, app1, app2}, nil)
+	client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).
+		Return([]*container.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 
 	_, cleanup, err := update(newTestLogger(t), t.Context(), client,
@@ -274,6 +279,8 @@ func TestRunUpdatesWithNotifications_RemovesOldInstanceImageOnce(t *testing.T) {
 
 	client := newMockClient(t)
 	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{current, old}, nil)
+	client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).
+		Return([]*container.Container{current, old}, nil)
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
 	client.EXPECT().IsContainerStale(mock.Anything, mock.Anything, mock.Anything).
 		RunAndReturn(func(_ context.Context, c *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {

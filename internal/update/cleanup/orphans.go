@@ -24,10 +24,10 @@ const orphanedOrchestratorAge = 10 * time.Minute
 // that may have persisted due to crashes or unexpected termination.
 //
 // This is called during startup alongside RemoveExcessWatchtowerInstances to
-// ensure a clean state. Orchestrators in every state are checked, including one
-// that a failed start left in the created state. An orchestrator is removed
-// only when it started longer ago than any self-update can take or was created
-// that long ago without starting. A younger orchestrator is kept because it may
+// ensure a clean state. Orchestrators that are not running are checked too,
+// including one that a failed start left in the created state. An orchestrator
+// is removed only when it started longer ago than any self-update can take or
+// was created that long ago without starting. A younger orchestrator is kept because it may
 // still be handing off to a new Watchtower, such as the instance running this
 // cleanup or one in another scope. An orchestrator whose start and creation
 // times cannot be read is kept too.
