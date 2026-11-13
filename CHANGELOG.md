@@ -129,6 +129,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/jedib0t/go-pretty/v6 to v6.9.1 by @renovate[bot] in [#3743](https://github.com/nicholas-fedor/watchtower/pull/3743)
+- Update module tags.cncf.io/container-device-interface to v1.1.2 by @renovate[bot] in [#3742](https://github.com/nicholas-fedor/watchtower/pull/3742)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.17 by @renovate[bot] in [#3736](https://github.com/nicholas-fedor/watchtower/pull/3736)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.11 by @renovate[bot] in [#3737](https://github.com/nicholas-fedor/watchtower/pull/3737)
 - Update golang.org/x/tools digest to 4dd740f by @renovate[bot] in [#3732](https://github.com/nicholas-fedor/watchtower/pull/3732)
