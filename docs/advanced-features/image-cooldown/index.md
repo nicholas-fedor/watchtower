@@ -69,15 +69,15 @@ When set, the label value takes precedence over the global configuration.
             image: nginx
             labels:
                 com.centurylinklabs.watchtower.cooldown-delay: "48h"
-            ...
+            # ...
     ```
 
 === "Docker CLI"
 
     ```bash title="docker run"
     docker run -d \
-    --label=com.centurylinklabs.watchtower.cooldown-delay="48h" \
-    nginx
+      --label=com.centurylinklabs.watchtower.cooldown-delay="48h" \
+      nginx
     ```
 
 === "Dockerfile"

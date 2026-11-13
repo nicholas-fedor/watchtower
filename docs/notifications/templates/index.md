@@ -49,11 +49,11 @@ Create a template file named `custom-template.txt` with your desired template co
 
     ```bash
     docker run -d \
-    --name watchtower \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -v /path/to/custom-template.txt:/custom-template.txt \
-    -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
-    nickfedor/watchtower:latest
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -v /path/to/custom-template.txt:/custom-template.txt \
+      -e WATCHTOWER_NOTIFICATION_TEMPLATE_FILE="/custom-template.txt" \
+      nickfedor/watchtower:latest
     ```
 
 ### Notification Report

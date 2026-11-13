@@ -597,7 +597,6 @@ Hook execution results are evaluated based on exit codes, with different behavio
     === "Docker Compose"
 
         ```yaml
-        version: '3.8'
         services:
           postgres:
             image: postgres:13
@@ -616,7 +615,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
               - "com.centurylinklabs.watchtower.lifecycle.post-update-timeout=15"
 
           watchtower:
-            image: nicholas-fedor/watchtower
+            image: nickfedor/watchtower:latest
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
             environment:
@@ -651,7 +650,6 @@ Hook execution results are evaluated based on exit codes, with different behavio
     === "Docker Compose"
 
         ```yaml
-        version: '3.8'
         services:
           node-app:
             image: node:18
@@ -669,7 +667,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
               - "com.centurylinklabs.watchtower.lifecycle.post-update-timeout=5"
 
           watchtower:
-            image: nicholas-fedor/watchtower
+            image: nickfedor/watchtower:latest
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
             environment:
@@ -697,7 +695,6 @@ Hook execution results are evaluated based on exit codes, with different behavio
     === "Docker Compose"
 
         ```yaml
-        version: '3.8'
         services:
           notification-service:
             image: alpine:latest
@@ -709,7 +706,7 @@ Hook execution results are evaluated based on exit codes, with different behavio
               - "com.centurylinklabs.watchtower.lifecycle.pre-update=/usr/local/bin/notify.sh"
 
           watchtower:
-            image: nicholas-fedor/watchtower
+            image: nickfedor/watchtower:latest
             volumes:
               - /var/run/docker.sock:/var/run/docker.sock
             environment:

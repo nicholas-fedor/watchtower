@@ -95,7 +95,6 @@ Here is a complete docker-compose.yml file that starts up a docker container fro
 Note the command argument changing the interval to 30s rather than the default 24 hours.
 
 ```yaml
-version: "3"
 services:
   cavo:
     image: ghcr.io/OWNER/IMAGE:TAG
