@@ -15,7 +15,7 @@ require (
 	github.com/docker/compose/v5 v5.7.1
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/gofiber/contrib/v3/swaggo v1.0.16
-	github.com/gofiber/contrib/v3/zerolog v1.1.10
+	github.com/gofiber/contrib/v3/zerolog v1.1.11
 	github.com/gofiber/fiber/v3 v3.7.0
 	github.com/mattn/go-isatty v0.0.24
 	github.com/maypok86/otter/v2 v2.4.0
