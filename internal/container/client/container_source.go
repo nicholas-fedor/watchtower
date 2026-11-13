@@ -19,7 +19,6 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
-	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
@@ -168,7 +167,8 @@ func listSourceContainers(log *zerolog.Logger,
 
 // getSourceContainer inspects a container and optionally reuses ImageInspect results.
 //
-// It resolves the network mode when it references another container.
+// It rewrites the IDs of the containers whose network or volumes the
+// container uses to their names, when those containers still exist.
 //
 // Parameters:
 //   - log: Logger for debug output.
@@ -243,7 +243,7 @@ func getSourceContainer(log *zerolog.Logger,
 		}
 
 		// Rewrite volumes-from IDs to names while the source still exists.
-		recreate.ResolveVolumesFrom(ctx, api, clog, containerInfo)
+		resolveVolumesFrom(ctx, api, clog, containerInfo)
 	}
 
 	imageInfo, err := resolveImageInspect(ctx, api, containerInfo.Image, imageCache)
@@ -268,6 +268,71 @@ func getSourceContainer(log *zerolog.Logger,
 		Msg("Retrieved container and image info")
 
 	return container.NewContainer(log, containerInfo, imageInfo), nil
+}
+
+// resolveVolumesFrom replaces each volumes-from source ID in an inspected
+// container's host config with that source container's name.
+//
+// Docker reports volumes-from sources by ID. The replacement names them
+// instead, so it still finds a source that an update has recreated under a new
+// ID. A source that cannot be inspected keeps its ID. A mode suffix such as :ro
+// or :rw stays on its entry.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client.
+//   - clog: Logger for warn and debug output.
+//   - containerInfo: Inspected container whose volumes-from entries are rewritten.
+func resolveVolumesFrom(
+	ctx context.Context,
+	api dockerClient.APIClient,
+	clog *zerolog.Logger,
+	containerInfo *dockerContainer.InspectResponse,
+) {
+	if containerInfo.HostConfig == nil || len(containerInfo.HostConfig.VolumesFrom) == 0 {
+		return
+	}
+
+	rewritten := slices.Clone(containerInfo.HostConfig.VolumesFrom)
+	containerName := container.NormalizeContainerName(containerInfo.Name)
+
+	for i, spec := range rewritten {
+		name, mode := container.ParseVolumesFromSpec(spec)
+		if name == "" {
+			continue
+		}
+
+		sourceResult, err := api.ContainerInspect(
+			ctx,
+			name,
+			dockerClient.ContainerInspectOptions{},
+		)
+		if err != nil {
+			// Leave the stored ID so create fails with a clear missing-container
+			// error instead of inventing a name.
+			clog.Warn().
+				Err(err).
+				Str("container", containerName).
+				Str("volumes_from", name).
+				Msg("Unable to resolve volumes-from container")
+
+			continue
+		}
+
+		resolved := container.NormalizeContainerName(sourceResult.Container.Name)
+		if mode != "" {
+			// Keep :ro/:rw/SELinux flags from the original spec.
+			resolved = resolved + ":" + mode
+		}
+
+		rewritten[i] = resolved
+		clog.Debug().
+			Str("container", containerName).
+			Str("volumes_from", resolved).
+			Msg("Resolved volumes-from container name")
+	}
+
+	containerInfo.HostConfig.VolumesFrom = rewritten
 }
 
 // resolveImageInspect returns image inspect metadata, using imageCache when set.
