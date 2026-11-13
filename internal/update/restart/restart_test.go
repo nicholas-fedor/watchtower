@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -64,6 +65,23 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	w := zerolog.TestWriter{T: t, Frame: 4}
 
 	return new(zerolog.New(w))
+}
+
+// newWatchtowerContainer returns a running Watchtower container named
+// "watchtower", so a self-update renames it or hands it to an orchestrator.
+//
+// Returns:
+//   - *container.Container: A Watchtower container with the ID "watchtower".
+func newWatchtowerContainer() *container.Container {
+	return mockUpdate.CreateMockContainerWithConfig(
+		"watchtower",
+		"/watchtower",
+		"watchtower:latest",
+		true,
+		false,
+		time.Now(),
+		&dockerContainer.Config{Labels: map[string]string{"com.centurylinklabs.watchtower": "true"}},
+	)
 }
 
 // Test_restartStaleContainer verifies when restarting a stale Watchtower
@@ -454,7 +472,7 @@ func TestDetachedContext(t *testing.T) {
 	t.Run("Watchtower self-update start failure cleanup", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("removes the newly created container, not the renamed source", func(t *testing.T) {
+		t.Run("removes the newly created container and renames the source back", func(t *testing.T) {
 			t.Parallel()
 
 			client := mockUpdate.CreateFakeClient(
@@ -525,8 +543,24 @@ func TestDetachedContext(t *testing.T) {
 			wg.Wait()
 
 			require.EqualError(t, err, "simulated start failure")
-			assert.True(t, renamed)
+			assert.False(t, renamed, "name should be restored after start failure")
 			assert.Equal(t, int32(1), client.TestData.CreateContainerCount.Load())
+
+			// The removed replacement held the original name, so the source can
+			// take it back only after the removal.
+			assert.Equal(t,
+				[]string{container.WatchtowerOldPrefix + testContainer.ID().ShortID(), "watchtower"},
+				client.TestData.RenameTargets,
+			)
+
+			handoff := slices.DeleteFunc(slices.Clone(client.TestData.OperationOrder), func(op string) bool {
+				return op != "RenameContainer" && op != "StopAndRemoveContainer"
+			})
+			assert.Equal(t,
+				[]string{"RenameContainer", "StopAndRemoveContainer", "RenameContainer"},
+				handoff,
+				"the rename back follows the replacement's removal",
+			)
 			assert.NotEmpty(t, client.TestData.LastCreatedContainerID)
 			assert.Equal(t, int32(1), client.TestData.StopAndRemoveContainerCount.Load())
 			assert.Equal(t, int32(1), client.TestData.RemoveContainerCount.Load())
@@ -725,7 +759,7 @@ func TestDetachedContext(t *testing.T) {
 			// cleanup (StopAndRemoveContainer) should have been attempted
 			// using the detached context, which survives parent cancellation.
 			require.EqualError(t, err, "simulated start failure")
-			assert.True(t, renamed)
+			assert.False(t, renamed, "the source takes its original name back")
 
 			// Verify that RemoveContainer was called during cleanup.
 			// This demonstrates that the detached context allowed the cleanup
@@ -2093,20 +2127,6 @@ func TestRun(t *testing.T) {
 func TestClientErrorsNamedOnce(t *testing.T) {
 	t.Parallel()
 
-	// watchtower builds a running Watchtower container under its canonical
-	// name, so a self-update renames it or hands it to an orchestrator.
-	watchtower := func() *container.Container {
-		return mockUpdate.CreateMockContainerWithConfig(
-			"watchtower",
-			"/watchtower",
-			"watchtower:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{Labels: map[string]string{"com.centurylinklabs.watchtower": "true"}},
-		)
-	}
-
 	t.Run("stop and remove", func(t *testing.T) {
 		t.Parallel()
 
@@ -2186,7 +2206,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 
 		text := "failed to rename container: daemon unavailable"
 		clientErr := errors.New(text)
-		source := watchtower()
+		source := newWatchtowerContainer()
 		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
 			RenameContainer(mock.Anything, source, container.WatchtowerOldPrefix+source.ID().ShortID()).
@@ -2203,7 +2223,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 
 		text := "failed to start ephemeral orchestrator container: daemon unavailable"
 		clientErr := errors.New(text)
-		source := watchtower()
+		source := newWatchtowerContainer()
 		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
 			CreateEphemeralOrchestrator(mock.Anything, source, mock.Anything, mock.Anything, mock.Anything).
@@ -2219,6 +2239,73 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
+}
+
+// TestRestartStaleContainer_NameNotRestored verifies that a self-update whose
+// replacement fails to be created or started, and whose rename back to the
+// original name then fails too, adds the failed rename to its error.
+//
+// A Watchtower left under its "watchtower-old-" name stops at its next update
+// check or restart. Because the update reports the returned error with the
+// container in its "Could not update container" line and in the report, the
+// error names the container's original and current names. The restart
+// reports the source as still renamed.
+func TestRestartStaleContainer_NameNotRestored(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		// name describes the step that fails after the rename.
+		name string
+		// replacementErr is the error of the failed create or start.
+		replacementErr error
+		// expect sets up the calls between the rename and the rename back.
+		expect func(client *mockRestart.MockClient, source *container.Container, replacementErr error)
+	}{
+		{
+			name:           "create fails",
+			replacementErr: errors.New("failed to create container: daemon unavailable"),
+			expect: func(client *mockRestart.MockClient, source *container.Container, replacementErr error) {
+				client.EXPECT().CreateContainer(mock.Anything, source).Return("", replacementErr).Once()
+			},
+		},
+		{
+			name:           "start fails",
+			replacementErr: errors.New("failed to start container replacement-id: daemon unavailable"),
+			expect: func(client *mockRestart.MockClient, source *container.Container, replacementErr error) {
+				const newID = container.ContainerID("replacement-id")
+
+				failed := mockUpdate.CreateMockContainer(string(newID), "/watchtower", "watchtower:latest", time.Now())
+
+				client.EXPECT().CreateContainer(mock.Anything, source).Return(newID, nil).Once()
+				client.EXPECT().StartContainerByID(mock.Anything, newID).Return(replacementErr).Once()
+				client.EXPECT().GetContainer(mock.Anything, newID).Return(failed, nil).Once()
+				client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Duration(0)).Return(nil).Once()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			source := newWatchtowerContainer()
+			oldName := container.WatchtowerOldPrefix + source.ID().ShortID()
+
+			client := mockRestart.NewMockClient(t)
+			client.EXPECT().RenameContainer(mock.Anything, source, oldName).Return(nil).Once()
+			tt.expect(client, source, tt.replacementErr)
+			client.EXPECT().RenameContainer(mock.Anything, source, "watchtower").
+				Return(errors.New("failed to rename container: daemon unavailable")).Once()
+
+			_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
+			require.ErrorIs(t, err, tt.replacementErr)
+			require.ErrorIs(t, err, errNameNotRestored)
+			require.EqualError(t, err, tt.replacementErr.Error()+
+				", and could not restore Watchtower's container name watchtower from "+oldName+
+				": failed to rename container: daemon unavailable")
+			assert.True(t, renamed, "the source still has its old name")
+		})
+	}
 }
 
 // TestRecordRestartOutcomes verifies that each failed restart is recorded and reported once.
