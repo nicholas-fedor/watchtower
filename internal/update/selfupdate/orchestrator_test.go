@@ -11,6 +11,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	mockSelfupdate "github.com/nicholas-fedor/watchtower/internal/update/selfupdate/mocks"
 )
@@ -210,6 +212,10 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 		setup        func(client *mockSelfupdate.MockHandoffClient, old *container.Container)
 		wantErr      error
 		wantCalls    []string
+		// wantErrorLogs lists the error-level lines. A failed step logs at
+		// debug, since RunOrchestrator reports the returned error, so only a
+		// failed recovery logs at error.
+		wantErrorLogs []string
 	}{
 		{
 			name: "old container not found",
@@ -226,7 +232,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(nil, errOrchestratorTestDocker)
 			},
-			wantErr:   errOrchestratorInspectFailed,
+			wantErr:   errOrchestratorTestDocker,
 			wantCalls: []string{"GetContainer 01d"},
 		},
 		{
@@ -334,7 +340,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(orchestratorContainer(orchestratorOldID, orchestratorOldName, true), nil).Once()
 			},
-			wantErr:   errOrchestratorStopFailed,
+			wantErr:   errOrchestratorTestDocker,
 			wantCalls: []string{"GetContainer 01d", "StopContainer 01d", "GetContainer 01d"},
 		},
 		{
@@ -345,7 +351,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(errOrchestratorTestDocker)
 				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
-			wantErr: errOrchestratorRenameFailed,
+			wantErr: errOrchestratorTestDocker,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
@@ -362,13 +368,14 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).
 					Return(errOrchestratorTestDocker)
 			},
-			wantErr: errOrchestratorRenameFailed,
+			wantErr: errOrchestratorTestDocker,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
 				"RenameContainer 01d to watchtower-old-01d000000000",
 				"StartContainerByID 01d",
 			},
+			wantErrorLogs: []string{"Failed to restart old Watchtower container after rename failure. Manual intervention required"},
 		},
 		{
 			name: "create failure restores and restarts the old container",
@@ -380,7 +387,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorOriginalName).Return(nil)
 				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
-			wantErr: errOrchestratorCreateFailed,
+			wantErr: errOrchestratorTestDocker,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
@@ -399,7 +406,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
 				client.EXPECT().StartContainer(mock.Anything, old).Return("", errOrchestratorTestDocker)
 			},
-			wantErr: errOrchestratorCreateFailed,
+			wantErr: errOrchestratorTestDocker,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
@@ -416,7 +423,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().StartContainer(mock.Anything, old).Return("", errOrchestratorTestDocker)
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorOriginalName).Return(errOrchestratorTestDocker)
 			},
-			wantErr: errOrchestratorCreateFailed,
+			wantErr: errOrchestratorTestDocker,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
@@ -424,6 +431,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				"StartContainer 01d",
 				"RenameContainer 01d to watchtower",
 			},
+			wantErrorLogs: []string{"Failed to restore old Watchtower container name. Manual intervention required"},
 		},
 		{
 			name: "stopped new container is started",
@@ -462,7 +470,7 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorOriginalName).Return(nil)
 				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).Return(nil)
 			},
-			wantErr: errOrchestratorStartFailed,
+			wantErr: errOrchestratorTestDocker,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
@@ -546,15 +554,23 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			client := mockSelfupdate.NewMockHandoffClient(t)
 			tt.setup(client, old)
 
-			err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
+
+			err := orchestrateSelfUpdate(log, t.Context(), client,
 				orchestratorOldID, orchestratorNewImage, originalName, "", tt.cleanup)
-			if tt.wantErr != nil {
-				require.ErrorIs(t, err, tt.wantErr)
-			} else {
+			switch {
+			case tt.wantErr == nil:
 				require.NoError(t, err)
+			case errors.Is(tt.wantErr, errOrchestratorTestDocker):
+				// A failed client call already names its step, so the
+				// orchestrator returns the client's error unchanged.
+				require.Same(t, tt.wantErr, err)
+			default:
+				require.ErrorIs(t, err, tt.wantErr)
 			}
 
 			assert.Equal(t, tt.wantCalls, orchestratorCalls(client))
+			assert.Equal(t, tt.wantErrorLogs, logcapture.Messages(t, logBuf.String(), "error"))
 		})
 	}
 }
