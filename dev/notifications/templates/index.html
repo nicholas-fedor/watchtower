@@ -3231,17 +3231,19 @@
 <a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_TEMPLATE_FILE</span><span class="p">:</span><span class="w"> </span><span class="s">"/custom-template.txt"</span>
 <a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/custom-template.txt:/custom-template.txt</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">TEMPLATE_FILE:/custom-template.txt</span>
 </code></pre></div>
+<p>Replace <em><code>TEMPLATE_FILE</code></em> with the path of the template file on the Docker host. A relative path starts with <code>./</code> and is read from the Compose project directory, which is the directory of the first Compose file unless you set <code>--project-directory</code>.</p>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/custom-template.txt:/custom-template.txt<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">"TEMPLATE_FILE:/custom-template.txt"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_TEMPLATE_FILE</span><span class="o">=</span><span class="s2">"/custom-template.txt"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">  </span>nickfedor/watchtower:latest
 </code></pre></div>
+<p>Replace <em><code>TEMPLATE_FILE</code></em> with the absolute path of the template file on the Docker host.</p>
 </div>
 </div>
 </div>
@@ -3380,8 +3382,8 @@
 <a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_REPORT</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
 <a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_URL</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">&gt;</span>
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">                </span><span class="no">discord://token@channel</span>
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">                </span><span class="no">slack://watchtower@token-a/token-b/token-c</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">                </span><span class="no">discord://DISCORD_WEBHOOK_TOKEN@DISCORD_WEBHOOK_ID</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">                </span><span class="no">slack://hook:SLACK_WORKSPACE_ID-SLACK_WEBHOOK_ID-SLACK_WEBHOOK_TOKEN@webhook?botname=watchtower</span>
 <a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">            </span><span class="nt">WATCHTOWER_NOTIFICATION_TEMPLATE</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">                </span><span class="no">{{- if .Report -}}</span>
 <a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">                  </span><span class="no">{{- with .Report -}}</span>
@@ -3415,13 +3417,21 @@
 <a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a><span class="w">                  </span><span class="no">{{- end -}}</span>
 <a id="__codelineno-9-42" name="__codelineno-9-42" href="#__codelineno-9-42"></a><span class="w">                </span><span class="no">{{- end -}}</span>
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>DISCORD_WEBHOOK_TOKEN</code></em>: the token of your Discord webhook</li>
+<li><em><code>DISCORD_WEBHOOK_ID</code></em>: the ID of your Discord webhook</li>
+<li><em><code>SLACK_WORKSPACE_ID</code></em>: the workspace ID of your Slack webhook URL, which starts with <code>T</code></li>
+<li><em><code>SLACK_WEBHOOK_ID</code></em>: the webhook ID of your Slack webhook URL, which starts with <code>B</code></li>
+<li><em><code>SLACK_WEBHOOK_TOKEN</code></em>: the webhook token of your Slack webhook URL</li>
+</ul>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_REPORT</span><span class="o">=</span><span class="s2">"true"</span><span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"discord://token@channel"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_URL</span><span class="o">=</span><span class="s2">"discord://DISCORD_WEBHOOK_TOKEN@DISCORD_WEBHOOK_ID"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_NOTIFICATION_TEMPLATE</span><span class="o">=</span><span class="s2">"\</span>
 <a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="s2">{{- if .Report -}}</span>
 <a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="s2">  {{- with .Report -}}</span>
@@ -3457,6 +3467,11 @@
 <a id="__codelineno-10-38" name="__codelineno-10-38" href="#__codelineno-10-38"></a><span class="s2">"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-10-39" name="__codelineno-10-39" href="#__codelineno-10-39"></a><span class="w">  </span>nickfedor/watchtower:latest
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>DISCORD_WEBHOOK_TOKEN</code></em>: the token of your Discord webhook</li>
+<li><em><code>DISCORD_WEBHOOK_ID</code></em>: the ID of your Discord webhook</li>
+</ul>
 </div>
 </div>
 </div>
@@ -3726,7 +3741,7 @@ They are empty, or the zero time, on a container that no cooldown holds back.</p
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 01:06:00 UTC"><span class="timeago" datetime="2026-11-13T01:06:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 01:06:00 UTC">2026-11-13</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 04:12:58 UTC"><span class="timeago" datetime="2026-11-13T04:12:58+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 04:12:58 UTC">2026-11-13</span>
   </span>
 
     

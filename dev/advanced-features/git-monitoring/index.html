@@ -5427,13 +5427,19 @@ The runtime image is scratch and has no default host keys.</p>
 <a id="__codelineno-27-3" name="__codelineno-27-3" href="#__codelineno-27-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
 <a id="__codelineno-27-4" name="__codelineno-27-4" href="#__codelineno-27-4"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
 <a id="__codelineno-27-5" name="__codelineno-27-5" href="#__codelineno-27-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/var/run/docker.sock:/var/run/docker.sock</span>
-<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/id_ed25519:/run/secrets/id_ed25519:ro</span>
-<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/known_hosts:/run/secrets/known_hosts:ro</span>
+<a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SSH_KEY_FILE:/run/secrets/id_ed25519:ro</span>
+<a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">KNOWN_HOSTS_FILE:/run/secrets/known_hosts:ro</span>
 <a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
 <a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a><span class="w">            </span><span class="nt">WATCHTOWER_GIT_ENABLE</span><span class="p">:</span><span class="w"> </span><span class="s">"true"</span>
 <a id="__codelineno-27-10" name="__codelineno-27-10" href="#__codelineno-27-10"></a><span class="w">            </span><span class="nt">WATCHTOWER_GIT_SSH_KEY_PATH</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/run/secrets/id_ed25519</span>
 <a id="__codelineno-27-11" name="__codelineno-27-11" href="#__codelineno-27-11"></a><span class="w">            </span><span class="nt">WATCHTOWER_GIT_SSH_KNOWN_HOSTS</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/run/secrets/known_hosts</span>
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>SSH_KEY_FILE</code></em>: the path of the SSH private key on the Docker host</li>
+<li><em><code>KNOWN_HOSTS_FILE</code></em>: the path of the <code>known_hosts</code> file on the Docker host</li>
+</ul>
+<p>A relative path starts with <code>./</code> and is read from the Compose project directory, which is the directory of the first Compose file unless you set <code>--project-directory</code>.</p>
 </div>
 </div>
 </div>
@@ -5446,7 +5452,7 @@ The runtime image is scratch and has no default host keys.</p>
 <div class="highlight"><span class="filename">Mount a token file</span><pre><span></span><code><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="w">    </span>-v<span class="w"> </span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a><span class="w">    </span>-v<span class="w"> </span><span class="s2">"</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_GIT_ENABLE</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_GIT_AUTH_TOKEN</span><span class="o">=</span>/run/secrets/git_auth_token<span class="w"> </span><span class="se">\</span>
@@ -5457,14 +5463,19 @@ The runtime image is scratch and has no default host keys.</p>
 <div class="highlight"><span class="filename">Mount an SSH key and known_hosts</span><pre><span></span><code><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-2" name="__codelineno-29-2" href="#__codelineno-29-2"></a><span class="w">    </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-3" name="__codelineno-29-3" href="#__codelineno-29-3"></a><span class="w">    </span>-v<span class="w"> </span>/var/run/docker.sock:/var/run/docker.sock<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">    </span>-v<span class="w"> </span>/path/to/id_ed25519:/run/secrets/id_ed25519:ro<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">    </span>-v<span class="w"> </span>/path/to/known_hosts:/run/secrets/known_hosts:ro<span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-29-4" name="__codelineno-29-4" href="#__codelineno-29-4"></a><span class="w">    </span>-v<span class="w"> </span><span class="s2">"SSH_KEY_FILE:/run/secrets/id_ed25519:ro"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-29-5" name="__codelineno-29-5" href="#__codelineno-29-5"></a><span class="w">    </span>-v<span class="w"> </span><span class="s2">"KNOWN_HOSTS_FILE:/run/secrets/known_hosts:ro"</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-6" name="__codelineno-29-6" href="#__codelineno-29-6"></a><span class="w">    </span>--restart<span class="w"> </span>unless-stopped<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-7" name="__codelineno-29-7" href="#__codelineno-29-7"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_GIT_ENABLE</span><span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-8" name="__codelineno-29-8" href="#__codelineno-29-8"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_GIT_SSH_KEY_PATH</span><span class="o">=</span>/run/secrets/id_ed25519<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-9" name="__codelineno-29-9" href="#__codelineno-29-9"></a><span class="w">    </span>-e<span class="w"> </span><span class="nv">WATCHTOWER_GIT_SSH_KNOWN_HOSTS</span><span class="o">=</span>/run/secrets/known_hosts<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-29-10" name="__codelineno-29-10" href="#__codelineno-29-10"></a><span class="w">    </span>nickfedor/watchtower
 </code></pre></div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>SSH_KEY_FILE</code></em>: the absolute path of the SSH private key on the Docker host</li>
+<li><em><code>KNOWN_HOSTS_FILE</code></em>: the absolute path of the <code>known_hosts</code> file on the Docker host</li>
+</ul>
 </div>
 </div>
 </div>
@@ -5703,7 +5714,7 @@ The first session after Watchtower restarts builds the current commit once more.
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 04:12:58 UTC"><span class="timeago" datetime="2026-11-13T04:12:58+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 04:12:58 UTC">2026-11-13</span>
   </span>
 
     

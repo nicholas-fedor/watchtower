@@ -3395,17 +3395,18 @@
 </ul>
 </div>
 <h2 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">&para;</a></h2>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Replace <code>remote-host</code> with your actual Docker host address and <code>/path/to/certs</code> with the path to your certificate directory.</p>
-</div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>CERT_DIR</code></em>: the absolute path of a directory that holds only the client's <code>ca.pem</code>, <code>cert.pem</code> and <code>key.pem</code> files</li>
+<li><em><code>HOST</code></em>: the host name or IP address of the Docker host, as named in its server certificate. Enclose an IPv6 address in brackets, such as <code>[2001:db8::1]</code>.</li>
+</ul>
 <div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Docker CLI</label><label for="__tabbed_1_2">Docker Compose</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/certs:/etc/ssl/docker:ro<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--host<span class="w"> </span>tcp://remote-host:2376<span class="w"> </span>--cert-path<span class="w"> </span>/etc/ssl/docker<span class="w"> </span>--tlsverify
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">"CERT_DIR:/etc/ssl/docker:ro"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--host<span class="w"> </span>tcp://HOST:2376<span class="w"> </span>--cert-path<span class="w"> </span>/etc/ssl/docker<span class="w"> </span>--tlsverify
 </code></pre></div>
 <table>
 <thead>
@@ -3420,7 +3421,7 @@
 <td>Assigns the name "watchtower" to the container for easy identification and management.</td>
 </tr>
 <tr>
-<td><code>-v /path/to/certs:/etc/ssl/docker:ro</code></td>
+<td><code>-v "CERT_DIR:/etc/ssl/docker:ro"</code></td>
 <td>Mounts the local certificate directory to the container's SSL directory as read-only.</td>
 </tr>
 <tr>
@@ -3428,7 +3429,7 @@
 <td>Specifies the Docker image to run, which is the Watchtower container image.</td>
 </tr>
 <tr>
-<td><code>--host tcp://remote-host:2376</code></td>
+<td><code>--host tcp://HOST:2376</code></td>
 <td>Sets the Docker host to connect to via TCP on port 2376.</td>
 </tr>
 <tr>
@@ -3451,11 +3452,11 @@
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=tcp://remote-host:2376</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=tcp://HOST:2376</span>
 <a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_CERT_PATH=/etc/ssl/docker</span>
 <a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_TLS_VERIFY=1</span>
 <a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/certs:/etc/ssl/docker:ro</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CERT_DIR:/etc/ssl/docker:ro</span>
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">        </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 </code></pre></div>
 <table>
@@ -3471,7 +3472,7 @@
 <td>Specifies the Docker image for the Watchtower service.</td>
 </tr>
 <tr>
-<td><code>- DOCKER_HOST=tcp://remote-host:2376</code></td>
+<td><code>- DOCKER_HOST=tcp://HOST:2376</code></td>
 <td>Sets the Docker host connection URL.</td>
 </tr>
 <tr>
@@ -3483,7 +3484,7 @@
 <td>Enables TLS verification for secure connections.</td>
 </tr>
 <tr>
-<td><code>/path/to/certs:/etc/ssl/docker:ro</code></td>
+<td><code>CERT_DIR:/etc/ssl/docker:ro</code></td>
 <td>Mounts the local certificate directory to the container's SSL directory as read-only.</td>
 </tr>
 <tr>
@@ -3538,7 +3539,7 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 <li>
 <p><strong>Environment Variables:</strong></p>
 <ul>
-<li>Set <code>DOCKER_HOST</code> to the secure endpoint (e.g., <code>tcp://host:2376</code>)</li>
+<li>Set <code>DOCKER_HOST</code> to the secure endpoint (e.g., <code>tcp://docker.example.com:2376</code>)</li>
 <li>Set <code>DOCKER_CERT_PATH</code> to the directory containing client certificates</li>
 <li>Set <code>DOCKER_TLS_VERIFY=1</code> to enable verification</li>
 </ul>
@@ -3723,26 +3724,28 @@ You are <strong>highly</strong> encouraged to perform your own due diligence to 
 <a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a><span class="w">    </span><span class="nt">watchtower</span><span class="p">:</span>
 <a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a><span class="w">        </span><span class="nt">image</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">nickfedor/watchtower</span>
 <a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a><span class="w">        </span><span class="nt">environment</span><span class="p">:</span>
-<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=tcp://remote-host:2376</span>
+<a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_HOST=tcp://HOST:2376</span>
 <a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_CERT_PATH=/etc/ssl/docker</span>
 <a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DOCKER_TLS_VERIFY=1</span>
 <a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a><span class="w">        </span><span class="nt">volumes</span><span class="p">:</span>
-<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/certs:/etc/ssl/docker:ro</span>
+<a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a><span class="w">            </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CERT_DIR:/etc/ssl/docker:ro</span>
 <a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a><span class="w">        </span><span class="nt">restart</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">unless-stopped</span>
 </code></pre></div>
 </div>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>docker<span class="w"> </span>run<span class="w"> </span>-d<span class="w"> </span><span class="se">\</span>
 <a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a><span class="w">  </span>--name<span class="w"> </span>watchtower<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">  </span>-v<span class="w"> </span>/path/to/certs:/etc/ssl/docker:ro<span class="w"> </span><span class="se">\</span>
-<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--host<span class="w"> </span>tcp://remote-host:2376<span class="w"> </span>--cert-path<span class="w"> </span>/etc/ssl/docker<span class="w"> </span>--tlsverify
+<a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a><span class="w">  </span>-v<span class="w"> </span><span class="s2">"CERT_DIR:/etc/ssl/docker:ro"</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a><span class="w">  </span>nickfedor/watchtower<span class="w"> </span>--host<span class="w"> </span>tcp://HOST:2376<span class="w"> </span>--cert-path<span class="w"> </span>/etc/ssl/docker<span class="w"> </span>--tlsverify
 </code></pre></div>
 </div>
 </div>
 </div>
-<div class="admonition note">
-<p class="admonition-title"><code>remote-host</code> is used, but can be replaced with <code>localhost</code> for local testing.</p>
-</div>
+<p>Replace the following:</p>
+<ul>
+<li><em><code>HOST</code></em>: the host name or IP address of the Docker host, as named in its server certificate. Enclose an IPv6 address in brackets, such as <code>[2001:db8::1]</code>.</li>
+<li><em><code>CERT_DIR</code></em>: the absolute path of a directory that holds only the client's <code>ca.pem</code>, <code>cert.pem</code> and <code>key.pem</code> files. Do not use <code>/etc/docker/certs</code>, which also holds the CA and server private keys.</li>
+</ul>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
 <h3 id="insecure_scheme_with_tls_verification">Insecure Scheme with TLS Verification<a class="headerlink" href="#insecure_scheme_with_tls_verification" title="Permanent link">&para;</a></h3>
 <p>When <a href="#tls_verification">TLS verification</a> is enabled and the <a href="#docker_host_url">Docker host URL</a> uses <code>http://</code>,  Watchtower logs the following warning:</p>
@@ -3821,7 +3824,7 @@ If you are exposing your Docker daemon to external network connections, then bot
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 04:12:58 UTC"><span class="timeago" datetime="2026-11-13T04:12:58+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 04:12:58 UTC">2026-11-13</span>
   </span>
 
     
