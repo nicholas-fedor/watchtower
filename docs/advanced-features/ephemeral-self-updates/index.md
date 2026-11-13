@@ -40,7 +40,7 @@ The ephemeral self-update mechanism is an alternative to the default rename-base
         -v /var/run/docker.sock:/var/run/docker.sock \
         --restart unless-stopped \
         -e WATCHTOWER_EPHEMERAL_SELF_UPDATE=true \
-        nickfedor/watchtower \
+        nickfedor/watchtower
     ```
 
 ## Differences from Default Self-Update

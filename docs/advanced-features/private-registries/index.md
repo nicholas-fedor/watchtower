@@ -70,7 +70,7 @@ When the Watchtower Docker container is started, the created configuration file 
 docker run [...] -v CONFIG_DIR/config.json:/config.json nickfedor/watchtower
 ```
 
-Replace *`CONFIG_DIR`* with the directory that holds the configuration file.
+Replace *`CONFIG_DIR`* with the absolute path of the directory that holds the configuration file. Docker reads a relative path as the name of a volume.
 
 ## Sharing the Docker Configuration File
 
@@ -84,7 +84,7 @@ When the Docker container is started, pass the configuration file to Watchtower:
 docker run [...] -v HOME_DIR/.docker/config.json:/config.json nickfedor/watchtower
 ```
 
-Replace *`HOME_DIR`* with your home directory.
+Replace *`HOME_DIR`* with the absolute path of your home directory, such as `/home/dana`.
 
 When creating the Watchtower container via Docker Compose, use the following lines:
 
@@ -95,10 +95,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - HOME_DIR/.docker/config.json:/config.json
-  ...
+  # ...
 ```
 
-Replace *`HOME_DIR`* with your home directory.
+Replace *`HOME_DIR`* with the absolute path of your home directory, such as `/home/dana`.
 
 ### Docker Config path
 

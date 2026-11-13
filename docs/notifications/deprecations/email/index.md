@@ -27,32 +27,32 @@ Watchtower uses Shoutrrr's [SMTP service](https://shoutrrr.nickfedor.com/latest/
 
     ```yaml
     services:
-    watchtower:
+      watchtower:
         image: nickfedor/watchtower:latest
         environment:
-        WATCHTOWER_NOTIFICATION_URL: smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com
+          WATCHTOWER_NOTIFICATION_URL: smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com
         volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
+          - /var/run/docker.sock:/var/run/docker.sock
     ```
 
 === "Docker CLI (Env Vars)"
 
     ```bash
     docker run -d \
-    --name watchtower \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    -e WATCHTOWER_NOTIFICATION_URL="smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com" \
-    nickfedor/watchtower
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      -e WATCHTOWER_NOTIFICATION_URL="smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com" \
+      nickfedor/watchtower
     ```
 
 === "Docker CLI (Flags)"
 
     ```bash
     docker run -d \
-    --name watchtower \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    nickfedor/watchtower \
-    --notification-url "smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com"
+      --name watchtower \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower \
+      --notification-url "smtp://USERNAME:PASSWORD@smtp.example.com:587/?fromaddress=sender@example.com&toaddresses=recipient@example.com"
     ```
 
 Replace the following:
@@ -71,34 +71,34 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
 
         ```yaml
         services:
-        watchtower:
+          watchtower:
             image: nickfedor/watchtower:latest
             environment:
-            WATCHTOWER_NOTIFICATIONS: email
-            WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
-            WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
-            WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
-            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
-            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: USERNAME
-            WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: 'PASSWORD'
-            WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
+              WATCHTOWER_NOTIFICATIONS: email
+              WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+              WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+              WATCHTOWER_NOTIFICATION_EMAIL_SERVER: smtp.example.com
+              WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: 587
+              WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: USERNAME
+              WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: 'PASSWORD'
+              WATCHTOWER_NOTIFICATION_EMAIL_DELAY: 10
             volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
+              - /var/run/docker.sock:/var/run/docker.sock
         ```
 
     === "SMTP Relay"
 
         ```yaml
         services:
-        watchtower:
+          watchtower:
             image: nickfedor/watchtower:latest
             environment:
-            WATCHTOWER_NOTIFICATIONS: email
-            WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
-            WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
-            WATCHTOWER_NOTIFICATION_EMAIL_SERVER: relay.example.com
+              WATCHTOWER_NOTIFICATIONS: email
+              WATCHTOWER_NOTIFICATION_EMAIL_FROM: sender@example.com
+              WATCHTOWER_NOTIFICATION_EMAIL_TO: recipient@example.com
+              WATCHTOWER_NOTIFICATION_EMAIL_SERVER: relay.example.com
             volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
+              - /var/run/docker.sock:/var/run/docker.sock
         ```
 
         !!! Note
@@ -116,60 +116,60 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
 
         ```bash
         docker run -d \
-        --name watchtower \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -e WATCHTOWER_NOTIFICATIONS=email \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=USERNAME \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD='PASSWORD' \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
-        nickfedor/watchtower
+          --name watchtower \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -e WATCHTOWER_NOTIFICATIONS=email \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT=587 \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER=USERNAME \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD='PASSWORD' \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_DELAY=10 \
+          nickfedor/watchtower
         ```
 
     === "Flags"
 
         ```bash
         docker run -d \
-        --name watchtower \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        nickfedor/watchtower \
-        --notifications email \
-        --notification-email-from sender@example.com \
-        --notification-email-to recipient@example.com \
-        --notification-email-server smtp.example.com \
-        --notification-email-server-port 587 \
-        --notification-email-server-user USERNAME \
-        --notification-email-server-password 'PASSWORD' \
-        --notification-email-delay 10
+          --name watchtower \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          nickfedor/watchtower \
+          --notifications email \
+          --notification-email-from sender@example.com \
+          --notification-email-to recipient@example.com \
+          --notification-email-server smtp.example.com \
+          --notification-email-server-port 587 \
+          --notification-email-server-user USERNAME \
+          --notification-email-server-password 'PASSWORD' \
+          --notification-email-delay 10
         ```
 
     === "Env Vars (SMTP Relay)"
 
         ```bash
         docker run -d \
-        --name watchtower \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -e WATCHTOWER_NOTIFICATIONS=email \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
-        -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=relay.example.com \
-        nickfedor/watchtower
+          --name watchtower \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          -e WATCHTOWER_NOTIFICATIONS=email \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_FROM=sender@example.com \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_TO=recipient@example.com \
+          -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=relay.example.com \
+          nickfedor/watchtower
         ```
 
     === "Flags (SMTP Relay)"
 
         ```bash
         docker run -d \
-        --name watchtower \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        nickfedor/watchtower \
-        --notifications email \
-        --notification-email-from sender@example.com \
-        --notification-email-to recipient@example.com \
-        --notification-email-server relay.example.com
+          --name watchtower \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          nickfedor/watchtower \
+          --notifications email \
+          --notification-email-from sender@example.com \
+          --notification-email-to recipient@example.com \
+          --notification-email-server relay.example.com
         ```
 
         !!! Note

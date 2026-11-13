@@ -55,10 +55,10 @@ Watchtower is designed to run as a Docker container. It only requires access to 
 
     ```bash title="Pull and run Watchtower"
     docker run -d \
-    --name watchtower \
-    --restart unless-stopped \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    nickfedor/watchtower
+      --name watchtower \
+      --restart unless-stopped \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower
     ```
 
 ## Expected Behavior

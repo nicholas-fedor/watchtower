@@ -76,6 +76,7 @@ When [label enable](../../configuration/container-selection/index.md#enable_labe
     ```yaml
     services:
         someimage:
+            image: someimage
             labels:
                 - "com.centurylinklabs.watchtower.enable=true"
     ```
@@ -97,6 +98,7 @@ To exclude a container, set the label to `false`:
     ```yaml
     services:
         someimage:
+            image: someimage
             labels:
                 - "com.centurylinklabs.watchtower.enable=false"
     ```
@@ -122,6 +124,7 @@ Set the `com.centurylinklabs.watchtower.monitor-only` label to `true` on the con
     ```yaml
     services:
         someimage:
+            image: someimage
             labels:
                 - "com.centurylinklabs.watchtower.monitor-only=true"
     ```

@@ -118,9 +118,9 @@ When using internal mirrors that may use self-signed certificates:
 
     ```bash
     docker run -d --name watchtower \
-    -e WATCHTOWER_DEBUG=true \
-    -v /var/run/docker.sock:/var/run/docker.sock \
-    nickfedor/watchtower
+      -e WATCHTOWER_DEBUG=true \
+      -v /var/run/docker.sock:/var/run/docker.sock \
+      nickfedor/watchtower
     ```
 
     Look for log output containing `Resolved registry mirror configuration`.

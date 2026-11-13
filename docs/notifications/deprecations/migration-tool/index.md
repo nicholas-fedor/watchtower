@@ -175,7 +175,7 @@ If you have not yet deployed Watchtower or if you want to run `notify-upgrade` a
           notify-upgrade \
           --notifications slack \
           --notification-slack-hook-url "https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN" \
-          --notification-slack-identifier watchtower-server-1 \
+          --notification-slack-identifier watchtower-server-1
         ```
 
     Replace the following with the parts of your Slack webhook URL:
@@ -286,7 +286,7 @@ Select the tab that matches your legacy notification service.
         === "Docker CLI (Env Vars)"
             ```bash
             docker run -d \
-            --name watchtower \
+              --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -e WATCHTOWER_NOTIFICATIONS=email \
               -e WATCHTOWER_NOTIFICATION_EMAIL_SERVER=smtp.example.com \
@@ -493,8 +493,8 @@ Select the tab that matches your legacy notification service.
               --name watchtower \
               -v /var/run/docker.sock:/var/run/docker.sock \
               -e WATCHTOWER_NOTIFICATIONS=slack \
-          -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN" \
-          -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
+              -e WATCHTOWER_NOTIFICATION_SLACK_HOOK_URL="https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN" \
+              -e WATCHTOWER_NOTIFICATION_SLACK_IDENTIFIER=watchtower-server-1 \
               nickfedor/watchtower
             ```
         === "Docker CLI (Flags)"
@@ -505,7 +505,7 @@ Select the tab that matches your legacy notification service.
               nickfedor/watchtower \
               --notifications slack \
               --notification-slack-hook-url "https://hooks.slack.com/services/WORKSPACE_ID/WEBHOOK_ID/WEBHOOK_TOKEN" \
-          --notification-slack-identifier watchtower-server-1 \
+              --notification-slack-identifier watchtower-server-1
             ```
 
         Replace the following with the parts of your Slack webhook URL:
