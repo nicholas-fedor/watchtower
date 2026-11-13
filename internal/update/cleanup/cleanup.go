@@ -21,6 +21,9 @@ import (
 type Client interface {
 	// ListContainers returns the containers that pass every filter.
 	ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error)
+	// ListLabeledContainers returns the containers in every state whose
+	// label is set to "true".
+	ListLabeledContainers(ctx context.Context, label string) ([]*container.Container, error)
 	// StopAndRemoveContainer stops the container and removes it. The stop
 	// waits up to timeout.
 	StopAndRemoveContainer(ctx context.Context, target *container.Container, timeout time.Duration) error

@@ -1828,6 +1828,31 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 	assert.Equal(t, container.ContainerID(createdID), newID)
 }
 
+// TestListLabeledContainers verifies that a labeled listing asks Docker for
+// containers in every state whose label is "true", so a stopped or
+// never-started container is listed even when stopped containers are
+// otherwise left out.
+func TestListLabeledContainers(t *testing.T) {
+	t.Parallel()
+
+	api := newDockerAPI(t)
+	api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
+		All: true,
+		Filters: dockerClient.Filters{
+			"label": {"com.centurylinklabs.watchtower.ephemeral-orchestrator=true": true},
+		},
+	}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
+		{ID: string(fixtureStopped.id)},
+	}}, nil).Once()
+	expectContainerFixtures(t, api, fixtureStopped)
+
+	labeled, err := (&Client{log: newTestLogger(t), api: api}).
+		ListLabeledContainers(t.Context(), "com.centurylinklabs.watchtower.ephemeral-orchestrator")
+	require.NoError(t, err)
+	require.Len(t, labeled, 1)
+	assert.Equal(t, fixtureStopped.id, labeled[0].ID())
+}
+
 // TestCreateFailureNamedOnce verifies that a failed create, through
 // CreateContainer or StartContainer, returns the recreation's error without a
 // second prefix and is logged once, by the recreation.

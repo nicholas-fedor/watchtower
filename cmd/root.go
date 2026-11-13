@@ -809,9 +809,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 			Msg("Failed to clean up old Watchtower containers, continuing anyway")
 	}
 
-	// Check for and cleanup orphaned ephemeral orchestrator containers.
-	// These may persist if the orchestrator crashed or was killed unexpectedly.
-	// With AutoRemove: true, this is a safety net for edge cases.
+	// Remove ephemeral orchestrators that a crash or failed start left behind.
 	removedOrchestratorCount, orchestratorErr := cleanup.RemoveOrphanedOrchestrators(p.log, ctx, client)
 	if orchestratorErr != nil {
 		p.log.Warn().

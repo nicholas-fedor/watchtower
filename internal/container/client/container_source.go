@@ -81,14 +81,53 @@ func listSourceContainers(log *zerolog.Logger,
 		Msg("Built filter arguments")
 
 	// Fetch containers with status filters always applied based on ClientOptions.
-	listOptions := dockerClient.ContainerListOptions{Filters: filterArgs}
+	hostContainers, err := inspectListedContainers(clog, ctx, api, dockerClient.ContainerListOptions{Filters: filterArgs}, filter)
+	if err != nil {
+		return nil, err
+	}
 
-	clog.Debug().Msg("API status filters applied based on ClientOptions")
+	// An update needs each container's image, so a missing one is worth a warning.
+	for _, c := range hostContainers {
+		if !c.HasImageInfo() {
+			clog.Warn().
+				Str("container", c.Name()).
+				Str("container_id", string(c.ID())).
+				Str("image", c.ImageName()).
+				Msg("Failed to retrieve image info")
+		}
+	}
 
+	return hostContainers, nil
+}
+
+// inspectListedContainers lists containers with the given list options and
+// inspects each one.
+//
+// A container removed between the list and its inspect is left out. A
+// container whose image inspect fails is kept without image info.
+//
+// Parameters:
+//   - log: Logger for list and inspect diagnostics.
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client.
+//   - listOptions: Docker list options, such as the states and labels to list.
+//   - filter: Function to filter containers, or nil to keep every container.
+//
+// Returns:
+//   - []*container.Container: The inspected containers that pass the filter.
+//   - error: Non-nil if listing fails or an inspect fails for a reason other
+//     than the container being gone. A 404 for the list itself returns no
+//     containers.
+func inspectListedContainers(log *zerolog.Logger,
+	ctx context.Context,
+	api dockerClient.APIClient,
+	listOptions dockerClient.ContainerListOptions,
+	filter filters.Filter,
+) ([]*container.Container, error) {
 	containers, err := api.ContainerList(ctx, listOptions)
 	if err != nil {
 		// Log detailed error information for debugging
-		clog.Debug().
+		log.Debug().
 			Err(err).
 			Str("error_type", fmt.Sprintf("%T", err)).
 			Str("endpoint", "/containers/json").
@@ -99,7 +138,7 @@ func listSourceContainers(log *zerolog.Logger,
 
 		// Check for 404 responses and return an empty container list instead of failing.
 		if cerrdefs.IsNotFound(err) {
-			clog.Warn().
+			log.Warn().
 				Err(err).
 				Str("endpoint", "/containers/json").
 				Str("api_version", strings.Trim(api.ClientVersion(), "\"")).
@@ -109,7 +148,7 @@ func listSourceContainers(log *zerolog.Logger,
 			return []*container.Container{}, nil
 		}
 
-		clog.Debug().
+		log.Debug().
 			Err(err).
 			Msg("Failed to list containers")
 
@@ -146,19 +185,11 @@ func listSourceContainers(log *zerolog.Logger,
 		}
 
 		if filter == nil || filter(c) {
-			if !c.HasImageInfo() {
-				log.Warn().
-					Str("container", c.Name()).
-					Str("container_id", runningContainer.ID).
-					Str("image", c.ImageName()).
-					Msg("Failed to retrieve image info")
-			}
-
 			hostContainers = append(hostContainers, c)
 		}
 	}
 
-	clog.Debug().
+	log.Debug().
 		Int("count", len(hostContainers)).
 		Msg("Filtered container list")
 

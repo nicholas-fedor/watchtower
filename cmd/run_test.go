@@ -520,9 +520,9 @@ func TestRun_Continuous(t *testing.T) {
 			name: "no other containers",
 			setup: func(client *mockCmd.MockDockerClient, current *container.Container) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+				client.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 			},
-			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+			want: []string{"ListContainers filtered", "ListLabeledContainers", "GetVersion"},
 		},
 		{
 			// The removed image is reported to a slice that is then discarded.
@@ -532,13 +532,13 @@ func TestRun_Continuous(t *testing.T) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil)
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
 				client.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+				client.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 			},
 			want: []string{
 				"ListContainers filtered",
 				"StopAndRemoveContainer watchtower-older 10m0s",
 				"RemoveImageByID sha256:01d0",
-				"ListContainers all",
+				"ListLabeledContainers",
 				"GetVersion",
 			},
 		},
@@ -550,9 +550,9 @@ func TestRun_Continuous(t *testing.T) {
 			uncached: true,
 			setup: func(client *mockCmd.MockDockerClient, current *container.Container) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, older}, nil)
+				client.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 			},
-			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+			want: []string{"ListContainers filtered", "ListLabeledContainers", "GetVersion"},
 		},
 		{
 			name:     "older instance is kept when the current container lookup failed",
@@ -561,30 +561,30 @@ func TestRun_Continuous(t *testing.T) {
 			knownID:  true,
 			setup: func(client *mockCmd.MockDockerClient, current *container.Container) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, older}, nil)
+				client.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 			},
-			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+			want: []string{"ListContainers filtered", "ListLabeledContainers", "GetVersion"},
 		},
 		{
 			name: "orchestrator still handing off is kept",
 			args: []string{"--scope", "prod"},
 			setup: func(client *mockCmd.MockDockerClient, current *container.Container) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, inFlight}, nil)
+				client.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return([]*container.Container{inFlight}, nil)
 			},
-			want: []string{"ListContainers filtered", "ListContainers all", "GetVersion"},
+			want: []string{"ListContainers filtered", "ListLabeledContainers", "GetVersion"},
 		},
 		{
 			name: "orphaned orchestrator from another scope is removed",
 			args: []string{"--scope", "prod"},
 			setup: func(client *mockCmd.MockDockerClient, current *container.Container) {
 				client.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-				client.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current, orchestrator}, nil)
+				client.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return([]*container.Container{orchestrator}, nil)
 				client.EXPECT().StopAndRemoveContainer(mock.Anything, orchestrator, time.Duration(0)).Return(nil)
 			},
 			want: []string{
 				"ListContainers filtered",
-				"ListContainers all",
+				"ListLabeledContainers",
 				"StopAndRemoveContainer watchtower-orchestrator 0s",
 				"GetVersion",
 			},
@@ -649,7 +649,7 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 
 			mockClient := mockCmd.NewMockDockerClient(t)
 			mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-			mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+			mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 			mockClient.EXPECT().GetVersion().Return("1.47")
 
 			if tt.wantCheck {
@@ -676,7 +676,7 @@ func TestRun_ScheduledUpdate(t *testing.T) {
 
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
 		RunAndReturn(func(context.Context, *container.Container, updateConfig.Policy) (bool, container.ImageID, string, error) {
@@ -723,7 +723,7 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current, older}, nil).Once()
 	mockClient.EXPECT().StopAndRemoveContainer(mock.Anything, older, 10*time.Minute).Return(nil)
 	mockClient.EXPECT().RemoveImageByID(mock.Anything, older.ImageID(), older.ImageName()).Return(nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
 		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
@@ -771,7 +771,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	mockClient := mockCmd.NewMockDockerClient(t)
 	// The startup cleanup of older instances lists the containers first.
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil).Once()
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	// The API request then lists them, and stays open until released.
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).
 		RunAndReturn(func(context.Context, ...filters.Filter) ([]*container.Container, error) {
@@ -868,7 +868,7 @@ func TestRun_APISharesUpdateLock(t *testing.T) {
 
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	// The update at startup's staleness check waits for the test. A second
 	// update, which a separate lock would let run, finds the container fresh.
@@ -926,7 +926,7 @@ func TestRun_APIOnlyWritesOneStartupMessage(t *testing.T) {
 
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
@@ -1096,7 +1096,7 @@ func runExitHelper(t *testing.T, helperCase string) {
 		args = []string{"--http-api-update"}
 
 		mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{current}, nil)
-		mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{current}, nil)
+		mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	default:
 		panic("unknown run exit helper case " + helperCase)
 	}
@@ -1129,7 +1129,7 @@ func TestRun_OldInstanceStops(t *testing.T) {
 
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{oldSelf}, nil)
-	mockClient.EXPECT().ListContainers(mock.Anything).Return([]*container.Container{oldSelf}, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil)
