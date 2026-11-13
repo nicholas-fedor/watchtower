@@ -992,13 +992,20 @@ The [Git Insecure Skip TLS](../../configuration/git-monitoring/index.md#git_inse
                 image: nickfedor/watchtower
                 volumes:
                     - /var/run/docker.sock:/var/run/docker.sock
-                    - /path/to/id_ed25519:/run/secrets/id_ed25519:ro
-                    - /path/to/known_hosts:/run/secrets/known_hosts:ro
+                    - SSH_KEY_FILE:/run/secrets/id_ed25519:ro
+                    - KNOWN_HOSTS_FILE:/run/secrets/known_hosts:ro
                 environment:
                     WATCHTOWER_GIT_ENABLE: "true"
                     WATCHTOWER_GIT_SSH_KEY_PATH: /run/secrets/id_ed25519
                     WATCHTOWER_GIT_SSH_KNOWN_HOSTS: /run/secrets/known_hosts
         ```
+
+        Replace the following:
+
+        - *`SSH_KEY_FILE`*: the path of the SSH private key on the Docker host
+        - *`KNOWN_HOSTS_FILE`*: the path of the `known_hosts` file on the Docker host
+
+        A relative path starts with `./` and is read from the Compose project directory, which is the directory of the first Compose file unless you set `--project-directory`.
 
 === "Docker CLI"
 
@@ -1010,7 +1017,7 @@ The [Git Insecure Skip TLS](../../configuration/git-monitoring/index.md#git_inse
         docker run -d \
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v $(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro \
+            -v "$(pwd)/secrets/git_auth_token.txt:/run/secrets/git_auth_token:ro" \
             --restart unless-stopped \
             -e WATCHTOWER_GIT_ENABLE=true \
             -e WATCHTOWER_GIT_AUTH_TOKEN=/run/secrets/git_auth_token \
@@ -1023,14 +1030,19 @@ The [Git Insecure Skip TLS](../../configuration/git-monitoring/index.md#git_inse
         docker run -d \
             --name watchtower \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v /path/to/id_ed25519:/run/secrets/id_ed25519:ro \
-            -v /path/to/known_hosts:/run/secrets/known_hosts:ro \
+            -v "SSH_KEY_FILE:/run/secrets/id_ed25519:ro" \
+            -v "KNOWN_HOSTS_FILE:/run/secrets/known_hosts:ro" \
             --restart unless-stopped \
             -e WATCHTOWER_GIT_ENABLE=true \
             -e WATCHTOWER_GIT_SSH_KEY_PATH=/run/secrets/id_ed25519 \
             -e WATCHTOWER_GIT_SSH_KNOWN_HOSTS=/run/secrets/known_hosts \
             nickfedor/watchtower
         ```
+
+        Replace the following:
+
+        - *`SSH_KEY_FILE`*: the absolute path of the SSH private key on the Docker host
+        - *`KNOWN_HOSTS_FILE`*: the absolute path of the `known_hosts` file on the Docker host
 
 ### Hosts
 
