@@ -894,7 +894,7 @@ func TestClient(t *testing.T) {
 		})
 	})
 
-	t.Run("getRuntime", func(t *testing.T) {
+	t.Run("isPodmanRuntime", func(t *testing.T) {
 		t.Parallel()
 
 		t.Run("CPUCopyMode is auto", func(t *testing.T) {
@@ -910,7 +910,7 @@ func TestClient(t *testing.T) {
 					api:         mockContainer.NewMockAPIClient(t),
 					CPUCopyMode: cpuCopyModeAuto, Fs: memFs,
 				}
-				assert.True(t, testClient.getRuntime(t.Context()))
+				assert.True(t, testClient.isPodmanRuntime(t.Context()))
 			})
 
 			t.Run("should detect Docker via marker file", func(t *testing.T) {
@@ -923,7 +923,7 @@ func TestClient(t *testing.T) {
 					api:         mockContainer.NewMockAPIClient(t),
 					CPUCopyMode: cpuCopyModeAuto, Fs: memFs,
 				}
-				assert.False(t, testClient.getRuntime(t.Context()))
+				assert.False(t, testClient.isPodmanRuntime(t.Context()))
 			})
 		})
 	})
@@ -1413,7 +1413,7 @@ func TestClient(t *testing.T) {
 //
 // The test sets environment variables, so it does not run in parallel.
 func TestClientEnvironment(t *testing.T) {
-	t.Run("getRuntime", func(t *testing.T) {
+	t.Run("isPodmanRuntime", func(t *testing.T) {
 		t.Run("CPUCopyMode is auto", func(t *testing.T) {
 			// newAutoClient returns a client in auto CPU copy mode with no
 			// runtime marker files.
@@ -1430,7 +1430,7 @@ func TestClientEnvironment(t *testing.T) {
 			t.Run("should detect Podman via CONTAINER environment variable", func(t *testing.T) {
 				t.Setenv("CONTAINER", "podman")
 
-				assert.True(t, newAutoClient(t, mockContainer.NewMockAPIClient(t)).getRuntime(t.Context()))
+				assert.True(t, newAutoClient(t, mockContainer.NewMockAPIClient(t)).isPodmanRuntime(t.Context()))
 			})
 
 			t.Run("should detect Podman via API Name field", func(t *testing.T) {
@@ -1441,7 +1441,7 @@ func TestClientEnvironment(t *testing.T) {
 				api := newDockerAPI(t)
 				expectInfo(api, dockerSystem.Info{Name: "podman"})
 
-				assert.True(t, newAutoClient(t, api).getRuntime(t.Context()))
+				assert.True(t, newAutoClient(t, api).isPodmanRuntime(t.Context()))
 			})
 
 			t.Run("should detect Podman via API ServerVersion field", func(t *testing.T) {
@@ -1451,7 +1451,7 @@ func TestClientEnvironment(t *testing.T) {
 				api := newDockerAPI(t)
 				expectInfo(api, dockerSystem.Info{ServerVersion: "podman/4.0.0"})
 
-				assert.True(t, newAutoClient(t, api).getRuntime(t.Context()))
+				assert.True(t, newAutoClient(t, api).isPodmanRuntime(t.Context()))
 			})
 
 			t.Run("should fall back to Docker when detection fails", func(t *testing.T) {
@@ -1466,7 +1466,7 @@ func TestClientEnvironment(t *testing.T) {
 				testClient := newAutoClient(t, api)
 				testClient.log = log
 
-				assert.False(t, testClient.getRuntime(t.Context()))
+				assert.False(t, testClient.isPodmanRuntime(t.Context()))
 				assert.Contains(t, logOutput.String(), "Failed to detect container runtime, falling back to Docker")
 			})
 		})
@@ -1758,10 +1758,10 @@ func TestListContainers_RestartingFilterFollowsRuntime(t *testing.T) {
 	}
 }
 
-// TestGetRuntime_RetriesFailedDetection verifies that a failed detection is
+// TestIsPodmanRuntime_RetriesFailedDetection verifies that a failed detection is
 // not cached, so a later call detects the runtime, and that a successful
 // detection is cached. It sets environment variables, so it runs sequentially.
-func TestGetRuntime_RetriesFailedDetection(t *testing.T) {
+func TestIsPodmanRuntime_RetriesFailedDetection(t *testing.T) {
 	t.Setenv("container", "")
 	t.Setenv("CONTAINER", "")
 
@@ -1778,16 +1778,16 @@ func TestGetRuntime_RetriesFailedDetection(t *testing.T) {
 		CPUCopyMode: cpuCopyModeAuto, Fs: fstest.MapFS{},
 	}
 
-	assert.False(t, c.getRuntime(t.Context()), "a failed detection falls back to Docker")
-	assert.True(t, c.getRuntime(t.Context()), "the next call detects Podman")
-	assert.True(t, c.getRuntime(t.Context()), "the detection is cached")
+	assert.False(t, c.isPodmanRuntime(t.Context()), "a failed detection falls back to Docker")
+	assert.True(t, c.isPodmanRuntime(t.Context()), "the next call detects Podman")
+	assert.True(t, c.isPodmanRuntime(t.Context()), "the detection is cached")
 }
 
-// TestGetRuntime_NoFilesystem verifies that a client built without a
+// TestIsPodmanRuntime_NoFilesystem verifies that a client built without a
 // filesystem detects the runtime from the host's filesystem instead of
 // panicking. The host's marker files decide the result, so only the absence of
 // a panic is checked. It sets environment variables, so it runs sequentially.
-func TestGetRuntime_NoFilesystem(t *testing.T) {
+func TestIsPodmanRuntime_NoFilesystem(t *testing.T) {
 	t.Setenv("CONTAINER", "")
 	t.Setenv("container", "")
 
@@ -1800,7 +1800,7 @@ func TestGetRuntime_NoFilesystem(t *testing.T) {
 
 	c := &Client{log: newTestLogger(t), api: api, CPUCopyMode: cpuCopyModeAuto}
 
-	assert.NotPanics(t, func() { c.getRuntime(t.Context()) })
+	assert.NotPanics(t, func() { c.isPodmanRuntime(t.Context()) })
 }
 
 // TestStartContainer_StartsCreatedContainer verifies that StartContainer starts
@@ -1870,7 +1870,7 @@ func TestListLabeledContainers(t *testing.T) {
 			}}, nil).Once()
 			expectContainerFixtures(t, api, fixtureStopped)
 
-			client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true, isPodman: tt.podman}
+			client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true, podmanRuntime: tt.podman}
 
 			labeled, err := client.ListLabeledContainers(t.Context(), "com.centurylinklabs.watchtower.ephemeral-orchestrator")
 			require.NoError(t, err)

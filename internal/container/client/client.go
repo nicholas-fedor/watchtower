@@ -124,8 +124,8 @@ type Client struct {
 	runtimeMu sync.Mutex
 	// runtimeDetected is true once the container runtime was detected successfully.
 	runtimeDetected bool
-	// isPodman caches the result of Podman runtime detection.
-	isPodman bool
+	// podmanRuntime caches the result of Podman runtime detection.
+	podmanRuntime bool
 }
 
 // ClientOptions configures container management behavior for the Docker client.
@@ -440,7 +440,7 @@ func isTLSSetupError(err error) bool {
 func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) ([]*container.Container, error) {
 	// Podman has no restarting status, so the runtime only matters when
 	// restarting containers are included.
-	isPodman := c.IncludeRestarting && c.getRuntime(ctx)
+	isPodmanRuntime := c.IncludeRestarting && c.isPodmanRuntime(ctx)
 
 	var containerFilter filters.Filter
 
@@ -477,7 +477,7 @@ func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 			c.api,
 			c.ClientOptions,
 			containerFilter,
-			isPodman,
+			isPodmanRuntime,
 		)
 		if err == nil {
 			break
@@ -549,7 +549,7 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 		Add("status", "created", "running", "paused", "exited")
 
 	// Podman rejects the restarting status, which would fail the whole list.
-	if !c.getRuntime(ctx) {
+	if !c.isPodmanRuntime(ctx) {
 		filterArgs.Add("status", "restarting")
 	}
 
@@ -759,7 +759,7 @@ func (c *Client) CreateContainer(ctx context.Context, target *container.Containe
 		Logger()
 	clog := &clogVal
 	// Only the auto CPU copy mode depends on the runtime.
-	isPodman := c.CPUCopyMode == cpuCopyModeAuto && c.getRuntime(ctx)
+	isPodmanRuntime := c.CPUCopyMode == cpuCopyModeAuto && c.isPodmanRuntime(ctx)
 
 	clientVersion := c.GetVersion()
 
@@ -777,7 +777,7 @@ func (c *Client) CreateContainer(ctx context.Context, target *container.Containe
 		clientVersion,
 		c.DisableMemorySwappiness,
 		c.CPUCopyMode,
-		isPodman,
+		isPodmanRuntime,
 	)
 	if err != nil {
 		return "", err //nolint:wrapcheck // The recreation's error already names the step that failed.
@@ -1044,7 +1044,7 @@ func (c *Client) IsContainerStale(
 	)
 	if err != nil {
 		if pullErr, ok := errors.AsType[*containerImage.PullError](err); ok {
-			pullErr.Podman = c.getRuntime(ctx)
+			pullErr.Podman = c.isPodmanRuntime(ctx)
 		}
 
 		c.logger().Debug().
@@ -1347,7 +1347,7 @@ func (c *Client) logger() *zerolog.Logger {
 	return nopLog()
 }
 
-// getRuntime reports whether the container runtime is Podman.
+// isPodmanRuntime reports whether the container runtime is Podman.
 //
 // Callers ask only when the answer changes what the client does or reports. A
 // successful detection is cached to avoid repeated API calls and filesystem
@@ -1360,12 +1360,12 @@ func (c *Client) logger() *zerolog.Logger {
 //
 // Returns:
 //   - bool: True if Podman is detected, false otherwise.
-func (c *Client) getRuntime(ctx context.Context) bool {
+func (c *Client) isPodmanRuntime(ctx context.Context) bool {
 	c.runtimeMu.Lock()
 	defer c.runtimeMu.Unlock()
 
 	if c.runtimeDetected {
-		return c.isPodman
+		return c.podmanRuntime
 	}
 
 	// Without a configured filesystem, the host's holds the marker files.
@@ -1374,7 +1374,7 @@ func (c *Client) getRuntime(ctx context.Context) bool {
 		fsys = os.DirFS("/")
 	}
 
-	isPodman, err := containerRuntime.IsPodman(c.logger(), ctx, c.api, fsys)
+	podmanRuntime, err := containerRuntime.IsPodman(c.logger(), ctx, c.api, fsys)
 	if err != nil {
 		c.logger().Debug().
 			Err(err).
@@ -1383,10 +1383,10 @@ func (c *Client) getRuntime(ctx context.Context) bool {
 		return false
 	}
 
-	c.isPodman = isPodman
+	c.podmanRuntime = podmanRuntime
 	c.runtimeDetected = true
 
-	return isPodman
+	return podmanRuntime
 }
 
 // isDaemonConnectionError checks if an error is a transient Docker daemon connection error.
