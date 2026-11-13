@@ -102,13 +102,9 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
         ```
 
         !!! Note
-            The example assumes that your domain is called `example.com` and that you are going to use a valid certificate for `smtp.example.com`.
+            This example sends through an SMTP relay at `relay.example.com` that accepts mail on port 25 without authentication.
 
-            This hostname has to be used as `WATCHTOWER_NOTIFICATION_EMAIL_SERVER`, otherwise the TLS connection will fail with `Failed to send notification email` or `connection: connection refused` errors.
-
-            We also have to add a network for this setup in order to add an alias to it.
-
-            If you also want to enable DKIM or other features on the SMTP server, then you will find more information at [freinet/postfix-relay](https://hub.docker.com/r/freinet/postfix-relay){target="_blank" rel="noopener noreferrer"}
+            If the relay offers STARTTLS, Watchtower checks its certificate against the server name, so the certificate must be valid for `relay.example.com`. A relay in the same Compose project can take that name as a network alias.
 
 === "Docker CLI"
 
@@ -173,8 +169,9 @@ Use your SMTP server's host name in place of `smtp.example.com` and your own add
         ```
 
         !!! Note
-            This assumes that you already have an SMTP server up and running that you can connect to.
-            If you don't or you want to bring up Watchtower with your own simple SMTP relay, then check out the Docker Compose example.
+            These examples send through an SMTP relay at `relay.example.com` that accepts mail on port 25 without authentication.
+
+            If the relay offers STARTTLS, Watchtower checks its certificate against the server name, so the certificate must be valid for `relay.example.com`.
 
 Replace the following:
 
