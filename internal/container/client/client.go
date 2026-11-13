@@ -955,24 +955,7 @@ func (c *Client) RemoveContainer(ctx context.Context, target *container.Containe
 // Returns:
 //   - error: Non-nil if rename fails, nil on success.
 func (c *Client) RenameContainer(ctx context.Context, target *container.Container, newName string) error {
-	// Perform rename using helper function.
-	err := recreate.RenameTarget(c.logger(), ctx, c.api, target, newName)
-	if err != nil {
-		c.logger().Debug().
-			Err(err).
-			Str("container", target.Name()).
-			Str("new_name", newName).
-			Msg("Failed to rename container")
-
-		return fmt.Errorf("rename container: %w", err)
-	}
-
-	c.logger().Debug().
-		Str("container", target.Name()).
-		Str("new_name", newName).
-		Msg("Renamed container")
-
-	return nil
+	return recreate.RenameTarget(c.logger(), ctx, c.api, target, newName) //nolint:wrapcheck // The rename's error already names the failed rename.
 }
 
 // IsContainerStale checks if a container's image is outdated.

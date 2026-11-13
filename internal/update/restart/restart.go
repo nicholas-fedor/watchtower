@@ -62,8 +62,6 @@ var (
 	)
 	// errContainerGone indicates a container no longer existed when the update tried to stop it.
 	errContainerGone = errors.New("container no longer exists")
-	// errRenameWatchtowerFailed indicates a failure to rename the Watchtower container before restarting.
-	errRenameWatchtowerFailed = errors.New("failed to rename Watchtower container")
 )
 
 const (
@@ -778,32 +776,15 @@ func restartStaleContainer(
 			renamed = true
 		} else {
 			originalWatchtowerName = sourceContainer.Name()
-			newName := targetOldName
 
-			err := client.RenameContainer(
-				ctx,
-				sourceContainer,
-				newName,
-			)
+			err := client.RenameContainer(ctx, sourceContainer, targetOldName)
 			if err != nil {
-				log.Debug().
-					Err(err).
-					Str("container", sourceContainer.Name()).
-					Str("new_name", newName).
-					Msg("Failed to rename Watchtower container")
-
-				return "",
-					false,
-					fmt.Errorf(
-						"%w: %w",
-						errRenameWatchtowerFailed,
-						err,
-					)
+				return "", false, err //nolint:wrapcheck // The client's error already names the failed rename.
 			}
 
 			log.Debug().
 				Fields(fields).
-				Str("new_name", newName).
+				Str("new_name", targetOldName).
 				Msg("Renamed Watchtower container")
 
 			renamed = true

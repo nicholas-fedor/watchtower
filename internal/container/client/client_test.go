@@ -2003,7 +2003,7 @@ func TestClientWrappers(t *testing.T) {
 		require.NoError(t, (&Client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name"))
 	})
 
-	t.Run("RenameContainer reports a failed rename", func(t *testing.T) {
+	t.Run("RenameContainer names a failed rename once", func(t *testing.T) {
 		t.Parallel()
 
 		api := newDockerAPI(t)
@@ -2011,7 +2011,7 @@ func TestClientWrappers(t *testing.T) {
 			Return(dockerClient.ContainerRenameResult{}, daemonError("rename failed")).Once()
 
 		err := (&Client{log: newTestLogger(t), api: api}).RenameContainer(t.Context(), modelfixture.Container(), "new-name")
-		require.ErrorContains(t, err, "rename failed")
+		require.EqualError(t, err, "failed to rename container: Error response from daemon: rename failed")
 	})
 
 	t.Run("Ping pings the daemon without negotiating the API version", func(t *testing.T) {
