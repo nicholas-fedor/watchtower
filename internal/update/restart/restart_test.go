@@ -783,8 +783,7 @@ func TestDetachedContext(t *testing.T) {
 			)
 
 			// The operation should fail at RenameContainer due to parent context cancellation.
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to rename Watchtower container")
+			require.ErrorIs(t, err, context.Canceled)
 			assert.False(t, renamed)
 
 			// RenameContainer should have been attempted but failed due to context cancellation.
@@ -2087,12 +2086,26 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// TestClientErrorsNamedOnce verifies that a failed stop, remove, create or
-// start, or a failed ephemeral self-update orchestrator, reports the container
-// client's error as it is. The client's error already names the step, so the
-// restart adds no second prefix.
+// TestClientErrorsNamedOnce verifies that a failed stop, remove, create,
+// start or Watchtower rename, or a failed ephemeral self-update orchestrator,
+// reports the container client's error as it is. The client's error already
+// names the step, so the restart adds no second prefix.
 func TestClientErrorsNamedOnce(t *testing.T) {
 	t.Parallel()
+
+	// watchtower builds a running Watchtower container under its canonical
+	// name, so a self-update renames it or hands it to an orchestrator.
+	watchtower := func() *container.Container {
+		return mockUpdate.CreateMockContainerWithConfig(
+			"watchtower",
+			"/watchtower",
+			"watchtower:latest",
+			true,
+			false,
+			time.Now(),
+			&dockerContainer.Config{Labels: map[string]string{"com.centurylinklabs.watchtower": "true"}},
+		)
+	}
 
 	t.Run("stop and remove", func(t *testing.T) {
 		t.Parallel()
@@ -2168,29 +2181,38 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		require.EqualError(t, err, text)
 	})
 
+	t.Run("Watchtower rename", func(t *testing.T) {
+		t.Parallel()
+
+		text := "failed to rename container: daemon unavailable"
+		clientErr := errors.New(text)
+		source := watchtower()
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().
+			RenameContainer(mock.Anything, source, container.WatchtowerOldPrefix+source.ID().ShortID()).
+			Return(clientErr)
+
+		_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
+		require.Same(t, clientErr, err)
+		require.EqualError(t, err, text)
+		assert.False(t, renamed)
+	})
+
 	t.Run("ephemeral self-update orchestrator", func(t *testing.T) {
 		t.Parallel()
 
 		text := "failed to start ephemeral orchestrator container: daemon unavailable"
 		clientErr := errors.New(text)
-		watchtower := mockUpdate.CreateMockContainerWithConfig(
-			"watchtower",
-			"/watchtower",
-			"watchtower:latest",
-			true,
-			false,
-			time.Now(),
-			&dockerContainer.Config{Labels: map[string]string{"com.centurylinklabs.watchtower": "true"}},
-		)
+		source := watchtower()
 		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
-			CreateEphemeralOrchestrator(mock.Anything, watchtower, mock.Anything, mock.Anything, mock.Anything).
+			CreateEphemeralOrchestrator(mock.Anything, source, mock.Anything, mock.Anything, mock.Anything).
 			Return("", clientErr)
 
 		_, _, err := restartStaleContainer(
 			newTestLogger(t),
 			t.Context(),
-			watchtower,
+			source,
 			client,
 			updateParams.Params{EphemeralSelfUpdate: true},
 		)
