@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Read the container chain IDs in the model by @nicholas-fedor in [#3790](https://github.com/nicholas-fedor/watchtower/pull/3790)
 - Move the rename-based handoff into selfupdate by @nicholas-fedor in [#3786](https://github.com/nicholas-fedor/watchtower/pull/3786)
 - Decompose the stale container restart into phases by @nicholas-fedor in [#3784](https://github.com/nicholas-fedor/watchtower/pull/3784)
 - Decide the Podman restarting-status rule in one place by @nicholas-fedor in [#3780](https://github.com/nicholas-fedor/watchtower/pull/3780)
