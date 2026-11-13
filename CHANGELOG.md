@@ -136,6 +136,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to e217266 by @renovate[bot] in [#3760](https://github.com/nicholas-fedor/watchtower/pull/3760)
 - Update golang.org/x/exp digest to e397061 by @renovate[bot] in [#3759](https://github.com/nicholas-fedor/watchtower/pull/3759)
 - Update module github.com/jedib0t/go-pretty/v6 to v6.9.1 by @renovate[bot] in [#3743](https://github.com/nicholas-fedor/watchtower/pull/3743)
 - Update module tags.cncf.io/container-device-interface to v1.1.2 by @renovate[bot] in [#3742](https://github.com/nicholas-fedor/watchtower/pull/3742)
