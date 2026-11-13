@@ -185,14 +185,15 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		// The old container is still running after the failed stop, so the
 		// handoff ends before any rename or create.
 		old := createEphemeralHandoffContainer("wt-old-stop-fail", nil)
+		stopErr := errors.New("failed to stop container: simulated stop failure")
 		client := mockSelfupdate.NewMockHandoffClient(t)
 		client.EXPECT().GetContainer(mock.Anything, old.ID()).Return(old, nil).Twice()
 		client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).
-			Return(errors.New("simulated stop failure")).Once()
+			Return(stopErr).Once()
 
 		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
 			"wt-old-stop-fail", "watchtower:v2", "watchtower", "", false)
-		require.ErrorContains(t, err, "failed to stop old container")
+		require.Same(t, stopErr, err)
 	})
 
 	t.Run("restores and restarts the old container when create fails after rename", func(t *testing.T) {
@@ -202,14 +203,15 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		// removed.
 		old := createEphemeralHandoffContainer("wt-old-create-fail", nil)
 		client := mockSelfupdate.NewMockHandoffClient(t)
-		calls := expectHandoffStart(client, old, errors.New("simulated create failure"))
+		createErr := errors.New("failed to create container: simulated create failure")
+		calls := expectHandoffStart(client, old, createErr)
 		renameBack := client.EXPECT().RenameContainer(mock.Anything, old, "watchtower").Return(nil).Once()
 		restart := client.EXPECT().StartContainerByID(mock.Anything, old.ID()).Return(nil).Once()
 		mock.InOrder(calls.stop, calls.rename, calls.start, renameBack, restart)
 
 		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
 			"wt-old-create-fail", "watchtower:v2", "watchtower", "", false)
-		require.ErrorContains(t, err, "failed to create new container")
+		require.Same(t, createErr, err)
 	})
 
 	t.Run("pins Config.Image to the new image reference before create", func(t *testing.T) {

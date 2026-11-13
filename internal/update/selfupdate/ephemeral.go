@@ -86,18 +86,6 @@ var (
 	errOrchestratorInvalidEnv = errors.New("invalid orchestrator environment variable")
 	// errOrchestratorOldContainerNotFound indicates the old container was not found.
 	errOrchestratorOldContainerNotFound = errors.New("old container not found")
-	// errOrchestratorStopFailed indicates a failure to stop the old container.
-	errOrchestratorStopFailed = errors.New("failed to stop old container")
-	// errOrchestratorRemoveFailed indicates a failure to remove the old container.
-	errOrchestratorRemoveFailed = errors.New("failed to remove old container")
-	// errOrchestratorCreateFailed indicates a failure to create the new container.
-	errOrchestratorCreateFailed = errors.New("failed to create new container")
-	// errOrchestratorStartFailed indicates a failure to start the new container.
-	errOrchestratorStartFailed = errors.New("failed to start new container")
-	// errOrchestratorInspectFailed indicates a failure to inspect a container during orchestration.
-	errOrchestratorInspectFailed = errors.New("failed to inspect container during orchestration")
-	// errOrchestratorRenameFailed indicates a failure to rename the old container for handoff.
-	errOrchestratorRenameFailed = errors.New("failed to rename old container for handoff")
 	// errNewContainerNotRunning indicates the new container is not running after start.
 	errNewContainerNotRunning = errors.New("new container is not running after start")
 )
@@ -283,8 +271,12 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 	if err != nil {
 		exitCode = 1
 
+		// The steps log their failures at debug. This line reports the failure.
 		clog.Error().
 			Err(err).
+			Str("old_id", oldID).
+			Str("new_image", newImage).
+			Str("original_name", originalName).
 			Msg("Orchestration failed")
 	} else {
 		clog.Debug().Msg("Self-update orchestration completed successfully")
@@ -541,11 +533,7 @@ func renameOldContainerForHandoff(
 
 	err := client.RenameContainer(ctx, oldContainer, targetName)
 	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to rename old container before handoff")
-
-		return false, fmt.Errorf("%w: %w", errOrchestratorRenameFailed, err)
+		return false, err //nolint:wrapcheck // The client's error already names the failed rename.
 	}
 
 	clog.Debug().
@@ -719,16 +707,12 @@ func inspectOldContainer(
 	)
 	if err != nil {
 		if cerrdefs.IsNotFound(err) {
-			clog.Error().Msg("Old container not found")
+			clog.Debug().Msg("Old container not found")
 
 			return nil, fmt.Errorf("%w: %s", errOrchestratorOldContainerNotFound, oldID)
 		}
 
-		clog.Error().
-			Err(err).
-			Msg("Failed to inspect old container")
-
-		return nil, fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
+		return nil, err //nolint:wrapcheck // The client's error already names the failed inspect.
 	}
 
 	if !oldContainer.IsRunning() {
@@ -796,14 +780,11 @@ func stopOldContainer(
 				return true, nil
 			}
 
-			clog.Error().
+			clog.Debug().
 				Err(inspectErr).
 				Msg("Failed to re-inspect old container after stop failure")
-			clog.Error().
-				Err(err).
-				Msg("Failed to stop old container")
 
-			return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+			return false, err //nolint:wrapcheck // The client's error already names the failed stop.
 		}
 
 		if !freshContainer.IsRunning() {
@@ -812,11 +793,7 @@ func stopOldContainer(
 			return false, nil
 		}
 
-		clog.Error().
-			Err(err).
-			Msg("Failed to stop old container")
-
-		return false, fmt.Errorf("%w: %w", errOrchestratorStopFailed, err)
+		return false, err //nolint:wrapcheck // The client's error already names the failed stop.
 	}
 
 	clog.Debug().Msg("Old container stopped")
@@ -850,11 +827,7 @@ func removeOldContainer(
 			return nil
 		}
 
-		clog.Error().
-			Err(err).
-			Msg("Failed to remove old container")
-
-		return fmt.Errorf("%w: %w", errOrchestratorRemoveFailed, err)
+		return err //nolint:wrapcheck // The client's error already names the failed removal.
 	}
 
 	clog.Debug().Msg("Old container removed")
@@ -958,11 +931,7 @@ func createAndStartNewContainer(
 		oldContainer,
 	)
 	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to create and start new container")
-
-		return "", fmt.Errorf("%w: %w", errOrchestratorCreateFailed, err)
+		return "", err //nolint:wrapcheck // The client's error already names the failed create or start.
 	}
 
 	return newContainerID, nil
@@ -993,11 +962,7 @@ func ensureContainerRunning(
 
 	ctr, err := client.GetContainer(ctx, containerID)
 	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to inspect new container")
-
-		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
+		return err //nolint:wrapcheck // The client's error already names the failed inspect.
 	}
 
 	if ctr.IsRunning() {
@@ -1011,26 +976,16 @@ func ensureContainerRunning(
 
 	err = client.StartContainerByID(ctx, containerID)
 	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to start new container")
-
-		return fmt.Errorf("%w: %w", errOrchestratorStartFailed, err)
+		return err //nolint:wrapcheck // The client's error already names the failed start.
 	}
 
 	// Re-verify the container is running after the explicit start call.
 	ctr, err = client.GetContainer(ctx, containerID)
 	if err != nil {
-		clog.Error().
-			Err(err).
-			Msg("Failed to inspect new container after start")
-
-		return fmt.Errorf("%w: %w", errOrchestratorInspectFailed, err)
+		return err //nolint:wrapcheck // The client's error already names the failed inspect.
 	}
 
 	if !ctr.IsRunning() {
-		clog.Error().Msg("New container is not running after explicit start")
-
 		return fmt.Errorf("%w: %s", errNewContainerNotRunning, containerID.ShortID())
 	}
 
