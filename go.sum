@@ -278,8 +278,8 @@ github.com/jarcoal/httpmock v1.4.2 h1:dKwiP/9zITCPfBLsDn3kchbSOu16JrnxtVEmL0fPRc
 github.com/jarcoal/httpmock v1.4.2/go.mod h1:ftW1xULwo+j0R0JJkJIIi7UKigZUXCLLanykgjwBXL0=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
-github.com/jedib0t/go-pretty/v6 v6.8.3 h1:yVSk5aemoYHCvcrtqyXklwqcgHQIQzmy/oUzFlmffSQ=
-github.com/jedib0t/go-pretty/v6 v6.8.3/go.mod h1:YwC5CE4fJ1HFUDeivSV1r//AmANFHyqczZk+U6BDALU=
+github.com/jedib0t/go-pretty/v6 v6.9.1 h1:BCm4yFkewwPNfQebPACU6O6v8YCZKEGe9RVjuqQwPCI=
+github.com/jedib0t/go-pretty/v6 v6.9.1/go.mod h1:rDsMESQ3QyK0VMr1aeq/BErQLPk0tJ+ORkcjMMpnjeg=
 github.com/kevinburke/ssh_config v1.6.0 h1:J1FBfmuVosPHf5GRdltRLhPJtJpTlMdKTBjRgTaQBFY=
 github.com/kevinburke/ssh_config v1.6.0/go.mod h1:q2RIzfka+BXARoNexmF9gkxEX7DmvbW9P4hIVx2Kg4M=
 github.com/klauspost/compress v1.20.4 h1:dD0v/bvxtjCBqQu6sx1TNWkalEY5lNTIe+HY9w8TeNI=
@@ -398,6 +398,8 @@ github.com/prometheus/common v0.74.0 h1:6iYW8MsYvmEnXFD9zLGgF0qmReaRhs3OMONu1c/n
 github.com/prometheus/common v0.74.0/go.mod h1:i/02C+FCst5B1etKgWesNrD49n+onplJCqUCtUKkOeA=
 github.com/prometheus/procfs v0.23.0 h1:ad+S6FTkzwaMgacKLM5h6bNKExS+DMH0YiUwXItH/o4=
 github.com/prometheus/procfs v0.23.0/go.mod h1:3AVXO0FqLafyYFU/V/IQRZlC8Rgqz8Dm/x6pKLK+RIk=
+github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
+github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
 github.com/robfig/cron/v3 v3.0.1 h1:WdRxkvbJztn8LMz/QEvLN5sBU+xKpSqwwUO1Pjr4qDs=
 github.com/robfig/cron/v3 v3.0.1/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
