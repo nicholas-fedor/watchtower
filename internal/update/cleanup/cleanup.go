@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -399,7 +399,7 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 
 // getChainedContainers retrieves containers linked in a chain based on the current container's chain label.
 //
-// It parses the container chain label from the current container, identifies the linked
+// It reads the IDs in the current container's chain label, identifies the linked
 // Watchtower containers excluding the current one, and returns them as a slice. A linked
 // container that is not a Watchtower container is never returned. If the current container
 // has no chain label or an empty chain label, an empty slice is returned.
@@ -429,33 +429,16 @@ func getChainedContainers(log *zerolog.Logger,
 		return []*container.Container{}
 	}
 
-	// Get the (effective) current Watchtower container's com.centurylinklabs.watchtower.container-chain label.
-	chainLabelValue, present := effectiveCurrent.GetContainerChain()
-
-	// If it's not present, there are no chained containers.
-	if !present {
+	// The (effective) current container's chain names the instances it replaced.
+	chain := effectiveCurrent.ChainIDs()
+	if len(chain) == 0 {
 		return []*container.Container{}
-	}
-
-	// If it's empty, there are no chained containers.
-	if chainLabelValue == "" {
-		return []*container.Container{}
-	}
-
-	// Collect the container IDs from the chain for efficient lookup.
-	containerChainMap := make(map[string]struct{})
-
-	for id := range strings.SplitSeq(chainLabelValue, ",") {
-		if id = strings.TrimSpace(id); id != "" {
-			containerChainMap[id] = struct{}{}
-		}
 	}
 
 	// Filter containers that are in the chain, present on the host, and not the effective current.
 	// Chained containers are parent containers that must be removed regardless of scope.
 	for _, c := range allContainers {
-		_, exists := containerChainMap[string(c.ID())]
-		if !exists || c.ID() == effectiveCurrent.ID() {
+		if !slices.Contains(chain, c.ID()) || c.ID() == effectiveCurrent.ID() {
 			continue
 		}
 
@@ -500,8 +483,7 @@ func successorOf(old *container.Container, candidates []*container.Container) (*
 			firstInScope = c
 		}
 
-		chain, _ := c.GetContainerChain()
-		if container.IsWatchtowerParent(old.ID(), chain) {
+		if slices.Contains(c.ChainIDs(), old.ID()) {
 			return c, firstInScope
 		}
 	}

@@ -1419,6 +1419,55 @@ func TestContainer_GetContainerChain(t *testing.T) {
 	}
 }
 
+// TestContainer_ChainIDs verifies that the chain label is read as the IDs of
+// the replaced instances in order, with whitespace trimmed and empty entries
+// left out, and that a container without a chain lists none.
+func TestContainer_ChainIDs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// labels are the container's labels.
+		labels map[string]string
+		want   []ContainerID
+	}{
+		{name: "no chain label", labels: map[string]string{}, want: nil},
+		{name: "empty chain label", labels: map[string]string{labels.ContainerChain: ""}, want: nil},
+		{name: "one ID", labels: map[string]string{labels.ContainerChain: "first-id"}, want: []ContainerID{"first-id"}},
+		{
+			name:   "IDs in order",
+			labels: map[string]string{labels.ContainerChain: "first-id,second-id,third-id"},
+			want:   []ContainerID{"first-id", "second-id", "third-id"},
+		},
+		{
+			name:   "spaces around commas",
+			labels: map[string]string{labels.ContainerChain: "first-id, second-id , third-id"},
+			want:   []ContainerID{"first-id", "second-id", "third-id"},
+		},
+		{
+			name:   "empty entries",
+			labels: map[string]string{labels.ContainerChain: ",first-id,, ,second-id,"},
+			want:   []ContainerID{"first-id", "second-id"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := &Container{
+				containerInfo: &dockerContainer.InspectResponse{
+					ID:     "current-id",
+					Name:   "/watchtower",
+					Config: &dockerContainer.Config{Labels: tt.labels},
+				},
+			}
+
+			assert.Equal(t, tt.want, c.ChainIDs())
+		})
+	}
+}
+
 // TestContainer_SuccessorChain verifies that a replacement's chain lists the
 // replaced container's chain followed by that container's own ID.
 func TestContainer_SuccessorChain(t *testing.T) {
@@ -1821,66 +1870,6 @@ func TestContainer_IsWatchtower_DoesNotLog(t *testing.T) {
 			assert.Empty(t, out.String())
 		})
 	}
-}
-
-func TestIsWatchtowerParent(t *testing.T) {
-	t.Parallel()
-
-	t.Run("should return false for empty chain", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("test-id"), "")
-		assert.False(t, result)
-	})
-
-	t.Run("should return false for empty ID", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID(""), "id1,id2")
-		assert.False(t, result)
-	})
-
-	t.Run("should return true when ID is at start of chain", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("test-id"), "test-id,id2,id3")
-		assert.True(t, result)
-	})
-
-	t.Run("should return true when ID is in middle of chain", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("id2"), "id1,id2,id3")
-		assert.True(t, result)
-	})
-
-	t.Run("should return true when ID is at end of chain", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("id3"), "id1,id2,id3")
-		assert.True(t, result)
-	})
-
-	t.Run("should return true for single ID chain", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("test-id"), "test-id")
-		assert.True(t, result)
-	})
-
-	t.Run("should return false when ID is not in chain", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("test-id"), "id1,id2,id3")
-		assert.False(t, result)
-	})
-
-	t.Run("should handle chains with spaces around commas", func(t *testing.T) {
-		t.Parallel()
-
-		result := IsWatchtowerParent(ContainerID("id2"), "id1, id2 , id3")
-		assert.True(t, result)
-	})
 }
 
 // TestIsSuperseded verifies that a Watchtower container counts as replaced by
