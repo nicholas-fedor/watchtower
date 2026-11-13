@@ -141,6 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to bfe05e6 by @renovate[bot] in [#3776](https://github.com/nicholas-fedor/watchtower/pull/3776)
 - Update module github.com/moby/moby/client to v0.6.3 by @renovate[bot] in [#3769](https://github.com/nicholas-fedor/watchtower/pull/3769)
 - Update golang.org/x/tools digest to e217266 by @renovate[bot] in [#3760](https://github.com/nicholas-fedor/watchtower/pull/3760)
 - Update golang.org/x/exp digest to e397061 by @renovate[bot] in [#3759](https://github.com/nicholas-fedor/watchtower/pull/3759)
