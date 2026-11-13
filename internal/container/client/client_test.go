@@ -1828,6 +1828,39 @@ func TestStartContainer_StartsCreatedContainer(t *testing.T) {
 	assert.Equal(t, container.ContainerID(createdID), newID)
 }
 
+// TestCreateFailureNamedOnce verifies that a failed create, through
+// CreateContainer or StartContainer, returns the recreation's error without a
+// second prefix and is logged once, by the recreation.
+func TestCreateFailureNamedOnce(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		create func(c *Client, ctx context.Context, source *container.Container) (container.ContainerID, error)
+	}{
+		{name: "CreateContainer", create: (*Client).CreateContainer},
+		{name: "StartContainer", create: (*Client).StartContainer},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := newDockerAPI(t)
+			api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
+				Return(dockerClient.ContainerCreateResult{}, daemonError("create failed")).Once()
+
+			log, logOutput := logcapture.New(zerolog.DebugLevel)
+			source := modelfixture.Container(containerfixture.WithNetworkMode("bridge"))
+
+			newID, err := tt.create(&Client{log: log, api: api}, t.Context(), source)
+			require.EqualError(t, err, "failed to create container: Error response from daemon: create failed")
+			assert.Empty(t, newID)
+			assert.Equal(t, 1, strings.Count(logOutput.String(), "create failed"), "one log line carries the failure")
+		})
+	}
+}
+
 // TestClientIsContainerStale_NamesEngine verifies that a pull the engine
 // fails names the engine the client detects, Docker or Podman, so a
 // notification can say which one failed.

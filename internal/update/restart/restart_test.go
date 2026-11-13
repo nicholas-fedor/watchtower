@@ -2143,7 +2143,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 	t.Run("create", func(t *testing.T) {
 		t.Parallel()
 
-		text := "create replacement container: failed to create container: daemon unavailable"
+		text := "failed to create container: daemon unavailable"
 		clientErr := errors.New(text)
 		source := staleMockContainer()
 		client := mockRestart.NewMockClient(t)
