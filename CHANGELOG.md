@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Rename the client's getRuntime to isPodmanRuntime by @nicholas-fedor in [#3778](https://github.com/nicholas-fedor/watchtower/pull/3778)
 - Move volumes-from resolution into the client by @nicholas-fedor in [#3755](https://github.com/nicholas-fedor/watchtower/pull/3755)
 - Move the container rename into the client by @nicholas-fedor in [#3753](https://github.com/nicholas-fedor/watchtower/pull/3753)
 - Leave legacy teams webhook checks to shoutrrr by @nicholas-fedor in [#3723](https://github.com/nicholas-fedor/watchtower/pull/3723)
