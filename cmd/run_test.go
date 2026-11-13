@@ -1130,6 +1130,7 @@ func TestRun_OldInstanceStops(t *testing.T) {
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return([]*container.Container{oldSelf}, nil)
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, watchtowerLabelKey).Return([]*container.Container{oldSelf}, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil)
