@@ -3016,10 +3016,9 @@ This is useful when an external system (e.g., systemd) manages the container lif
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                Type: Boolean
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>             Default: false
 </code></pre></div>
-<div class="admonition warning">
-<p class="admonition-title">Warning</p>
-<p>Combining <code>--no-restart</code> with <code>--cleanup</code> during Watchtower self-update may leave a renamed Watchtower container running without starting a new one, preventing cleanup of the old image.</p>
-<p>Use cautiously for self-updating Watchtower instances and consider external lifecycle management (e.g., Docker Compose) to restart containers manually.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This option does not apply to Watchtower's own container. A self-update always starts the new Watchtower container. The new instance then removes the old container. With the cleanup configuration option, it also removes the old image.</p>
 </div>
 <h2 id="rolling_restart">Rolling Restart<a class="headerlink" href="#rolling_restart" title="Permanent link">&para;</a></h2>
 <p>Restarts containers one at a time to minimize downtime.
@@ -3090,7 +3089,6 @@ This is typically negligible for homelab setups but monitor disk space on resour
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>During Watchtower self-updates, cleanup is deferred to the new container to prevent premature image deletion.</p>
-<p>Ensure <code>--no-restart</code> is not used with <code>--cleanup</code> to avoid incomplete updates.</p>
 </div>
 <h2 id="remove_anonymous_volumes">Remove Anonymous Volumes<a class="headerlink" href="#remove_anonymous_volumes" title="Permanent link">&para;</a></h2>
 <p>Deletes anonymous volumes when updating containers.
@@ -3212,7 +3210,7 @@ See <a href="../../advanced-features/ephemeral-self-updates/">Advanced Features 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="October 31, 2026 08:42:55 UTC"><span class="timeago" datetime="2026-10-31T08:42:55+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="October 31, 2026 08:42:55 UTC">2026-10-31</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 12:54:49 UTC"><span class="timeago" datetime="2026-11-13T12:54:49+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 12:54:49 UTC">2026-11-13</span>
   </span>
 
     
