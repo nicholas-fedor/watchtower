@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Undo a failed stash restore through the checkout abort by @nicholas-fedor in [#3796](https://github.com/nicholas-fedor/watchtower/pull/3796)
 - Remove stopped old Watchtower containers in each update cycle by @nicholas-fedor in [#3774](https://github.com/nicholas-fedor/watchtower/pull/3774)
 - Recover self-update replacements left in the created state by @nicholas-fedor in [#3772](https://github.com/nicholas-fedor/watchtower/pull/3772)
 - Remove stopped ephemeral orchestrators at startup by @nicholas-fedor in [#3767](https://github.com/nicholas-fedor/watchtower/pull/3767)
