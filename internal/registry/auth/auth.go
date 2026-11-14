@@ -125,6 +125,27 @@ func ResolveEndpoint(endpoint, canonical, scheme string) (string, string, error)
 	return host, hostScheme, nil
 }
 
+// RedactEndpoint returns the host a registry endpoint override names, for logs.
+//
+// The endpoint is read as [ResolveEndpoint] reads it, so the log shows the host
+// a request goes to and never the endpoint's credentials, path or query. An
+// endpoint that [ResolveEndpoint] rejects gives a placeholder. An empty
+// endpoint gives an empty string.
+//
+// Parameters:
+//   - endpoint: Registry endpoint override, or empty for the canonical host.
+//
+// Returns:
+//   - string: The endpoint's host, "<redacted>", or empty.
+func RedactEndpoint(endpoint string) string {
+	host, _, err := ResolveEndpoint(endpoint, "", "https")
+	if err != nil {
+		return "<redacted>"
+	}
+
+	return host
+}
+
 // isRequestHost reports whether host, with an optional port, is the whole
 // authority of a request URL with the given scheme. A URL built with it then
 // parses back to the same host.
@@ -619,21 +640,11 @@ func GetToken(
 
 	// Extract the challenge header.
 	wwwAuthHeader := response.Header.Get(challengeHeaderName)
-	// Log endpoint in sanitized form (host only) to avoid leaking credentials.
-	sanitizedEndpoint := endpoint
-	if endpoint != "" {
-		sanitizedEndpoint = "<redacted>"
-
-		u, parseErr := url.Parse(endpoint)
-		if parseErr == nil && u.Host != "" {
-			sanitizedEndpoint = u.Host
-		}
-	}
 
 	clog.Debug().
 		Str("status", response.Status).
 		Str("header", wwwAuthHeader).
-		Str("mirrors", sanitizedEndpoint).
+		Str("registry_endpoint", RedactEndpoint(endpoint)).
 		Msg("Received challenge response")
 
 	parsedResponse := challengeResponse{

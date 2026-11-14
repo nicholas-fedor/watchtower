@@ -278,6 +278,41 @@ func TestResolveEndpoint(t *testing.T) {
 	}
 }
 
+// TestRedactEndpoint verifies that a registry endpoint is logged as the host
+// [ResolveEndpoint] resolves it to, and that an endpoint it rejects is
+// replaced, since an endpoint can carry credentials.
+func TestRedactEndpoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+	}{
+		{name: "mirror URL", endpoint: "https://mirror.example.com/", want: "mirror.example.com"},
+		{name: "port kept", endpoint: "http://mirror.example.com:5000", want: "mirror.example.com:5000"},
+		{
+			name:     "credentials, path and query dropped",
+			endpoint: "https://user:secret@mirror.example.com/token/abc?sig=secret",
+			want:     "mirror.example.com",
+		},
+		{name: "bare host", endpoint: "mirror.example.com", want: "mirror.example.com"},
+		{name: "bare host and port", endpoint: "mirror.example.com:5000", want: "mirror.example.com:5000"},
+		{name: "bare host with credentials", endpoint: "user:secret@mirror.example.com", want: "<redacted>"},
+		{name: "unsupported scheme", endpoint: "ftp://mirror.example.com", want: "<redacted>"},
+		{name: "unparseable URL", endpoint: "http://[::1", want: "<redacted>"},
+		{name: "empty endpoint", endpoint: "", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, RedactEndpoint(tt.endpoint))
+		})
+	}
+}
+
 // TestGetChallengeURL verifies the /v2/ challenge URL built for an image: Docker
 // Hub references use index.docker.io, lscr.io references use ghcr.io, other
 // registries pass through, and an endpoint override supplies the host and, when

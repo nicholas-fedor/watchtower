@@ -2,7 +2,6 @@ package image
 
 import (
 	"context"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -136,12 +135,7 @@ func (c Client) fetchDaemonInfo(ctx context.Context) daemonInfoResult {
 
 	sanitized := make([]string, 0, len(info.Info.RegistryConfig.Mirrors))
 	for _, m := range info.Info.RegistryConfig.Mirrors {
-		u, err := url.Parse(m)
-		if err == nil && u.Host != "" {
-			sanitized = append(sanitized, u.Host)
-		} else {
-			sanitized = append(sanitized, "<redacted>")
-		}
+		sanitized = append(sanitized, auth.RedactEndpoint(m))
 	}
 
 	c.logger().Debug().

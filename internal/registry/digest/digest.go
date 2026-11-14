@@ -863,15 +863,8 @@ func (dl *digestLookup) fromEndpoint(ctx context.Context, endpoint string) (stri
 	var epFields map[string]any
 
 	if endpoint != "" {
-		sanitized := "<redacted>"
-
-		u, err := url.Parse(endpoint)
-		if err == nil && u.Host != "" {
-			sanitized = u.Host
-		}
-
 		epFields = map[string]any{
-			"registry_endpoint": sanitized,
+			"registry_endpoint": auth.RedactEndpoint(endpoint),
 		}
 	}
 
