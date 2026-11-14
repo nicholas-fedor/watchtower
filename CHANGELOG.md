@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Log mirror endpoints as the host requests go to by @nicholas-fedor in [#3802](https://github.com/nicholas-fedor/watchtower/pull/3802)
 - Read the project worktree after the fetch by @nicholas-fedor in [#3798](https://github.com/nicholas-fedor/watchtower/pull/3798)
 - Undo a failed stash restore through the checkout abort by @nicholas-fedor in [#3796](https://github.com/nicholas-fedor/watchtower/pull/3796)
 - Remove stopped old Watchtower containers in each update cycle by @nicholas-fedor in [#3774](https://github.com/nicholas-fedor/watchtower/pull/3774)
