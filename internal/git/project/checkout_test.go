@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -172,6 +173,87 @@ func TestCheckoutRestoreFailureRollsBack(t *testing.T) {
 	compose, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
 	require.NoError(t, err)
 	assert.Equal(t, "services: {api: {}}\n", string(compose))
+}
+
+// TestCheckoutRestoreAndRollbackFailureKeepsLocalFiles verifies that when the
+// stashed files cannot be written back and HEAD cannot be rolled back either,
+// the checkout still tries to write the local files back and reports both
+// failures.
+//
+// The first write-back fails and leaves the worktree read-only, so the HEAD
+// rollback cannot rewrite compose.yaml. The second write-back makes the
+// worktree writable again and succeeds. The test is skipped for root and on
+// Windows because file modes stop neither.
+func TestCheckoutRestoreAndRollbackFailureKeepsLocalFiles(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("file permissions do not block writes here")
+	}
+
+	dir, first, _ := initTwoCommitRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=local\n"), 0o600))
+
+	compose := filepath.Join(dir, "compose.yaml")
+	writable := func() {
+		_ = os.Chmod(dir, 0o700)
+		_ = os.Chmod(compose, 0o600)
+	}
+	t.Cleanup(writable)
+
+	calls := 0
+	err := Checkout(t.Context(), dir, first, CheckoutOptions{
+		Stash: true,
+		restore: func(root string, saved []savedFile) error {
+			calls++
+			if calls == 1 {
+				require.NoError(t, os.Chmod(compose, 0o400))
+				require.NoError(t, os.Chmod(dir, 0o500))
+
+				return os.ErrPermission
+			}
+
+			writable()
+
+			return restoreSaved(root, saved)
+		},
+	})
+	require.ErrorIs(t, err, os.ErrPermission)
+	require.ErrorContains(t, err, "rollback checkout")
+	assert.Equal(t, 2, calls)
+
+	got, err := os.ReadFile(filepath.Join(dir, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, "SECRET=local\n", string(got))
+}
+
+// TestCheckoutRestoreFailureKeepsSnapshot verifies that when the stashed files
+// can never be written back, the checkout keeps their temp copy and names it in
+// the error, since that copy is then the only intact copy of the local files.
+func TestCheckoutRestoreFailureKeepsSnapshot(t *testing.T) {
+	t.Parallel()
+
+	dir, first, _ := initTwoCommitRepo(t)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, ".env"), []byte("SECRET=local\n"), 0o600))
+
+	err := Checkout(t.Context(), dir, first, CheckoutOptions{
+		Stash: true,
+		restore: func(string, []savedFile) error {
+			return os.ErrPermission
+		},
+	})
+	require.ErrorIs(t, err, os.ErrPermission)
+
+	_, snapshot, found := strings.Cut(err.Error(), "snapshot ")
+	require.True(t, found, "error names no snapshot: %v", err)
+
+	snapshot = strings.TrimSuffix(snapshot, ")")
+
+	t.Cleanup(func() { _ = os.RemoveAll(snapshot) })
+
+	got, err := os.ReadFile(filepath.Join(snapshot, ".env"))
+	require.NoError(t, err)
+	assert.Equal(t, "SECRET=local\n", string(got))
 }
 
 func TestCheckoutCleanWorktree(t *testing.T) {
