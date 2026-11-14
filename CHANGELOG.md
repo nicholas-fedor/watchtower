@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Split the digest lookup into endpoint phases by @nicholas-fedor in [#3800](https://github.com/nicholas-fedor/watchtower/pull/3800)
 - Decompose the project checkout into phases by @nicholas-fedor in [#3792](https://github.com/nicholas-fedor/watchtower/pull/3792)
 - Read the container chain IDs in the model by @nicholas-fedor in [#3790](https://github.com/nicholas-fedor/watchtower/pull/3790)
 - Move the rename-based handoff into selfupdate by @nicholas-fedor in [#3786](https://github.com/nicholas-fedor/watchtower/pull/3786)
