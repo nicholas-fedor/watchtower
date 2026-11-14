@@ -315,11 +315,6 @@ linters:
       - path: "doc.go$"
         linters:
           - dupword
-      # Functions above the gocyclo threshold today. Remove an entry when its function is split up.
-      - path: "internal/registry/digest/digest.go"
-        linters:
-          - gocyclo
-        text: "of func `fetchDigest` is high"
     paths:
       - ".*/mocks/.*"
       - "^internal/api/swagger/"

@@ -54,6 +54,46 @@ type manifestBody struct {
 	SchemaVersion int `json:"schemaVersion"`
 }
 
+// digestLookup holds what one digest lookup shares across the registry
+// endpoints it tries.
+type digestLookup struct {
+	// log is the process logger.
+	log *zerolog.Logger
+	// c is the container whose image digest is looked up.
+	c *container.Container
+	// client sends the token and manifest requests.
+	client auth.Client
+	// limiter paces registry requests.
+	limiter *ratelimit.Limiter
+	// fields name the container and its image in debug logs.
+	fields map[string]any
+	// registryAuth is the transformed registry credential, or empty.
+	registryAuth string
+	// method is the manifest request's HTTP method ("HEAD" or "GET").
+	method string
+	// tag replaces the image's own tag in the manifest request when set.
+	tag string
+	// originalHost is the image registry's host.
+	originalHost string
+	// limitKey is the rate limiter key the lookup holds.
+	limitKey string
+	// settings are the registry request settings.
+	settings registryConfig.Registry
+}
+
+// manifestReply is what one manifest request's response gave.
+type manifestReply struct {
+	// digest is the normalized digest. It is empty when the response asks for
+	// a retry.
+	digest string
+	// retryURL is the URL the response asks the request to be sent to again,
+	// or empty.
+	retryURL string
+	// redirect reports that the retry URL came from the registry's redirect
+	// rather than a host Watchtower chose.
+	redirect bool
+}
+
 // Errors for digest retrieval operations.
 var (
 	// errMissingImageInfo indicates the container lacks image metadata, preventing digest operations.
@@ -687,7 +727,8 @@ func buildManifestURLForImage(log *zerolog.Logger,
 // digest wins. When none does, the error is the last endpoint's. The exception is
 // an earlier HEAD response that asked for the GET fallback. Its error asks for the
 // fallback instead, unless the last endpoint answered 404 or refused the
-// repository, since a GET would get the same answer there.
+// repository, since a GET would get the same answer there. A rate-limited
+// endpoint ends the lookup at once.
 //
 // Parameters:
 //   - ctx: Context for request lifecycle control.
@@ -730,9 +771,6 @@ func fetchDigest(log *zerolog.Logger,
 	// Transform the provided auth string into a usable format for registry authentication.
 	registryAuth = auth.TransformAuth(log, registryAuth)
 
-	// Create an authentication client for registry requests.
-	client := auth.NewAuthClient(log, settings)
-
 	manifestURL, originalHost, _, err := buildManifestURL(log, c, settings, "")
 	if err != nil {
 		log.Debug().
@@ -760,6 +798,20 @@ func fetchDigest(log *zerolog.Logger,
 	}
 	defer release()
 
+	lookup := digestLookup{
+		log:          log,
+		c:            c,
+		client:       auth.NewAuthClient(log, settings),
+		limiter:      limiter,
+		fields:       fields,
+		registryAuth: registryAuth,
+		method:       method,
+		tag:          tag,
+		originalHost: originalHost,
+		limitKey:     limitKey,
+		settings:     settings,
+	}
+
 	var (
 		lastErr error
 		// fallbackErr is the first HEAD response that asked for the GET
@@ -769,223 +821,20 @@ func fetchDigest(log *zerolog.Logger,
 	)
 
 	for _, endpoint := range endpoints {
-		var epFields map[string]any
-
-		if endpoint != "" {
-			sanitized := "<redacted>"
-
-			u, err := url.Parse(endpoint)
-			if err == nil && u.Host != "" {
-				sanitized = u.Host
-			}
-
-			epFields = map[string]any{
-				"registry_endpoint": sanitized,
-			}
+		digest, err := lookup.fromEndpoint(ctx, endpoint)
+		if err == nil {
+			return digest, nil
 		}
 
-		result, err := limiter.DoValue(ctx, log, limitKey, func() (auth.TokenResult, error) {
-			return auth.GetToken(log,
-				ctx,
-				c,
-				registryAuth,
-				client,
-				settings,
-				endpoint,
-			)
-		})
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Fields(epFields).
-				Msg("Failed to get token from endpoint")
-			lastErr = fmt.Errorf("%w: %w", errFailedGetToken, err)
-
-			if ratelimit.Is(err) {
-				return "", lastErr
-			}
-
-			continue
+		if ratelimit.Is(err) {
+			return "", err
 		}
 
-		token := result.Token
-		redirected := result.Redirected
+		lastErr = err
 
-		// Only the canonical registry's redirect lets a failed manifest request
-		// return to the original host. A mirror's token belongs to the mirror,
-		// and the canonical endpoint is tried after it with its own challenge.
-		canonicalRedirect := redirected && endpoint == ""
-
-		if token == "" {
-			log.Debug().
-				Fields(fields).
-				Fields(epFields).
-				Msg("No authentication required, proceeding with request")
-		} else {
-			log.Debug().
-				Fields(fields).
-				Fields(epFields).
-				Bool("redirected", redirected).
-				Str("redirect_host", result.RedirectHost).
-				Msg("Received token and redirect flag from GetToken")
+		if fallbackErr == nil && errors.Is(err, errHeadFallback) {
+			fallbackErr = err
 		}
-
-		// Decide which host to use for this manifest request attempt.
-		// Priority:
-		// 1. The host the registry's challenge redirected to
-		// 2. Current mirror endpoint (when using registry mirrors)
-		// 3. Canonical host (empty string)
-		hostForManifest := challengeRedirectHost(result, originalHost)
-		if hostForManifest == "" && endpoint != "" {
-			// Use the current registry mirror endpoint for the manifest request.
-			hostForManifest = endpoint
-		}
-
-		var (
-			manifestURL string
-			parsedURL   *url.URL
-		)
-
-		manifestURL, _, parsedURL, err = buildManifestURLForTag(log,
-			c,
-			settings,
-			hostForManifest,
-			tag,
-		)
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Fields(epFields).
-				Msg("Failed to build manifest URL")
-			lastErr = err
-
-			continue
-		}
-
-		log.Debug().
-			Fields(fields).
-			Fields(epFields).
-			Str("method", method).
-			Str("url", manifestURL).
-			Msg("Fetching digest")
-
-		var (
-			digest     string
-			updatedURL string
-			retry      bool
-			// redirectRetry reports that a retry follows the registry's redirect
-			// rather than a host Watchtower chose.
-			redirectRetry bool
-		)
-
-		err = limiter.Do(ctx, log, limitKey, func() error {
-			req, reqErr := makeManifestRequest(ctx, method, manifestURL, token)
-			if reqErr != nil {
-				return reqErr
-			}
-
-			resp, doErr := client.Do(req)
-			if doErr != nil {
-				return fmt.Errorf("%w: %w", errFailedExecuteRequest, doErr)
-			}
-
-			var handleErr error
-
-			redirectRetry = resp.StatusCode >= http.StatusMultipleChoices &&
-				resp.StatusCode < http.StatusBadRequest
-
-			digest, updatedURL, retry, handleErr = handleManifestResponse(log,
-				resp,
-				method,
-				originalHost,
-				canonicalRedirect,
-				parsedURL,
-			)
-			_ = resp.Body.Close()
-
-			return handleErr
-		})
-		if err != nil {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Fields(epFields).
-				Msg("Failed to handle manifest response")
-			lastErr = err
-
-			if fallbackErr == nil && errors.Is(err, errHeadFallback) {
-				fallbackErr = err
-			}
-
-			if ratelimit.Is(err) {
-				return "", lastErr
-			}
-
-			continue
-		}
-
-		if retry && updatedURL != "" {
-			log.Debug().
-				Fields(fields).
-				Fields(epFields).
-				Str("retry_url", auth.RedactURL(updatedURL)).
-				Msg("Retrying manifest request with updated URL")
-
-			// A redirect can point anywhere, so the token goes only to the same
-			// origin. Hosts Watchtower picks for a retry serve the same registry.
-			retryToken := token
-
-			if redirectRetry && !sameOrigin(manifestURL, updatedURL) {
-				log.Debug().
-					Fields(fields).
-					Fields(epFields).
-					Msg("Manifest redirect leaves the registry's origin, retrying without the token")
-
-				retryToken = ""
-			}
-
-			digest, err = retryManifestRequest(log,
-				ctx,
-				method,
-				updatedURL,
-				retryToken,
-				originalHost,
-				canonicalRedirect,
-				parsedURL,
-				limitKey,
-				client,
-				limiter,
-			)
-			if err != nil {
-				log.Debug().
-					Err(err).
-					Fields(fields).
-					Fields(epFields).
-					Str("retry_url", auth.RedactURL(updatedURL)).
-					Msg("Failed to retry manifest request")
-				lastErr = err
-
-				if fallbackErr == nil && errors.Is(err, errHeadFallback) {
-					fallbackErr = err
-				}
-
-				if ratelimit.Is(err) {
-					return "", lastErr
-				}
-
-				continue
-			}
-		}
-
-		log.Debug().
-			Fields(fields).
-			Fields(epFields).
-			Str("remote_digest", digest).
-			Msg("Fetched remote digest")
-
-		return digest, nil
 	}
 
 	// The canonical registry is the last endpoint. Its 404 or refusal answers
@@ -995,6 +844,296 @@ func fetchDigest(log *zerolog.Logger,
 	}
 
 	return "", fallbackErr
+}
+
+// fromEndpoint asks one registry endpoint for the image's digest.
+//
+// The manifest request goes to the host the endpoint's challenge redirected
+// to. Without such a redirect it goes to the endpoint.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - endpoint: Registry mirror host, or empty for the canonical registry host.
+//
+// Returns:
+//   - string: Normalized digest.
+//   - error: Non-nil if the token request, the manifest URL or the manifest
+//     request fails.
+func (dl *digestLookup) fromEndpoint(ctx context.Context, endpoint string) (string, error) {
+	var epFields map[string]any
+
+	if endpoint != "" {
+		sanitized := "<redacted>"
+
+		u, err := url.Parse(endpoint)
+		if err == nil && u.Host != "" {
+			sanitized = u.Host
+		}
+
+		epFields = map[string]any{
+			"registry_endpoint": sanitized,
+		}
+	}
+
+	result, err := dl.limiter.DoValue(ctx, dl.log, dl.limitKey, func() (auth.TokenResult, error) {
+		return auth.GetToken(dl.log,
+			ctx,
+			dl.c,
+			dl.registryAuth,
+			dl.client,
+			dl.settings,
+			endpoint,
+		)
+	})
+	if err != nil {
+		dl.log.Debug().
+			Err(err).
+			Fields(dl.fields).
+			Fields(epFields).
+			Msg("Failed to get token from endpoint")
+
+		return "", fmt.Errorf("%w: %w", errFailedGetToken, err)
+	}
+
+	if result.Token == "" {
+		dl.log.Debug().
+			Fields(dl.fields).
+			Fields(epFields).
+			Msg("No authentication required, proceeding with request")
+	} else {
+		dl.log.Debug().
+			Fields(dl.fields).
+			Fields(epFields).
+			Bool("redirected", result.Redirected).
+			Str("redirect_host", result.RedirectHost).
+			Msg("Received token and redirect flag from GetToken")
+	}
+
+	// Decide which host to use for this manifest request attempt.
+	// Priority:
+	// 1. The host the registry's challenge redirected to
+	// 2. Current mirror endpoint (when using registry mirrors)
+	// 3. Canonical host (empty string)
+	hostForManifest := challengeRedirectHost(result, dl.originalHost)
+	if hostForManifest == "" && endpoint != "" {
+		// Use the current registry mirror endpoint for the manifest request.
+		hostForManifest = endpoint
+	}
+
+	manifestURL, _, parsedURL, err := buildManifestURLForTag(dl.log,
+		dl.c,
+		dl.settings,
+		hostForManifest,
+		dl.tag,
+	)
+	if err != nil {
+		dl.log.Debug().
+			Err(err).
+			Fields(dl.fields).
+			Fields(epFields).
+			Msg("Failed to build manifest URL")
+
+		return "", err
+	}
+
+	dl.log.Debug().
+		Fields(dl.fields).
+		Fields(epFields).
+		Str("method", dl.method).
+		Str("url", manifestURL).
+		Msg("Fetching digest")
+
+	// Only the canonical registry's redirect lets a failed manifest request
+	// return to the original host. A mirror's token belongs to the mirror,
+	// and the canonical endpoint is tried after it with its own challenge.
+	canonicalRedirect := result.Redirected && endpoint == ""
+
+	digest, err := dl.requestManifest(ctx, epFields, manifestURL, parsedURL, result.Token, canonicalRedirect)
+	if err != nil {
+		return "", err
+	}
+
+	dl.log.Debug().
+		Fields(dl.fields).
+		Fields(epFields).
+		Str("remote_digest", digest).
+		Msg("Fetched remote digest")
+
+	return digest, nil
+}
+
+// requestManifest sends one manifest request and follows the single retry its
+// response can ask for.
+//
+// A retry that follows the registry's redirect to another origin is sent
+// without the token, since a redirect can point anywhere.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - epFields: Log fields that name the endpoint, or nil for the canonical host.
+//   - manifestURL: URL of the manifest request.
+//   - parsedURL: Parsed manifest URL, whose host is the host the request goes to.
+//   - token: Authorization header value, or empty when none is needed.
+//   - redirected: Whether the canonical registry's challenge redirected the
+//     request to another host.
+//
+// Returns:
+//   - string: Normalized digest.
+//   - error: Non-nil if the request or its retry fails.
+func (dl *digestLookup) requestManifest(
+	ctx context.Context,
+	epFields map[string]any,
+	manifestURL string,
+	parsedURL *url.URL,
+	token string,
+	redirected bool,
+) (string, error) {
+	var reply manifestReply
+
+	err := dl.limiter.Do(ctx, dl.log, dl.limitKey, func() error {
+		var sendErr error
+
+		reply, sendErr = dl.sendManifest(ctx, manifestURL, token, redirected, parsedURL)
+
+		return sendErr
+	})
+	if err != nil {
+		dl.log.Debug().
+			Err(err).
+			Fields(dl.fields).
+			Fields(epFields).
+			Msg("Failed to handle manifest response")
+
+		return "", err //nolint:wrapcheck // The request's own error, or the limiter's, already names the failure.
+	}
+
+	if reply.retryURL == "" {
+		return reply.digest, nil
+	}
+
+	dl.log.Debug().
+		Fields(dl.fields).
+		Fields(epFields).
+		Str("retry_url", auth.RedactURL(reply.retryURL)).
+		Msg("Retrying manifest request with updated URL")
+
+	// Hosts Watchtower picks for a retry serve the same registry, so they
+	// get the token.
+	retryToken := token
+
+	if reply.redirect && !sameOrigin(manifestURL, reply.retryURL) {
+		dl.log.Debug().
+			Fields(dl.fields).
+			Fields(epFields).
+			Msg("Manifest redirect leaves the registry's origin, retrying without the token")
+
+		retryToken = ""
+	}
+
+	digest, err := dl.retryManifest(ctx, reply.retryURL, retryToken, redirected, parsedURL)
+	if err != nil {
+		dl.log.Debug().
+			Err(err).
+			Fields(dl.fields).
+			Fields(epFields).
+			Str("retry_url", auth.RedactURL(reply.retryURL)).
+			Msg("Failed to retry manifest request")
+
+		return "", err
+	}
+
+	return digest, nil
+}
+
+// retryManifest sends the manifest request again to the URL a response asked
+// for.
+//
+// The request is retried only once, so a retry response that asks for yet
+// another host is an error.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - retryURL: The URL the first response asked for.
+//   - token: Authorization header value, or empty when none is sent.
+//   - redirected: Whether the canonical registry's challenge redirected the
+//     request to another host.
+//   - parsedURL: Parsed URL of the first request, whose host is the host it
+//     went to.
+//
+// Returns:
+//   - string: Normalized digest.
+//   - error: Non-nil if the retry fails or asks for yet another host. A HEAD
+//     retry that gives no digest asks for the GET fallback.
+func (dl *digestLookup) retryManifest(
+	ctx context.Context,
+	retryURL, token string,
+	redirected bool,
+	parsedURL *url.URL,
+) (string, error) {
+	var digest string
+
+	err := dl.limiter.Do(ctx, dl.log, dl.limitKey, func() error {
+		reply, sendErr := dl.sendManifest(ctx, retryURL, token, redirected, parsedURL)
+		if sendErr != nil {
+			return sendErr
+		}
+
+		if reply.retryURL != "" {
+			return fmt.Errorf("%w: %s", errUnresolvedManifestRetry, auth.RedactURL(reply.retryURL))
+		}
+
+		digest = reply.digest
+
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("manifest retry: %w", err)
+	}
+
+	return digest, nil
+}
+
+// sendManifest sends one manifest request and reads its response.
+//
+// Parameters:
+//   - ctx: Context for request lifecycle control.
+//   - manifestURL: URL of the manifest request.
+//   - token: Authorization header value, or empty when none is sent.
+//   - redirected: Whether the canonical registry's challenge redirected the
+//     request to another host.
+//   - parsedURL: Parsed URL of the endpoint's manifest request, whose host is
+//     the host it went to.
+//
+// Returns:
+//   - manifestReply: The digest, or the URL the response asks the request to
+//     be sent to again.
+//   - error: Non-nil if the request cannot be sent or its response gives no
+//     digest and no retry.
+func (dl *digestLookup) sendManifest(
+	ctx context.Context,
+	manifestURL, token string,
+	redirected bool,
+	parsedURL *url.URL,
+) (manifestReply, error) {
+	req, err := makeManifestRequest(ctx, dl.method, manifestURL, token)
+	if err != nil {
+		return manifestReply{}, err
+	}
+
+	resp, err := dl.client.Do(req)
+	if err != nil {
+		return manifestReply{}, fmt.Errorf("%w: %w", errFailedExecuteRequest, err)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
+
+	return handleManifestResponse(dl.log,
+		resp,
+		dl.method,
+		dl.originalHost,
+		redirected,
+		parsedURL,
+	)
 }
 
 // handleManifestResponse processes the HTTP response, handles redirects, and extracts the digest.
@@ -1011,16 +1150,15 @@ func fetchDigest(log *zerolog.Logger,
 //   - parsedURL: Parsed URL of the request, whose host is the host it went to.
 //
 // Returns:
-//   - string: The extracted and normalized digest.
-//   - string: Updated manifest URL if redirected, otherwise empty.
-//   - bool: Whether a retry is needed.
+//   - manifestReply: The digest, or the URL the response asks the request to
+//     be sent to again.
 //   - error: Non-nil if processing or extraction fails, nil on success.
 func handleManifestResponse(log *zerolog.Logger,
 	resp *http.Response,
 	method, originalHost string,
 	redirected bool,
 	parsedURL *url.URL,
-) (string, string, bool, error) {
+) (manifestReply, error) {
 	currentHost := parsedURL.Host
 
 	fields := map[string]any{
@@ -1044,7 +1182,7 @@ func handleManifestResponse(log *zerolog.Logger,
 			Fields(fields).
 			Msg("Registry returned 429 for manifest request")
 
-		return "", "", false, ratelimit.FromResponse(resp, body)
+		return manifestReply{}, ratelimit.FromResponse(resp, body)
 	}
 
 	// A refused repository would refuse a GET too.
@@ -1065,7 +1203,7 @@ func handleManifestResponse(log *zerolog.Logger,
 			Fields(fields).
 			Msg("HEAD request failed, asking for the GET fallback")
 
-		return "", "", false, fmt.Errorf("%w: status %s", errHeadFallback, resp.Status)
+		return manifestReply{}, fmt.Errorf("%w: status %s", errHeadFallback, resp.Status)
 	}
 
 	// Check for redirect status codes (3xx)
@@ -1095,7 +1233,7 @@ func handleManifestResponse(log *zerolog.Logger,
 
 					*parsedURL = *target
 
-					return "", target.String(), true, nil
+					return manifestReply{digest: "", retryURL: target.String(), redirect: true}, nil
 				}
 			}
 		}
@@ -1117,7 +1255,7 @@ func handleManifestResponse(log *zerolog.Logger,
 				Str("error", "HEAD request returned 404, not retrying").
 				Msg("Response status not successful")
 
-			return "", "", false, fmt.Errorf(
+			return manifestReply{}, fmt.Errorf(
 				"%w: %w: status %s",
 				errManifestNotFound,
 				errInvalidRegistryResponse,
@@ -1135,7 +1273,7 @@ func handleManifestResponse(log *zerolog.Logger,
 
 			parsedURL.Host = originalHost
 
-			return "", parsedURL.String(), true, nil
+			return manifestReply{digest: "", retryURL: parsedURL.String(), redirect: false}, nil
 		}
 
 		if refused {
@@ -1143,7 +1281,7 @@ func handleManifestResponse(log *zerolog.Logger,
 				Fields(fields).
 				Msg("Registry denied access to the repository")
 
-			return "", "", false, fmt.Errorf("%w: status %s", errRepositoryDenied, resp.Status)
+			return manifestReply{}, fmt.Errorf("%w: status %s", errRepositoryDenied, resp.Status)
 		}
 
 		log.Debug().
@@ -1151,7 +1289,7 @@ func handleManifestResponse(log *zerolog.Logger,
 			Str("error", "invalid status code").
 			Msg("Response status not successful")
 
-		return "", "", false, fmt.Errorf("%w: status %s", errInvalidRegistryResponse, resp.Status)
+		return manifestReply{}, fmt.Errorf("%w: status %s", errInvalidRegistryResponse, resp.Status)
 	}
 
 	// Extract the digest based on the request method (HEAD from headers, GET from body).
@@ -1176,7 +1314,7 @@ func handleManifestResponse(log *zerolog.Logger,
 			Fields(fields).
 			Msg("Failed to extract digest")
 
-		return "", "", false, err
+		return manifestReply{}, err
 	}
 
 	log.Debug().
@@ -1184,7 +1322,7 @@ func handleManifestResponse(log *zerolog.Logger,
 		Str("extracted_digest", digest).
 		Msg("Successfully extracted digest")
 
-	return digest, "", false, nil
+	return manifestReply{digest: digest, retryURL: "", redirect: false}, nil
 }
 
 // retriesOnOriginalHost reports whether a manifest request that failed on the
@@ -1594,80 +1732,4 @@ func makeManifestRequest(
 	req.Header.Set("User-Agent", meta.UserAgent)
 
 	return req, nil
-}
-
-// retryManifestRequest performs a retry request to the manifest URL with updated host and returns the digest.
-//
-// Parameters:
-//   - ctx: Context for request lifecycle control.
-//   - method: HTTP method ("HEAD" or "GET").
-//   - updatedURL: The updated manifest URL to retry.
-//   - token: Authentication token.
-//   - originalHost: The image registry's host.
-//   - redirected: Whether the canonical registry's challenge redirected the request to
-//     another host.
-//   - parsedURL: Parsed URL object.
-//   - limitKey: Rate-limit host key from [ratelimit.Scope]. Empty uses parsedURL.Host.
-//   - client: The HTTP client to use for the request.
-//   - limiter: Rate limiter shared by registry requests.
-//
-// Returns:
-//   - string: The extracted digest.
-//   - error: Non-nil if the retry request fails or asks for yet another host. A
-//     HEAD retry that gives no digest asks for the GET fallback.
-func retryManifestRequest(
-	log *zerolog.Logger,
-	ctx context.Context,
-	method, updatedURL, token string,
-	originalHost string,
-	redirected bool,
-	parsedURL *url.URL,
-	limitKey string,
-	client auth.Client,
-	limiter *ratelimit.Limiter,
-) (string, error) {
-	var digest string
-
-	if limitKey == "" {
-		limitKey = parsedURL.Host
-	}
-
-	err := limiter.Do(ctx, log, limitKey, func() error {
-		req, reqErr := makeManifestRequest(ctx, method, updatedURL, token)
-		if reqErr != nil {
-			return reqErr
-		}
-
-		resp, doErr := client.Do(req)
-		if doErr != nil {
-			return fmt.Errorf("%w: %w", errFailedExecuteRequest, doErr)
-		}
-
-		defer func() { _ = resp.Body.Close() }()
-
-		got, nextURL, retry, handleErr := handleManifestResponse(log,
-			resp,
-			method,
-			originalHost,
-			redirected,
-			parsedURL,
-		)
-		if handleErr != nil {
-			return handleErr
-		}
-
-		// The request is retried only once.
-		if retry {
-			return fmt.Errorf("%w: %s", errUnresolvedManifestRetry, auth.RedactURL(nextURL))
-		}
-
-		digest = got
-
-		return nil
-	})
-	if err != nil {
-		return "", fmt.Errorf("manifest retry: %w", err)
-	}
-
-	return digest, nil
 }

@@ -264,7 +264,7 @@ func FuzzBuildManifestURLForImage(f *testing.F) {
 // one outcome.
 //
 // The outcome is one of these:
-//   - a retry with a new URL
+//   - a retry with a new URL, marked as a redirect only for a 3xx response
 //   - a digest, which is never empty
 //   - a request for the GET fallback, which only a HEAD request makes
 //   - an error for an invalid registry response, a refused repository or a
@@ -328,14 +328,15 @@ func FuzzHandleManifestResponse(f *testing.F) {
 			}
 		}
 
-		digest, manifestURL, retry, err := handleManifestResponse(newNopLogger(), resp,
+		reply, err := handleManifestResponse(newNopLogger(), resp,
 			method, originalHost, redirected, parsedURL)
 
 		switch {
-		case retry:
+		case reply.retryURL != "":
 			require.NoError(t, err)
-			assert.Empty(t, digest)
-			assert.NotEmpty(t, manifestURL)
+			assert.Empty(t, reply.digest)
+			assert.Equal(t, statusCode >= 300 && statusCode < 400, reply.redirect,
+				"only a 3xx response asks to follow a redirect")
 		case err != nil:
 			assert.True(t,
 				errors.Is(err, errInvalidRegistryResponse) || errors.Is(err, errRepositoryDenied) ||
@@ -352,11 +353,10 @@ func FuzzHandleManifestResponse(f *testing.F) {
 				assert.True(t, auth.IsRepositoryRefusal(resp), "a refusal without insufficient_scope")
 			}
 
-			assert.Empty(t, digest)
-			assert.Empty(t, manifestURL)
+			assert.Equal(t, manifestReply{}, reply)
 		default:
-			assert.NotEmpty(t, digest, "a response without an error gave no digest")
-			assert.Empty(t, manifestURL)
+			assert.NotEmpty(t, reply.digest, "a response without an error gave no digest")
+			assert.False(t, reply.redirect, "a digest came with a redirect")
 		}
 	})
 }
