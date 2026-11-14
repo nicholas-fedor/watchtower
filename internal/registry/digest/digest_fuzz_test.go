@@ -20,9 +20,9 @@ import (
 )
 
 // FuzzExtractHeadDigest checks that a HEAD response's digest is its normalized
-// Docker-Content-Digest header whatever the status code, that a missing header
-// is an invalid registry response, and that a header with no hash asks for the
-// GET fallback. A digest without an error is never empty.
+// Docker-Content-Digest header whatever the status code, and that a missing
+// header or one with no hash triggers the GET fallback. A digest without an
+// error is never empty.
 //
 // The seeds pair successful and failing status codes with a full digest, an
 // empty header, malformed values, and a bare or short sha256 prefix.
@@ -45,12 +45,6 @@ func FuzzExtractHeadDigest(f *testing.F) {
 		got, err := extractHeadDigest(newNopLogger(), resp)
 
 		header := resp.Header.Get(ContentDigestHeader)
-		if header == "" {
-			require.ErrorIs(t, err, errInvalidRegistryResponse)
-			assert.Empty(t, got)
-
-			return
-		}
 
 		want := NormalizeDigest(newNopLogger(), header)
 		if want == "" {

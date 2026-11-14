@@ -91,6 +91,7 @@ func Test_registryClient_Do(t *testing.T) {
 
 		resp, err := (&registryClient{client: refusingClient()}).Do(mustNewRequest(t, "http://"+refusedAddr+"/v2/")) //nolint:bodyclose // The request fails, so there is no response.
 		require.ErrorIs(t, err, syscall.ECONNREFUSED)
+		require.ErrorIs(t, err, ErrRequestFailed)
 		require.ErrorContains(t, err, "failed to execute HTTP request")
 		assert.Nil(t, resp)
 	})
