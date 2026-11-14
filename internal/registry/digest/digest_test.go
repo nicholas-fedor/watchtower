@@ -2412,8 +2412,9 @@ func TestHandleManifestResponse(t *testing.T) {
 		parsedURL      *url.URL
 		expectedDigest string
 		expectedURL    string
-		expectedRetry  bool
-		wantErr        bool
+		// expectedRedirect reports that the retry follows the registry's redirect.
+		expectedRedirect bool
+		wantErr          bool
 		// wantErrIs, when set, is the error the response must produce.
 		wantErrIs error
 	}{
@@ -2446,13 +2447,13 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:   "registry.example.com",
-			redirected:     false,
-			parsedURL:      mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			expectedDigest: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-			expectedURL:    "",
-			expectedRetry:  false,
-			wantErr:        false,
+			originalHost:     "registry.example.com",
+			redirected:       false,
+			parsedURL:        mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			expectedDigest:   "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+			expectedURL:      "",
+			expectedRedirect: false,
+			wantErr:          false,
 		},
 		{
 			name:   "HEAD 404 returns error without retry",
@@ -2518,12 +2519,12 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			redirected:    false,
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			expectedURL:   "https://new-registry.example.com/v2/manifests/latest",
-			expectedRetry: true,
-			wantErr:       false,
+			originalHost:     "registry.example.com",
+			redirected:       false,
+			parsedURL:        mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			expectedURL:      "https://new-registry.example.com/v2/manifests/latest",
+			expectedRedirect: true,
+			wantErr:          false,
 		},
 		{
 			name:   "3xx redirect keeps the Location's path and query",
@@ -2537,10 +2538,10 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://registry.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			parsedURL:     mustParseURL("https://registry.example.com/v2/manifests/latest"),
-			expectedURL:   "https://registry.example.com/v2/mirror/manifests/latest?sig=abc",
-			expectedRetry: true,
+			originalHost:     "registry.example.com",
+			parsedURL:        mustParseURL("https://registry.example.com/v2/manifests/latest"),
+			expectedURL:      "https://registry.example.com/v2/mirror/manifests/latest?sig=abc",
+			expectedRedirect: true,
 		},
 		{
 			name:   "3xx redirect to the request URL is not retried",
@@ -2570,12 +2571,12 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://redirect.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			redirected:    true,
-			parsedURL:     mustParseURL("https://redirect.example.com/v2/manifests/latest"),
-			expectedURL:   "https://registry.example.com/v2/manifests/latest",
-			expectedRetry: true,
-			wantErr:       false,
+			originalHost:     "registry.example.com",
+			redirected:       true,
+			parsedURL:        mustParseURL("https://redirect.example.com/v2/manifests/latest"),
+			expectedURL:      "https://registry.example.com/v2/manifests/latest",
+			expectedRedirect: false,
+			wantErr:          false,
 		},
 		{
 			name:   "refused HEAD returns a refusal without GET fallback",
@@ -2623,11 +2624,11 @@ func TestHandleManifestResponse(t *testing.T) {
 					Request:    &http.Request{URL: mustParseURL("https://redirect.example.com/v2/manifests/latest")},
 				}
 			},
-			originalHost:  "registry.example.com",
-			redirected:    true,
-			parsedURL:     mustParseURL("https://redirect.example.com/v2/manifests/latest"),
-			expectedURL:   "https://registry.example.com/v2/manifests/latest",
-			expectedRetry: true,
+			originalHost:     "registry.example.com",
+			redirected:       true,
+			parsedURL:        mustParseURL("https://redirect.example.com/v2/manifests/latest"),
+			expectedURL:      "https://registry.example.com/v2/manifests/latest",
+			expectedRedirect: false,
 		},
 		{
 			// The mirror's token belongs to the mirror, and the endpoint list
@@ -2697,7 +2698,7 @@ func TestHandleManifestResponse(t *testing.T) {
 				defer resp.Body.Close()
 			}
 
-			gotDigest, gotURL, gotRetry, err := handleManifestResponse(newTestLogger(t), resp,
+			got, err := handleManifestResponse(newTestLogger(t), resp,
 				tt.method,
 				tt.originalHost,
 				tt.redirected,
@@ -2718,9 +2719,13 @@ func TestHandleManifestResponse(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.expectedDigest, gotDigest)
-			assert.Equal(t, tt.expectedURL, gotURL)
-			assert.Equal(t, tt.expectedRetry, gotRetry)
+
+			want := manifestReply{
+				digest:   tt.expectedDigest,
+				retryURL: tt.expectedURL,
+				redirect: tt.expectedRedirect,
+			}
+			assert.Equal(t, want, got)
 		})
 	}
 }
@@ -3433,9 +3438,9 @@ func TestMakeManifestRequest(t *testing.T) {
 	}
 }
 
-// TestRetryManifestRequest verifies the outcome of retrying a manifest request
-// on another host: a digest, a GET fallback, or an error.
-func TestRetryManifestRequest(t *testing.T) {
+// TestDigestLookup_retryManifest verifies the outcome of retrying a manifest
+// request on another host, which is a digest, a GET fallback or an error.
+func TestDigestLookup_retryManifest(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -3598,16 +3603,25 @@ func TestRetryManifestRequest(t *testing.T) {
 
 			currentURL := cmp.Or(tt.currentURL, "https://registry.example.com/v2/manifests/latest")
 
-			got, err := retryManifestRequest(newTestLogger(t), context.Background(),
-				tt.method,
+			lookup := digestLookup{
+				log:          newTestLogger(t),
+				c:            nil,
+				client:       client,
+				limiter:      ratelimit.New(),
+				fields:       nil,
+				registryAuth: "",
+				method:       tt.method,
+				tag:          "",
+				originalHost: "registry.example.com",
+				limitKey:     "registry.example.com",
+				settings:     registryConfig.Registry{},
+			}
+
+			got, err := lookup.retryManifest(context.Background(),
 				tt.updatedURL,
 				tt.token,
-				"registry.example.com",
 				tt.redirected,
 				mustParseURL(currentURL),
-				"",
-				client,
-				ratelimit.New(),
 			)
 			if tt.wantErr {
 				require.Error(t, err)
