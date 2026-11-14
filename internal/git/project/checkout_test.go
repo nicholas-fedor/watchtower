@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/stretchr/testify/assert"
@@ -454,6 +455,73 @@ func TestCheckoutAuthForUsesOriginURL(t *testing.T) {
 	assert.Equal(t, origin, seen)
 }
 
+// TestCheckoutReadsWorktreeAfterFetch verifies that an edit to a tracked file
+// made while origin is fetched counts as a local change.
+//
+// AuthFor runs as the fetch starts, so it stands in for a user editing the
+// worktree then. Without Stash the checkout must fail as dirty and leave the
+// edit and HEAD alone. With Stash the edit must be written back after the
+// checkout.
+func TestCheckoutReadsWorktreeAfterFetch(t *testing.T) {
+	t.Parallel()
+
+	const edited = "services: {local: {}}\n"
+
+	tests := []struct {
+		name       string
+		wantErr    error
+		stash      bool
+		checkedOut bool
+	}{
+		{
+			name:       "without stash fails as dirty",
+			wantErr:    ErrDirty,
+			stash:      false,
+			checkedOut: false,
+		},
+		{
+			name:       "with stash keeps the edit",
+			wantErr:    nil,
+			stash:      true,
+			checkedOut: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir, first, second := initTwoCommitRepo(t)
+			addBrokenOrigin(t, dir)
+
+			err := Checkout(t.Context(), dir, first, CheckoutOptions{
+				Stash: tt.stash,
+				AuthFor: func(string) (transport.AuthMethod, error) {
+					return nil, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(edited), 0o600)
+				},
+			})
+			require.ErrorIs(t, err, tt.wantErr)
+
+			got, err := os.ReadFile(filepath.Join(dir, "compose.yaml"))
+			require.NoError(t, err)
+			assert.Equal(t, edited, string(got))
+
+			repo, err := goGit.PlainOpen(dir)
+			require.NoError(t, err)
+
+			head, err := repo.Head()
+			require.NoError(t, err)
+
+			wantHead := second
+			if tt.checkedOut {
+				wantHead = first
+			}
+
+			assert.Equal(t, wantHead, head.Hash().String())
+		})
+	}
+}
+
 func TestCheckoutAuthErrorWithoutLocalCommit(t *testing.T) {
 	t.Parallel()
 
@@ -584,6 +652,37 @@ func TestCheckoutRecordsPriorHead(t *testing.T) {
 
 	require.NoError(t, Checkout(t.Context(), dir, first, CheckoutOptions{Prior: &prior}))
 	assert.Equal(t, second, prior)
+}
+
+// TestCheckoutRecordsHeadAfterFetch verifies that Checkout records the HEAD
+// the worktree has when the fetch ends, not the one it had when the checkout
+// began.
+//
+// AuthFor runs as the fetch starts, so it stands in for a user who checks
+// out another commit then. Prior must name that commit, because a caller's
+// undo returns to it.
+func TestCheckoutRecordsHeadAfterFetch(t *testing.T) {
+	t.Parallel()
+
+	dir, first, second := initTwoCommitRepo(t)
+	addBrokenOrigin(t, dir)
+
+	repo, err := goGit.PlainOpen(dir)
+	require.NoError(t, err)
+
+	worktree, err := repo.Worktree()
+	require.NoError(t, err)
+
+	var prior string
+
+	err = Checkout(t.Context(), dir, second, CheckoutOptions{
+		Prior: &prior,
+		AuthFor: func(string) (transport.AuthMethod, error) {
+			return nil, worktree.Checkout(&goGit.CheckoutOptions{Hash: plumbing.NewHash(first)})
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, first, prior)
 }
 
 // TestCheckoutFailureRollsBack verifies that a checkout that fails part way
