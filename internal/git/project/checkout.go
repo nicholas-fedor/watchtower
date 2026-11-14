@@ -307,16 +307,15 @@ func (c *projectCheckout) switchTo(ctx context.Context, hash plumbing.Hash) erro
 
 // restoreStash writes the saved local files back onto the checked-out commit.
 //
-// It does nothing without Stash. When the files cannot be written back, HEAD
-// and the files from before the checkout are put back. The same happens when
-// ctx ends after the files are written back.
+// It does nothing without Stash. When the files cannot be written back, or
+// ctx ends after they are, the checkout is undone. The previous HEAD is
+// checked out again and the saved local files are written back.
 //
 // Parameters:
 //   - ctx: Cancellation for the checkout.
 //
 // Returns:
-//   - error: The restore or cancellation error, with the snapshot path when
-//     the worktree could not be put back.
+//   - error: The restore or cancellation error, joined with any undo failure.
 func (c *projectCheckout) restoreStash(ctx context.Context) error {
 	if !c.opts.Stash {
 		return nil
@@ -324,25 +323,14 @@ func (c *projectCheckout) restoreStash(ctx context.Context) error {
 
 	err := c.stash.putBack()
 	if err == nil {
-		canceled := checkoutCanceled(ctx)
-		if canceled != nil {
-			return c.abort(canceled)
-		}
-
-		return nil
+		err = checkoutCanceled(ctx)
 	}
 
-	rbErr := c.rollbackHead()
-	if rbErr != nil {
-		return fmt.Errorf("%w (rollback checkout: %w; snapshot %s)", err, rbErr, c.stash.copyDir)
+	if err != nil {
+		return c.abort(err)
 	}
 
-	rbErr = c.stash.putBack()
-	if rbErr != nil {
-		return fmt.Errorf("%w (rollback restore: %w; snapshot %s)", err, rbErr, c.stash.copyDir)
-	}
-
-	return err
+	return nil
 }
 
 // abort undoes a checkout that failed or was canceled after the worktree
@@ -358,9 +346,14 @@ func (c *projectCheckout) restoreStash(ctx context.Context) error {
 //   - error: cause, joined with a failed HEAD rollback, and wrapped with the
 //     snapshot path when the local files cannot be written back.
 func (c *projectCheckout) abort(cause error) error {
-	rollbackErr := c.rollbackHead()
-	if rollbackErr != nil {
-		cause = errors.Join(cause, fmt.Errorf("rollback checkout: %w", rollbackErr))
+	if !c.prior.IsZero() {
+		err := c.worktree.Checkout(&goGit.CheckoutOptions{
+			Hash:  c.prior,
+			Force: true,
+		})
+		if err != nil {
+			cause = errors.Join(cause, fmt.Errorf("rollback checkout: %w", err))
+		}
 	}
 
 	err := c.stash.putBack()
@@ -369,21 +362,6 @@ func (c *projectCheckout) abort(cause error) error {
 	}
 
 	return cause
-}
-
-// rollbackHead checks the HEAD from before checkout out again.
-//
-// Returns:
-//   - error: The checkout error, or nil when the previous HEAD is unknown.
-func (c *projectCheckout) rollbackHead() error {
-	if c.prior.IsZero() {
-		return nil
-	}
-
-	return c.worktree.Checkout(&goGit.CheckoutOptions{ //nolint:wrapcheck // Each caller names the failed rollback.
-		Hash:  c.prior,
-		Force: true,
-	})
 }
 
 // newLocalStash saves the worktree's modified and untracked files and copies
