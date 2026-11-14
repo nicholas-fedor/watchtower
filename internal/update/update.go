@@ -250,8 +250,13 @@ func update(
 	// post-checks.
 	if config.LifecycleHooks {
 		log.Debug().Msg("Executing pre-check lifecycle hooks")
-		hooks.ExecutePreChecks(log, ctx, client, config.Filter, config.LifecycleUID, config.LifecycleGID, filteredContainers)
+		hooks.ExecutePreChecks(log, ctx, client, config.Filter, config.LifecycleUID, config.LifecycleGID,
+			dueContainers(config, filteredContainers))
 	}
+
+	// The post-checks run in the containers that were due when the session
+	// began, found again by name, as an update recreates them.
+	postCheckFilter := dueFilter(config, dueContainers(config, filteredContainers))
 
 	// A failed check of Watchtower's own image delays the end of a run-once
 	// session.
@@ -285,6 +290,8 @@ func update(
 		return nil, cleanupImageInfos, err
 	}
 
+	recordUncheckedRestarts(log, progress, config, allContainersToRestart)
+
 	// Perform updates and restarts, either with rolling restarts or in batches.
 	err = restart.Run(
 		log,
@@ -309,7 +316,7 @@ func update(
 			log,
 			ctx,
 			client,
-			config.Filter,
+			postCheckFilter,
 			config.LifecycleUID,
 			config.LifecycleGID,
 			nil,
@@ -341,6 +348,87 @@ func update(
 
 	// Return the final report summarizing the session and the cleanup image infos.
 	return progress.Report(log), cleanupImageInfos, nil
+}
+
+// dueContainers returns the containers the session checks for updates: every
+// filtered container, or those [updateParams.Params.Due] accepts.
+//
+// Parameters:
+//   - config: Update parameters.
+//   - filteredContainers: The monitored containers.
+//
+// Returns:
+//   - []*container.Container: The due containers. It is non-nil, as the
+//     lifecycle hooks expect of a scan snapshot.
+func dueContainers(config updateParams.Params, filteredContainers []*container.Container) []*container.Container {
+	if config.Due == nil {
+		return filteredContainers
+	}
+
+	due := make([]*container.Container, 0, len(filteredContainers))
+
+	for _, c := range filteredContainers {
+		if config.Due(c) {
+			due = append(due, c)
+		}
+	}
+
+	return due
+}
+
+// dueFilter returns the filter for the post-checks: the session's filter,
+// narrowed when [updateParams.Params.Due] is set to the containers that were
+// due when the session began. They are matched by name, so an updated
+// container's replacement still matches whatever its labels now say, and a
+// container created during the session does not.
+//
+// Parameters:
+//   - config: Update parameters.
+//   - due: The containers due when the session began.
+//
+// Returns:
+//   - filters.Filter: The filter for the due containers.
+func dueFilter(config updateParams.Params, due []*container.Container) filters.Filter {
+	if config.Due == nil {
+		return config.Filter
+	}
+
+	names := make(map[string]bool, len(due))
+	for _, c := range due {
+		names[container.NormalizeContainerName(c.Name())] = true
+	}
+
+	return func(c filters.FilterableContainer) bool {
+		return (config.Filter == nil || config.Filter(c)) && names[container.NormalizeContainerName(c.Name())]
+	}
+}
+
+// recordUncheckedRestarts adds to the session's progress each restarting
+// container that has no result yet, as scanned with its current image. Only a
+// container that is not due has none: it restarts because a container it
+// depends on restarts, and the report then shows it restarted, as it shows a
+// checked container that restarts for a dependency.
+//
+// Parameters:
+//   - log: Process logger.
+//   - progress: Session progress.
+//   - config: Update parameters.
+//   - restarting: Containers the session restarts.
+func recordUncheckedRestarts(
+	log *zerolog.Logger,
+	progress *state.Progress,
+	config updateParams.Params,
+	restarting []*container.Container,
+) {
+	if config.Due == nil {
+		return
+	}
+
+	for _, c := range restarting {
+		if _, recorded := (*progress)[c.ID()]; !recorded {
+			progress.AddScanned(log, c, c.ImageID(), config)
+		}
+	}
 }
 
 // currentOldInstance returns the current container when it is an old
@@ -522,6 +610,14 @@ func checkStaleness(
 			Str("image", sourceContainer.ImageName()).
 			Logger()
 		clog := &clogVal
+
+		// A container that is not due is not checked. It stays in the
+		// session, so it still restarts when a container it depends on does.
+		if config.Due != nil && !config.Due(sourceContainer) {
+			clog.Debug().Msg("Skipping staleness check for container that is not due")
+
+			continue
+		}
 
 		// Check if the container uses a pinned (digest-based) image to skip updates.
 		isPinnedVal, err := staleness.IsPinned(log, sourceContainer, progress, config, gitSession)

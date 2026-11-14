@@ -163,6 +163,7 @@ func loadSchedule(vCfg *viper.Viper) schedule.Schedule {
 		IntervalSeconds: vCfg.GetInt("interval"),
 		Spec:            vCfg.GetString("schedule"),
 		UpdateOnStart:   vCfg.GetBool("update-on-start"),
+		WatchEvents:     vCfg.GetBool("watch-events"),
 	}
 }
 

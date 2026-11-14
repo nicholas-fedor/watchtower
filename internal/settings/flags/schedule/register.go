@@ -40,6 +40,14 @@ func Specs() []spec.FlagSpec {
 			EnvKeys: []string{"WATCHTOWER_UPDATE_ON_START"},
 			Help:    "Perform an update check on startup, then continue with periodic updates",
 		},
+		{
+			Name:    "watch-events",
+			Kind:    spec.KindBool,
+			Default: false,
+			EnvKeys: []string{"WATCHTOWER_WATCH_EVENTS"},
+			Help: "Follow Docker's container events, and check a new container for updates " +
+				"as soon as it starts instead of at the next scheduled run",
+		},
 	}
 }
 

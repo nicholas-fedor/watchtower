@@ -428,6 +428,20 @@ func isTLSSetupError(err error) bool {
 		errors.As(err, &verifyErr)
 }
 
+// Events streams the Docker daemon's events (see watch.EventStream).
+// The event watch type-asserts for it, so consumers' client interfaces
+// and their mocks need not declare it.
+//
+// Parameters:
+//   - ctx: Ends the stream when canceled.
+//   - options: Which events to stream.
+//
+// Returns:
+//   - dockerClient.EventsResult: The event and error channels.
+func (c *Client) Events(ctx context.Context, options dockerClient.EventsListOptions) dockerClient.EventsResult {
+	return c.api.Events(ctx, options)
+}
+
 // ListContainers retrieves a list of containers, optionally filtered.
 //
 // Parameters:

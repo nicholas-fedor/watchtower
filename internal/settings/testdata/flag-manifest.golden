@@ -95,6 +95,14 @@
   list-parse: none
   hidden: false
   deprecated: ""
+--watch-events
+  shorthand: ""
+  kind: bool
+  default: false
+  env: WATCHTOWER_WATCH_EVENTS
+  list-parse: none
+  hidden: false
+  deprecated: ""
 --run-once
   shorthand: "R"
   kind: bool
