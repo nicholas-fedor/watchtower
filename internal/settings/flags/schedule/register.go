@@ -40,6 +40,14 @@ func Specs() []spec.FlagSpec {
 			EnvKeys: []string{"WATCHTOWER_UPDATE_ON_START"},
 			Help:    "Perform an update check on startup, then continue with periodic updates",
 		},
+		{
+			Name:    "container-schedules",
+			Kind:    spec.KindBool,
+			Default: false,
+			EnvKeys: []string{"WATCHTOWER_CONTAINER_SCHEDULES"},
+			Help: "Let containers set their own update schedule with the " +
+				"com.centurylinklabs.watchtower.schedule label",
+		},
 	}
 }
 

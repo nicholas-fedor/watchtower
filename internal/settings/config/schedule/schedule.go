@@ -8,4 +8,6 @@ type Schedule struct {
 	IntervalSeconds int
 	// UpdateOnStart runs an update check immediately on startup.
 	UpdateOnStart bool
+	// ContainerSchedules lets containers set their own schedule with the schedule label.
+	ContainerSchedules bool
 }
