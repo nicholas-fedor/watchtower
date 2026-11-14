@@ -121,9 +121,11 @@ type projectCheckout struct {
 
 // Checkout fetches origin and checks out commit in an existing worktree.
 //
-// When Stash is false and the worktree is dirty, the call fails.
-// When Stash is true, modified and untracked files are saved, the commit is
-// checked out, and those files are written back.
+// The worktree and its HEAD are read after the fetch, just before the
+// checkout, so a change made during the fetch counts. When Stash is false
+// and the worktree is dirty, the call fails. When Stash is true, modified and
+// untracked files are saved, the commit is checked out, and those files are
+// written back.
 // Fetch uses AuthFor, CABundle, and InsecureSkipTLS when set. If fetch fails
 // but commit is already in the local object store, checkout continues.
 // A checkout that fails or is canceled after the worktree changed puts the
@@ -150,6 +152,11 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 		return err
 	}
 
+	err = checkout.captureLocal()
+	if err != nil {
+		return err
+	}
+
 	err = checkout.switchTo(ctx, hash)
 	if err != nil {
 		return err
@@ -158,20 +165,17 @@ func Checkout(ctx context.Context, dir, commit string, opts CheckoutOptions) err
 	return checkout.restoreStash(ctx)
 }
 
-// openCheckout opens the project worktree and saves its local files.
-//
-// A dirty worktree fails with [ErrDirty] unless Stash is set. With Stash set,
-// modified and untracked files are saved. The HEAD before checkout is
-// recorded in Prior when it is set.
+// openCheckout opens the project repository and its worktree.
 //
 // Parameters:
 //   - ctx: Cancellation for the checkout.
 //   - dir: Existing Git checkout.
-//   - opts: Stash and Prior settings.
+//   - opts: The caller's checkout options.
 //
 // Returns:
 //   - *projectCheckout: The opened checkout.
-//   - error: Non-nil when ctx is done, the worktree cannot be read, or it is dirty.
+//   - error: Non-nil when ctx is done or the repository or its worktree cannot
+//     be opened.
 func openCheckout(ctx context.Context, dir string, opts CheckoutOptions) (*projectCheckout, error) {
 	err := checkoutCanceled(ctx)
 	if err != nil {
@@ -193,38 +197,12 @@ func openCheckout(ctx context.Context, dir string, opts CheckoutOptions) (*proje
 		return nil, fmt.Errorf("project worktree: %w", err)
 	}
 
-	status, err := worktree.Status()
-	if err != nil {
-		return nil, fmt.Errorf("project status: %w", err)
-	}
-
-	if !status.IsClean() && !opts.Stash {
-		return nil, ErrDirty
-	}
-
-	// A clean worktree saves nothing, so only a stash saves files.
-	stash, err := newLocalStash(dir, status, opts.restore)
-	if err != nil {
-		return nil, err
-	}
-
-	var prior plumbing.Hash
-
-	head, err := repo.Head()
-	if err == nil && head != nil {
-		prior = head.Hash()
-
-		if opts.Prior != nil {
-			*opts.Prior = prior.String()
-		}
-	}
-
 	return &projectCheckout{
 		repo:     repo,
 		worktree: worktree,
-		stash:    stash,
+		stash:    localStash{restore: opts.restore, root: dir, copyDir: "", files: nil, kept: false},
 		opts:     opts,
-		prior:    prior,
+		prior:    plumbing.ZeroHash,
 	}, nil
 }
 
@@ -277,10 +255,48 @@ func (c *projectCheckout) resolve(ctx context.Context, commit string) (plumbing.
 	return *resolved, nil
 }
 
+// captureLocal saves the worktree's local files and records its HEAD, which
+// an undo puts back.
+//
+// A dirty worktree fails with [ErrDirty] unless Stash is set. With Stash set,
+// modified and untracked files are saved. Once they are saved, the HEAD is
+// recorded in Prior when it is set.
+//
+// Returns:
+//   - error: [ErrDirty], or the error from reading the worktree or saving its
+//     files.
+func (c *projectCheckout) captureLocal() error {
+	status, err := c.worktree.Status()
+	if err != nil {
+		return fmt.Errorf("project status: %w", err)
+	}
+
+	if !status.IsClean() && !c.opts.Stash {
+		return ErrDirty
+	}
+
+	err = c.stash.save(status)
+	if err != nil {
+		return err
+	}
+
+	head, err := c.repo.Head()
+	if err == nil && head != nil {
+		c.prior = head.Hash()
+
+		if c.opts.Prior != nil {
+			*c.opts.Prior = c.prior.String()
+		}
+	}
+
+	return nil
+}
+
 // switchTo checks the worktree out at hash.
 //
-// A checkout that fails or that ctx ends is undone. The previous HEAD is
-// checked out again and the saved local files are written back.
+// A done ctx leaves the worktree untouched. A checkout that fails or that
+// ctx ends is undone. The previous HEAD is checked out again and the saved
+// local files are written back.
 //
 // Parameters:
 //   - ctx: Cancellation for the checkout.
@@ -289,7 +305,14 @@ func (c *projectCheckout) resolve(ctx context.Context, commit string) (plumbing.
 // Returns:
 //   - error: The checkout or cancellation error, joined with any undo failure.
 func (c *projectCheckout) switchTo(ctx context.Context, hash plumbing.Hash) error {
-	err := c.worktree.Checkout(&goGit.CheckoutOptions{
+	// Saving the local files can take a while, so ctx may have ended since
+	// the fetch.
+	err := checkoutCanceled(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = c.worktree.Checkout(&goGit.CheckoutOptions{
 		Hash:  hash,
 		Force: true,
 	})
@@ -364,31 +387,32 @@ func (c *projectCheckout) abort(cause error) error {
 	return cause
 }
 
-// newLocalStash saves the worktree's modified and untracked files and copies
-// them to a temp directory outside the worktree.
+// save saves the worktree's modified and untracked files and copies them to
+// a temp directory outside the worktree.
 //
 // The copy means a failed write-back is never the only copy of those bytes.
+// A clean worktree saves nothing.
 //
 // Parameters:
-//   - root: Worktree root.
 //   - status: The worktree's status.
-//   - restore: Writes the files back. Nil writes them under root.
 //
 // Returns:
-//   - localStash: The saved files.
 //   - error: Non-nil when a file cannot be read or the copy cannot be written.
-func newLocalStash(root string, status goGit.Status, restore func(root string, saved []savedFile) error) (localStash, error) {
-	files, err := snapshotDirty(root, status)
+func (s *localStash) save(status goGit.Status) error {
+	files, err := snapshotDirty(s.root, status)
 	if err != nil {
-		return localStash{}, err
+		return err
 	}
 
 	copyDir, err := writeSnapshot(files)
 	if err != nil {
-		return localStash{}, err
+		return err
 	}
 
-	return localStash{restore: restore, root: root, copyDir: copyDir, files: files, kept: false}, nil
+	s.files = files
+	s.copyDir = copyDir
+
+	return nil
 }
 
 // putBack writes the saved files back onto the worktree.
@@ -473,7 +497,7 @@ func RestoreHead(dir, hash string, stash bool) error {
 		return fmt.Errorf("restore project head: %w", err)
 	}
 
-	var local localStash
+	local := localStash{restore: nil, root: dir, copyDir: "", files: nil, kept: false}
 
 	if stash {
 		status, err := worktree.Status()
@@ -481,7 +505,7 @@ func RestoreHead(dir, hash string, stash bool) error {
 			return fmt.Errorf("restore project head: %w", err)
 		}
 
-		local, err = newLocalStash(dir, status, nil)
+		err = local.save(status)
 		if err != nil {
 			return err
 		}
