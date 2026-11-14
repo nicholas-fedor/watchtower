@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -227,6 +228,64 @@ func bearerChallengeHandlers(t *testing.T, addr, scope string) []http.HandlerFun
 	t.Helper()
 
 	return []http.HandlerFunc{bearerChallengeHandler(t, addr, scope), tokenHandler(t)}
+}
+
+// fetchWithGet fetches a digest with GET alone from a new digest lookup, so
+// tests can exercise the GET handling directly. A digest check fetches with GET
+// only after a HEAD round.
+//
+// Parameters:
+//   - ctx: Context for the lookup.
+//   - t: Test that owns the logger.
+//   - c: Container whose digest is looked up.
+//   - registryAuth: Base64-encoded auth string.
+//   - settings: Registry request settings.
+//   - endpoints: Registry mirror host overrides to try before the canonical host.
+//
+// Returns:
+//   - string: Normalized digest.
+//   - error: The lookup's error, or the last failure when no response contains
+//     a digest.
+func fetchWithGet(
+	ctx context.Context,
+	t *testing.T,
+	c *container.Container,
+	registryAuth string,
+	settings registryConfig.Registry,
+	endpoints ...string,
+) (string, error) {
+	t.Helper()
+
+	lookup, release, err := newDigestLookup(newTestLogger(t), ctx, c, registryAuth, settings, ratelimit.New(), "", endpoints)
+	if err != nil {
+		return "", err
+	}
+	defer release()
+
+	return lookup.fetch(ctx, http.MethodGet)
+}
+
+// failingMirror returns a stub mirror whose HEAD and GET manifest requests both
+// fail with 503, each after a /v2/ challenge that needs no authentication.
+//
+// Parameters:
+//   - t: Test that receives verification failures.
+//   - manifestPath: Expected manifest path.
+//
+// Returns:
+//   - *httpstub.Server: The mirror.
+func failingMirror(t *testing.T, manifestPath string) *httpstub.Server {
+	t.Helper()
+
+	mirror := httpstub.New(t)
+	mirror.AppendHandlers(
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodHead, manifestPath, http.StatusServiceUnavailable, nil),
+		anonymousRegistryHandler(t),
+		manifestHandler(t, http.MethodGet, manifestPath, http.StatusServiceUnavailable, nil),
+	)
+
+	return mirror
 }
 
 // anonymousRegistryHandler returns the handler of a registry that answers /v2/
@@ -919,37 +978,54 @@ func TestCompareDigest_StubRegistry(t *testing.T) {
 }
 
 // TestCompareDigest_HashesManifestWithoutDigestHeader verifies that when a
-// registry sends no digest header, the comparison uses the sha256 of the
-// manifest list it serves, so an image pulled from that list matches.
+// registry sends no digest on HEAD or GET, the comparison uses the sha256 of
+// the manifest list it serves, so an image pulled from that list matches. A
+// HEAD response whose digest header is missing or has no hash triggers the GET
+// fallback.
 func TestCompareDigest_HashesManifestWithoutDigestHeader(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/test/image/manifests/latest"
 
-	server := httpstub.New(t)
-	server.AppendHandlers(
-		bearerChallengeHandler(t, server.Addr(), "repository:test/image:pull"),
-		tokenHandler(t),
-		manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader("sha256:")),
-		bearerChallengeHandler(t, server.Addr(), "repository:test/image:pull"),
-		httpstub.CombineHandlers(
-			httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
-			httpstub.RespondWith(http.StatusOK, testManifestListBody, http.Header{
-				"Content-Type": {"application/vnd.docker.distribution.manifest.list.v2+json"},
-			}),
-		),
-	)
+	tests := []struct {
+		name string
+		// headHeader is the HEAD response's header.
+		headHeader http.Header
+	}{
+		{name: "digest header has no hash", headHeader: digestHeader("sha256:")},
+		{name: "no digest header", headHeader: nil},
+	}
 
-	c := newRegistryContainer(
-		server.Addr()+"/test/image:latest",
-		server.Addr()+"/test/image@sha256:"+sha256Hex(testManifestListBody),
-	)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
-		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
-	require.NoError(t, err)
-	assert.True(t, match)
-	assert.Equal(t, "sha256:"+sha256Hex(testManifestListBody), remoteDigest)
+			server := httpstub.New(t)
+			server.AppendHandlers(
+				bearerChallengeHandler(t, server.Addr(), "repository:test/image:pull"),
+				tokenHandler(t),
+				manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, tt.headHeader),
+				bearerChallengeHandler(t, server.Addr(), "repository:test/image:pull"),
+				httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path(manifestPath)),
+					httpstub.RespondWith(http.StatusOK, testManifestListBody, http.Header{
+						"Content-Type": {"application/vnd.docker.distribution.manifest.list.v2+json"},
+					}),
+				),
+			)
+
+			c := newRegistryContainer(
+				server.Addr()+"/test/image:latest",
+				server.Addr()+"/test/image@sha256:"+sha256Hex(testManifestListBody),
+			)
+
+			match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
+				c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			require.NoError(t, err)
+			assert.True(t, match)
+			assert.Equal(t, "sha256:"+sha256Hex(testManifestListBody), remoteDigest)
+		})
+	}
 }
 
 // TestSameOrigin verifies which redirect targets count as the registry's own
@@ -986,11 +1062,11 @@ func TestSameOrigin(t *testing.T) {
 	}
 }
 
-// TestFetchDigestWithGet_RedirectPastClientLimit verifies the retry Watchtower
+// TestDigestLookup_fetch_redirectPastClientLimit verifies the retry Watchtower
 // makes when a registry keeps redirecting a manifest request past the client's
 // redirect limit. The retry goes to the redirect's whole URL, and it carries
 // the registry token only when the redirect stays on the registry's origin.
-func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
+func TestDigestLookup_fetch_redirectPastClientLimit(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/test/image/manifests/latest"
@@ -1038,19 +1114,19 @@ func TestFetchDigestWithGet_RedirectPastClientLimit(t *testing.T) {
 
 			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
-			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-				c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			got, err := fetchWithGet(t.Context(), t,
+				c, "token", registryConfig.Registry{TLSSkip: true})
 			require.NoError(t, err)
 			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
 		})
 	}
 }
 
-// TestFetchDigestWithGet_MirrorFailure verifies that a manifest request a
+// TestDigestLookup_fetch_mirrorFailure verifies that a manifest request a
 // mirror fails moves on to the next endpoint, so the registry gets its own
 // challenge and never the mirror's token. This holds when the mirror's
 // challenge redirects to another host or to the registry itself.
-func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
+func TestDigestLookup_fetch_mirrorFailure(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -1116,8 +1192,8 @@ func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 
 			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
-			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+			got, err := fetchWithGet(t.Context(), t,
+				c, "", registryConfig.Registry{TLSSkip: true}, mirror.Addr(), "")
 			require.NoError(t, err)
 			assert.Equal(t, NormalizeDigest(newTestLogger(t), testDigestHash), got)
 			assert.Len(t, registry.ReceivedRequests(), tt.registryRequests,
@@ -1126,10 +1202,10 @@ func TestFetchDigestWithGet_MirrorFailure(t *testing.T) {
 	}
 }
 
-// TestFetchDigestWithGet_RedirectHostFailure verifies that a manifest request
+// TestDigestLookup_fetch_redirectHostFailure verifies that a manifest request
 // the registry's redirect host refuses is retried once on the image registry,
-// whose answer decides the result.
-func TestFetchDigestWithGet_RedirectHostFailure(t *testing.T) {
+// whose response determines the result.
+func TestDigestLookup_fetch_redirectHostFailure(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/test/image/manifests/latest"
@@ -1180,8 +1256,8 @@ func TestFetchDigestWithGet_RedirectHostFailure(t *testing.T) {
 
 			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
 
-			got, err := fetchDigestWithGet(newTestLogger(t), t.Context(),
-				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			got, err := fetchWithGet(t.Context(), t,
+				c, "", registryConfig.Registry{TLSSkip: true})
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				assert.Empty(t, got)
@@ -1373,6 +1449,29 @@ func TestCompareDigestWithRemote_MirrorHeadFailure(t *testing.T) {
 			},
 		},
 		{
+			name: "mirror fails and the registry's HEAD has no digest header so the registry answers GET",
+			mirror: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusServiceUnavailable, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusServiceUnavailable, nil),
+				}
+			},
+			registry: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+		{
 			name: "mirror rejects HEAD while the registry is unreachable so the mirror answers GET",
 			mirror: func(t *testing.T) []http.HandlerFunc {
 				t.Helper()
@@ -1411,6 +1510,210 @@ func TestCompareDigestWithRemote_MirrorHeadFailure(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, match)
 			assert.Equal(t, testDigestHash, remoteDigest)
+		})
+	}
+}
+
+// TestCompareDigestWithRemote_tokenFailure verifies that the GET fallback first
+// sends a HEAD request to an endpoint whose token request failed in the HEAD
+// round. Docker Hub does not count HEAD requests toward its pull limit, so the
+// GET request is sent only when that HEAD response also triggers the fallback,
+// as a failed HEAD request or one without a digest header does. The mirror's
+// HEAD response triggers the fallback, and the registry's first challenge
+// fails.
+func TestCompareDigestWithRemote_tokenFailure(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/latest"
+
+	tests := []struct {
+		name string
+		// responses returns the registry's handlers after its first successful
+		// challenge, in request order.
+		responses func(t *testing.T) []http.HandlerFunc
+	}{
+		{
+			name: "HEAD response contains the digest",
+			responses: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+		{
+			name: "HEAD response triggers the fallback",
+			responses: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusServiceUnavailable, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+		{
+			name: "HEAD response has no digest header",
+			responses: func(t *testing.T) []http.HandlerFunc {
+				t.Helper()
+
+				return []http.HandlerFunc{
+					manifestHandler(t, http.MethodHead, manifestPath, http.StatusOK, nil),
+					anonymousRegistryHandler(t),
+					manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mirror := failingMirror(t, manifestPath)
+			responses := tt.responses(t)
+
+			registry := httpstub.New(t)
+			registry.AppendHandlers(
+				httpstub.CombineHandlers(
+					httpstub.VerifyRequest(t, http.MethodGet, httpstub.Path("/v2/")),
+					httpstub.RespondWith(http.StatusInternalServerError, "", nil),
+				),
+				anonymousRegistryHandler(t),
+			)
+			registry.AppendHandlers(responses...)
+
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
+				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+			require.NoError(t, err)
+			assert.True(t, match)
+			assert.Equal(t, testDigestHash, remoteDigest)
+			assert.Len(t, registry.ReceivedRequests(), 2+len(responses))
+		})
+	}
+}
+
+// TestCompareDigestWithRemote_noRegistryHost verifies that a digest check
+// fails before any request when the image reference names no registry host to
+// build a manifest URL from.
+func TestCompareDigestWithRemote_noRegistryHost(t *testing.T) {
+	t.Parallel()
+
+	c := newRegistryContainer("a_b.example.com/repo:tag", testRepoDigest)
+
+	_, _, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
+		c, "", registryConfig.Registry{}, ratelimit.New())
+	require.ErrorIs(t, err, auth.ErrMissingRegistryHost)
+}
+
+// TestFetchDigestForTag_noRegistryHost verifies that a release tag lookup fails
+// before any request when the image reference names no registry host to build
+// a manifest URL from.
+func TestFetchDigestForTag_noRegistryHost(t *testing.T) {
+	t.Parallel()
+
+	c := newRegistryContainer("a_b.example.com/repo:tag", testRepoDigest)
+
+	_, err := FetchDigestForTag(newTestLogger(t), t.Context(),
+		c, "", "v1.0.0", registryConfig.Registry{}, ratelimit.New())
+	require.ErrorIs(t, err, auth.ErrMissingRegistryHost)
+}
+
+// TestCompareDigestWithRemote_unreachableEndpoint verifies that the GET
+// fallback sends no request to an endpoint whose request received no response
+// in the HEAD round. A check behind a failing mirror then waits for one failed
+// connection to the registry rather than two. The registry closes every
+// connection it accepts.
+func TestCompareDigestWithRemote_unreachableEndpoint(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/latest"
+
+	mirror := failingMirror(t, manifestPath)
+
+	listener, err := (&net.ListenConfig{}).Listen(t.Context(), "tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = listener.Close() })
+
+	var accepted atomic.Int32
+
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+
+			accepted.Add(1)
+
+			_ = conn.Close()
+		}
+	}()
+
+	c := newRegistryContainer(listener.Addr().String()+"/test/image:latest", testRepoDigest)
+
+	match, _, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
+		c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+	require.ErrorIs(t, err, auth.ErrRequestFailed, "the error is the registry's failed connection")
+	assert.False(t, match)
+	assert.Equal(t, int32(1), accepted.Load())
+}
+
+// TestCompareDigestWithRemote_mirrorNotFoundOrRefused verifies that the GET
+// fallback sends no request to a mirror whose HEAD response was a 404 or a
+// refusal of the repository, since a GET request would receive the same
+// response. The registry's HEAD response triggers the fallback, and its GET
+// response contains the digest. A GET request to the mirror has no handler.
+func TestCompareDigestWithRemote_mirrorNotFoundOrRefused(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/v2/test/image/manifests/latest"
+
+	tests := []struct {
+		name string
+		// header is the mirror's HEAD response header.
+		header http.Header
+		// status is the mirror's HEAD response status.
+		status int
+	}{
+		{name: "mirror returns 404", header: nil, status: http.StatusNotFound},
+		{
+			name:   "mirror refuses the repository",
+			header: unauthorizedChallenge("insufficient_scope"),
+			status: http.StatusUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			mirror := httpstub.New(t)
+			mirror.AppendHandlers(
+				anonymousRegistryHandler(t),
+				manifestHandler(t, http.MethodHead, manifestPath, tt.status, tt.header),
+			)
+
+			registry := httpstub.New(t)
+			registry.AppendHandlers(
+				anonymousRegistryHandler(t),
+				manifestHandler(t, http.MethodHead, manifestPath, http.StatusServiceUnavailable, nil),
+				anonymousRegistryHandler(t),
+				manifestHandler(t, http.MethodGet, manifestPath, http.StatusOK, digestHeader(testDigestHash)),
+			)
+
+			c := newRegistryContainer(registry.Addr()+"/test/image:latest", testRepoDigest)
+
+			match, remoteDigest, err := CompareDigestWithRemote(newTestLogger(t), t.Context(),
+				c, "", registryConfig.Registry{TLSSkip: true}, ratelimit.New(), mirror.Addr(), "")
+			require.NoError(t, err)
+			assert.True(t, match)
+			assert.Equal(t, testDigestHash, remoteDigest)
+			assert.Len(t, mirror.ReceivedRequests(), 2)
 		})
 	}
 }
@@ -2026,10 +2329,10 @@ func TestLocalOnlyImageCache(t *testing.T) {
 	assert.Len(t, server.ReceivedRequests(), 6, "the first local-only image was no longer cached")
 }
 
-// TestFetchDigestWithGet verifies digest retrieval from an anonymous registry's
+// TestDigestLookup_fetch verifies digest retrieval from an anonymous registry's
 // GET response header, JSON body, and plain text body, and the error for a
 // response that carries no digest.
-func TestFetchDigestWithGet(t *testing.T) {
+func TestDigestLookup_fetch(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -2088,8 +2391,8 @@ func TestFetchDigestWithGet(t *testing.T) {
 
 			c := newRegistryContainer("registry.example.com/myapp:latest", "registry.example.com/myapp@"+localHash)
 
-			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-				c, "", registryConfig.Registry{}, ratelimit.New(), server.URL())
+			got, err := fetchWithGet(context.Background(), t,
+				c, "", registryConfig.Registry{}, server.URL())
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)
@@ -2103,10 +2406,10 @@ func TestFetchDigestWithGet(t *testing.T) {
 	}
 }
 
-// TestFetchDigestWithGet_StubRegistry verifies digest retrieval with a GET
+// TestDigestLookup_fetch_stubRegistry verifies digest retrieval with a GET
 // request against a plain HTTP registry, and the failures that happen before
 // any request is made.
-func TestFetchDigestWithGet_StubRegistry(t *testing.T) {
+func TestDigestLookup_fetch_stubRegistry(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/test/image/manifests/latest"
@@ -2206,8 +2509,8 @@ func TestFetchDigestWithGet_StubRegistry(t *testing.T) {
 
 			c := newRegistryContainer(image, testRepoDigest)
 
-			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-				c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+			got, err := fetchWithGet(context.Background(), t,
+				c, "token", registryConfig.Registry{TLSSkip: true})
 			if tt.errContains != "" {
 				require.ErrorContains(t, err, tt.errContains)
 				assert.Empty(t, got)
@@ -2221,9 +2524,10 @@ func TestFetchDigestWithGet_StubRegistry(t *testing.T) {
 	}
 }
 
-// TestFetchDigestWithGet_LocalImages verifies that locally built images, which
-// have no repo digests, skip the registry for any registry host.
-func TestFetchDigestWithGet_LocalImages(t *testing.T) {
+// TestFetchDigestForTag_localImages verifies that a release tag lookup for a
+// locally built image, which has no repo digests, fails without a request for
+// any registry host.
+func TestFetchDigestForTag_localImages(t *testing.T) {
 	t.Parallel()
 
 	for _, image := range []string{
@@ -2234,17 +2538,17 @@ func TestFetchDigestWithGet_LocalImages(t *testing.T) {
 		t.Run(image, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-				newRegistryContainer(image), "", registryConfig.Registry{}, ratelimit.New())
-			require.NoError(t, err)
+			got, err := FetchDigestForTag(newTestLogger(t), t.Context(),
+				newRegistryContainer(image), "", "v1.0.0", registryConfig.Registry{}, ratelimit.New())
+			require.ErrorIs(t, err, errInvalidRegistryResponse)
 			assert.Empty(t, got)
 		})
 	}
 }
 
-// TestFetchDigestWithGet_RedirectedChallenge verifies that when the /v2/
+// TestDigestLookup_fetch_redirectedChallenge verifies that when the /v2/
 // challenge redirects to another host, the manifest request goes to that host.
-func TestFetchDigestWithGet_RedirectedChallenge(t *testing.T) {
+func TestDigestLookup_fetch_redirectedChallenge(t *testing.T) {
 	t.Parallel()
 
 	const manifestPath = "/v2/test/image/manifests/latest"
@@ -2266,16 +2570,16 @@ func TestFetchDigestWithGet_RedirectedChallenge(t *testing.T) {
 
 	c := newRegistryContainer(server.Addr()+"/test/image:latest", testRepoDigest)
 
-	got, err := fetchDigestWithGet(newTestLogger(t), context.Background(),
-		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+	got, err := fetchWithGet(context.Background(), t,
+		c, "token", registryConfig.Registry{TLSSkip: true})
 	require.NoError(t, err)
 	assert.Equal(t, "d68e1e532088964195ad3a0a71526bc2f11a78de0def85629beb75e2265f0547", got)
 }
 
-// TestFetchDigestWithGet_SlowResponse verifies that a manifest request the
-// registry does not answer before the context deadline fails with the deadline
-// error instead of waiting for the registry.
-func TestFetchDigestWithGet_SlowResponse(t *testing.T) {
+// TestDigestLookup_fetch_slowResponse verifies that a manifest request without
+// a response before the context deadline fails with the deadline error instead
+// of waiting for the registry.
+func TestDigestLookup_fetch_slowResponse(t *testing.T) {
 	t.Parallel()
 
 	server := httpstub.New(t)
@@ -2296,8 +2600,8 @@ func TestFetchDigestWithGet_SlowResponse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
 	defer cancel()
 
-	_, err := fetchDigestWithGet(newTestLogger(t), ctx,
-		c, "token", registryConfig.Registry{TLSSkip: true}, ratelimit.New())
+	_, err := fetchWithGet(ctx, t,
+		c, "token", registryConfig.Registry{TLSSkip: true})
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 }
 
@@ -2812,7 +3116,8 @@ func TestChallengeRedirectHost(t *testing.T) {
 }
 
 // TestExtractHeadDigest verifies digest extraction from a HEAD response's
-// Docker-Content-Digest header and the error when it is missing.
+// Docker-Content-Digest header, and that a missing header or one with no hash
+// triggers the GET fallback.
 func TestExtractHeadDigest(t *testing.T) {
 	t.Parallel()
 
@@ -2838,7 +3143,7 @@ func TestExtractHeadDigest(t *testing.T) {
 			wantErr:  false,
 		},
 		{
-			name: "returns error when Docker-Content-Digest header is missing",
+			name: "triggers the GET fallback when Docker-Content-Digest is missing",
 			setupResp: func() *http.Response {
 				return &http.Response{
 					StatusCode: http.StatusOK,
@@ -2847,8 +3152,8 @@ func TestExtractHeadDigest(t *testing.T) {
 					Body:       http.NoBody,
 				}
 			},
-			expected: "",
-			wantErr:  true,
+			wantErr:   true,
+			wantErrIs: errHeadFallback,
 		},
 		{
 			name: "includes www-authenticate header in error for 401",
@@ -3610,19 +3915,21 @@ func TestDigestLookup_retryManifest(t *testing.T) {
 				limiter:      ratelimit.New(),
 				fields:       nil,
 				registryAuth: "",
-				method:       tt.method,
+				endpoints:    nil,
 				tag:          "",
 				originalHost: "registry.example.com",
 				limitKey:     "registry.example.com",
 				settings:     registryConfig.Registry{},
 			}
 
-			got, err := lookup.retryManifest(context.Background(),
-				tt.updatedURL,
-				tt.token,
-				tt.redirected,
-				mustParseURL(currentURL),
-			)
+			retry := &manifestTarget{
+				parsedURL:  mustParseURL(currentURL),
+				url:        tt.updatedURL,
+				token:      tt.token,
+				redirected: tt.redirected,
+			}
+
+			got, err := lookup.retryManifest(t.Context(), tt.method, retry)
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Empty(t, got)

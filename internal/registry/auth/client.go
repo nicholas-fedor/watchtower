@@ -38,9 +38,16 @@ var tlsVersionMap = map[string]uint16{
 	"TLS1.3": tls.VersionTLS13,
 }
 
-// errUnparseableRedirect replaces the client's error for a redirect whose
-// Location header does not parse, which quotes the raw Location.
-var errUnparseableRedirect = errors.New("failed to parse redirect Location header")
+// Errors for registry requests.
+var (
+	// ErrRequestFailed indicates that a registry request received no usable
+	// response, such as after a refused connection, a failed TLS handshake, a
+	// timeout or a redirect the client could not follow.
+	ErrRequestFailed = errors.New("failed to execute HTTP request")
+	// errUnparseableRedirect replaces the client's error for a redirect whose
+	// Location header does not parse, which quotes the raw Location.
+	errUnparseableRedirect = errors.New("failed to parse redirect Location header")
+)
 
 // unparseableRedirectPrefix starts the HTTP client's error for a redirect
 // whose Location header does not parse.
@@ -67,7 +74,8 @@ type Client interface {
 	//
 	// Returns:
 	//   - *http.Response: The HTTP response from the registry, if successful.
-	//   - error: Non-nil if the request fails, nil otherwise.
+	//   - error: Wraps [ErrRequestFailed] if the request received no usable
+	//     response, nil otherwise.
 	Do(req *http.Request) (*http.Response, error)
 }
 
@@ -103,7 +111,8 @@ type registryClient struct {
 //
 // Returns:
 //   - *http.Response: The HTTP response from the registry, if successful.
-//   - error: Non-nil if the request fails, nil otherwise.
+//   - error: Wraps [ErrRequestFailed] if the request received no usable
+//     response, nil otherwise.
 func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 	response, err := r.client.Do(request)
 	if err != nil {
@@ -115,7 +124,7 @@ func (r *registryClient) Do(request *http.Request) (*http.Response, error) {
 			}
 		}
 
-		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrRequestFailed, err)
 	}
 
 	return response, nil
