@@ -605,12 +605,20 @@ func TestPreRun_Exit(t *testing.T) {
 			// is created for that when startup has not created it yet.
 			helperCase:   "invalid-environment",
 			wantExitCode: 1,
-			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to apply environment configuration"},
+			wantOutput: []string{
+				"SetRestartPolicy cccccccccccc no",
+				"apply environment configuration:",
+				"Failed to load configuration",
+			},
 		},
 		{
 			helperCase:   "invalid-log-format",
 			wantExitCode: 1,
-			wantOutput:   []string{"SetRestartPolicy cccccccccccc no", "Failed to initialize logging"},
+			wantOutput: []string{
+				"SetRestartPolicy cccccccccccc no",
+				"set up logging:",
+				"Failed to load configuration",
+			},
 		},
 		{
 			// Because the notification settings are part of the configuration
@@ -628,7 +636,7 @@ func TestPreRun_Exit(t *testing.T) {
 			wantOutput: []string{
 				"newClient DOCKER_HOST=tcp://socket-proxy:2375 bounded=true",
 				"SetRestartPolicy cccccccccccc no",
-				"Failed to initialize logging",
+				"Failed to load configuration",
 			},
 		},
 		{
@@ -653,7 +661,7 @@ func TestPreRun_Exit(t *testing.T) {
 			wantExitCode: 1,
 			wantOutput: []string{
 				logging.RestartsKept,
-				"Failed to initialize logging",
+				"Failed to load configuration",
 			},
 			unwantedOutput: []string{"SetRestartPolicy"},
 		},

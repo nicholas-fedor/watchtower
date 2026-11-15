@@ -1087,7 +1087,7 @@ func loadNotify(t *testing.T, args []string) notifyConfig.Notify {
 	settings.RegisterAll(command)
 	require.NoError(t, command.ParseFlags(args))
 
-	cfg, err := settings.Load(newTestLogger(t), command, nil)
+	cfg, _, err := settings.Load(newTestLogger(t), command, nil)
 	require.NoError(t, err)
 
 	return cfg.Notify

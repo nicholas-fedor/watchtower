@@ -81,7 +81,7 @@ func TestLifecycleFlags(t *testing.T) {
 	err := cmd.ParseFlags([]string{"--lifecycle-uid", "1000", "--lifecycle-gid", "1001"})
 	require.NoError(t, err)
 
-	cfg, err := settings.Load(newTestLogger(t), cmd, nil)
+	cfg, _, err := settings.Load(newTestLogger(t), cmd, nil)
 	require.NoError(t, err)
 
 	assert.Equal(t, 1000, cfg.Lifecycle.UID, "lifecycle UID should be set to 1000")
@@ -655,33 +655,6 @@ func TestIsContainerMainProcess(t *testing.T) {
 			parentProcessID = func() int { return tt.ppid }
 
 			assert.Equal(t, tt.want, isContainerMainProcess())
-		})
-	}
-}
-
-// Test_prepareFailure verifies the exit message for each failed step of
-// settings.Prepare, and a general one for any other error.
-func Test_prepareFailure(t *testing.T) {
-	t.Parallel()
-
-	cause := errors.New("cause")
-
-	tests := []struct {
-		err  error
-		want string
-	}{
-		{err: fmt.Errorf("%w: %w", settings.ErrApplyEnvironment, cause), want: "Failed to apply environment configuration"},
-		{err: fmt.Errorf("%w: %w", settings.ErrSetUpLogging, cause), want: "Failed to initialize logging"},
-		{err: fmt.Errorf("%w: %w", settings.ErrFlagAliases, cause), want: "Invalid configuration"},
-		{err: fmt.Errorf("%w: %w", settings.ErrSecretFiles, cause), want: "Failed to load secret from file"},
-		{err: cause, want: "Failed to prepare configuration"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.want, func(t *testing.T) {
-			t.Parallel()
-
-			assert.Equal(t, tt.want, prepareFailure(tt.err))
 		})
 	}
 }

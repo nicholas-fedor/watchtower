@@ -46,64 +46,47 @@ var (
 	errIntervalAndSchedule = errors.New("cannot define both interval and schedule")
 )
 
-// Errors from [Prepare], one for each step that can fail.
-var (
-	// ErrApplyEnvironment reports that environment variables could not be
-	// applied to the flags.
-	ErrApplyEnvironment = errors.New("apply environment configuration")
-	// ErrSetUpLogging reports an invalid log format or level.
-	ErrSetUpLogging = errors.New("setup logging")
-	// ErrFlagAliases reports an invalid configuration found while applying
-	// alias flags, such as an interval set with a schedule.
-	ErrFlagAliases = errors.New("process flag aliases")
-	// ErrSecretFiles reports a secret file that could not be read.
-	ErrSecretFiles = errors.New("load secrets from files")
-)
-
-// Prepare readies the parsed flags of rootCmd for [Load] and returns the logger
-// to use from then on.
+// prepareFlags readies the parsed root command flags in flagSet for loading
+// and returns the logger to use from then on.
 //
-// It applies environment variables to unset flags, sets the log format and
-// level, then applies the alias flags, which can force a debug or trace level.
-// It sets the logging up again so that level applies, then reads secret files
-// into their flags. Setting the format before the aliases makes their errors
-// use the chosen format.
+// It applies environment variables to unset flags and sets the log format and
+// level. It then applies the alias flags, which can force a debug or trace
+// level, and sets the logging up again so that level applies. Last, it reads
+// secret files into their flags. Setting the format before the aliases makes
+// their errors use the chosen format.
 //
 // Parameters:
 //   - log: Logger to reconfigure.
-//   - rootCmd: Root command, with its flags registered and parsed.
+//   - flagSet: The root command's persistent flags, registered and parsed.
 //
 // Returns:
 //   - *zerolog.Logger: The logger with the configured format and level. On a
 //     failure it is the last logger set up, for reporting the failure.
-//   - error: Non-nil when a step fails, wrapping [ErrApplyEnvironment],
-//     [ErrSetUpLogging], [ErrFlagAliases] or [ErrSecretFiles].
-func Prepare(log *zerolog.Logger, rootCmd *cobra.Command) (*zerolog.Logger, error) {
-	flagSet := rootCmd.PersistentFlags()
-
+//   - error: Non-nil when a step fails, naming the step.
+func prepareFlags(log *zerolog.Logger, flagSet *pflag.FlagSet) (*zerolog.Logger, error) {
 	err := applyEnvToFlags(flagSet)
 	if err != nil {
-		return log, fmt.Errorf("%w: %w", ErrApplyEnvironment, err)
+		return log, fmt.Errorf("apply environment configuration: %w", err)
 	}
 
 	log, err = setupLogging(log, flagSet)
 	if err != nil {
-		return log, fmt.Errorf("%w: %w", ErrSetUpLogging, err)
+		return log, fmt.Errorf("set up logging: %w", err)
 	}
 
 	err = processFlagAliases(log, flagSet)
 	if err != nil {
-		return log, fmt.Errorf("%w: %w", ErrFlagAliases, err)
+		return log, fmt.Errorf("process flag aliases: %w", err)
 	}
 
 	log, err = setupLogging(log, flagSet)
 	if err != nil {
-		return log, fmt.Errorf("%w: %w", ErrSetUpLogging, err)
+		return log, fmt.Errorf("set up logging: %w", err)
 	}
 
-	err = getSecretsFromFiles(log, rootCmd)
+	err = getSecretsFromFiles(log, flagSet)
 	if err != nil {
-		return log, fmt.Errorf("%w: %w", ErrSecretFiles, err)
+		return log, fmt.Errorf("load secrets from files: %w", err)
 	}
 
 	return log, nil
@@ -234,14 +217,13 @@ func setEnvOptBool(log *zerolog.Logger, env string, opt bool) error {
 //
 // Parameters:
 //   - log: Logger for secret-loading diagnostics.
-//   - rootCmd: Root Cobra command.
+//   - flags: The root command's persistent flags.
 //
 // Returns:
 //   - error: Non-nil when a secret file cannot be loaded, naming its flag.
 //
 //nolint:godox
-func getSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) error {
-	flags := rootCmd.PersistentFlags()
+func getSecretsFromFiles(log *zerolog.Logger, flags *pflag.FlagSet) error {
 	secrets := []string{
 		// TODO: Remove just before v2 Release.
 		"notification-email-server-password",
@@ -447,8 +429,7 @@ func isFilePath(path string) bool {
 // processFlagAliases applies the alias flags: porcelain mode, an interval as a
 // schedule, and the debug and trace log levels.
 //
-// [Prepare] runs it after the environment reaches the flags and between its
-// two logging setups.
+// The environment must already be applied to the flags.
 //
 // Parameters:
 //   - log: Logger for alias diagnostics.

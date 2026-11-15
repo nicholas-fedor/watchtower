@@ -340,8 +340,8 @@ func (p *process) exit(cmd *cobra.Command, err error) {
 // preRun prepares the environment and configuration before the main command execution begins.
 //
 // It runs these steps in order:
-//  1. Prepares the flags with [settings.Prepare].
-//  2. Maps the Docker flags into the process environment and loads the configuration.
+//  1. Loads the configuration with [settings.Load], which also sets up logging.
+//  2. Maps the Docker flags into the process environment.
 //  3. Creates the Docker client and finds Watchtower's own container.
 //  4. Ends the process for the ephemeral self-update orchestrator and for an old container
 //     restarted after a self-update replaced it.
@@ -366,20 +366,15 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 
 	var err error
 
-	p.log, err = settings.Prepare(p.log, cmd)
+	appCfg, p.log, err = settings.Load(p.log, cmd, args)
 	if err != nil {
-		return &exitError{err: err, msg: prepareFailure(err), code: 1}
+		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
 	// Map Docker connection flags into the process environment for the client stack.
 	err = settings.EnvConfig(p.log, cmd)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to configure Docker environment", code: 1}
-	}
-
-	appCfg, err = settings.Load(p.log, cmd, args)
-	if err != nil {
-		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
 	p.log.Debug().
@@ -488,28 +483,6 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	notify.LogLegacyDeprecationWarnings(p.log, appCfg.Notify.LegacyTypes)
 
 	return nil
-}
-
-// prepareFailure returns the exit message for a failed [settings.Prepare] step.
-//
-// Parameters:
-//   - err: The error Prepare returned.
-//
-// Returns:
-//   - string: The message that names the failed step.
-func prepareFailure(err error) string {
-	switch {
-	case errors.Is(err, settings.ErrApplyEnvironment):
-		return "Failed to apply environment configuration"
-	case errors.Is(err, settings.ErrSetUpLogging):
-		return "Failed to initialize logging"
-	case errors.Is(err, settings.ErrFlagAliases):
-		return "Invalid configuration"
-	case errors.Is(err, settings.ErrSecretFiles):
-		return "Failed to load secret from file"
-	default:
-		return "Failed to prepare configuration"
-	}
 }
 
 // retire retires Watchtower's container after a self-update replaced it.

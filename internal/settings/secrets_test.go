@@ -391,7 +391,7 @@ func Test_getSecretsFromFiles_readsEverySecret(t *testing.T) {
 		require.NoError(t, flags.Set(flag.Name, writeSecretFile(t, content+"\n")))
 	})
 
-	require.NoError(t, getSecretsFromFiles(newInfoTestLogger(t), cmd))
+	require.NoError(t, getSecretsFromFiles(newInfoTestLogger(t), cmd.PersistentFlags()))
 
 	var read []string
 
@@ -418,7 +418,7 @@ func Test_getSecretsFromFiles_invalidSecret(t *testing.T) {
 	path := writeSecretFile(t, "not-a-url\n")
 	cmd := newParsedCommand(t, "--notification-url", path)
 
-	err := getSecretsFromFiles(newInfoTestLogger(t), cmd)
+	err := getSecretsFromFiles(newInfoTestLogger(t), cmd.PersistentFlags())
 	require.ErrorIs(t, err, errInvalidSecretURL)
 	assert.ErrorContains(t, err, "notification-url")
 }

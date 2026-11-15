@@ -75,15 +75,10 @@ func (p *process) runNotifyUpgrade(cmd *cobra.Command, args []string) error {
 //   - error: Non-nil if the settings cannot be loaded or turned into notification URLs. Non-nil also if the
 //     environment file cannot be written. A failure to remove the file afterwards is only logged.
 func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*zerolog.Logger, error) {
-	// The settings live on the root command's flags, which Load reads too.
-	log, err := settings.Prepare(log, cmd.Root())
+	// The settings live on the root command's flags.
+	cfg, log, err := settings.Load(log, cmd.Root(), nil)
 	if err != nil {
-		return log, err //nolint:wrapcheck // Prepare names the failed step.
-	}
-
-	cfg, loadErr := settings.Load(log, cmd.Root(), nil)
-	if loadErr != nil {
-		return log, fmt.Errorf("load configuration: %w", loadErr)
+		return log, fmt.Errorf("load configuration: %w", err)
 	}
 
 	// Write the file to the working directory, where the instructions below tell the user to copy it from.

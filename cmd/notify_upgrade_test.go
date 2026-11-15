@@ -187,7 +187,7 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 		{
 			name:        "invalid log format",
 			args:        []string{"--log-format", "bogus"},
-			wantMessage: "setup logging",
+			wantMessage: "load configuration: set up logging",
 		},
 		{
 			name: "invalid legacy notifier settings",
