@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -8,10 +9,19 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf16"
+	"unicode/utf8"
 
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog"
 )
+
+// jsonWriter writes zerolog's JSON events to out with every character that
+// changes how text shows escaped.
+type jsonWriter struct {
+	// out receives the events.
+	out io.Writer
+}
 
 // errInvalidLogFormat is returned by ConfigureWriter for unrecognized format names.
 var errInvalidLogFormat = errors.New("invalid log format")
@@ -19,7 +29,7 @@ var errInvalidLogFormat = errors.New("invalid log format")
 // ConfigureWriter returns an io.Writer for the requested log format.
 //
 // Supported formats (case-insensitive):
-//   - json: raw os.Stderr (zerolog default JSON encoding)
+//   - json: zerolog's JSON encoding through [JSONWriter] to os.Stderr
 //   - pretty: zerolog.ConsoleWriter with colors unless noColor is true
 //   - logfmt: ConsoleWriter with NoColor and key=value-style formatting
 //   - auto: pretty when stderr is a TTY, NO_COLOR is not present in the
@@ -36,7 +46,7 @@ var errInvalidLogFormat = errors.New("invalid log format")
 func ConfigureWriter(format string, noColor bool) (io.Writer, error) {
 	switch strings.ToLower(strings.TrimSpace(format)) {
 	case "json":
-		return os.Stderr, nil
+		return JSONWriter(os.Stderr), nil
 	case "pretty":
 		return newPrettyWriter(noColor), nil
 	case "logfmt":
@@ -50,6 +60,75 @@ func ConfigureWriter(format string, noColor bool) (io.Writer, error) {
 	default:
 		return nil, fmt.Errorf("%w: %q", errInvalidLogFormat, format)
 	}
+}
+
+// JSONWriter returns a writer that passes zerolog's JSON events to out with C1
+// control characters, Unicode format characters, and line and paragraph
+// separators written as \u escapes.
+//
+// zerolog escapes only ASCII control characters. Without these escapes, text
+// from outside Watchtower such as a registry error could carry an 8-bit
+// terminal control or a bidirectional override into a terminal or log viewer.
+// Each event stays valid JSON with the same values.
+//
+// Parameters:
+//   - out: Destination for the events.
+//
+// Returns:
+//   - io.Writer: Writer that expects one encoded event per Write, as zerolog
+//     writes them.
+func JSONWriter(out io.Writer) io.Writer {
+	return jsonWriter{out: out}
+}
+
+// Write writes event to the destination with every character that changes
+// how text shows escaped.
+//
+// Parameters:
+//   - event: One JSON event encoded by zerolog.
+//
+// Returns:
+//   - int: Length of event when it is written in full. On an error, at most
+//     the bytes of event that reached the destination.
+//   - error: Error from the destination.
+func (w jsonWriter) Write(event []byte) (int, error) {
+	// zerolog has already escaped the ASCII characters that need it. Most events
+	// are ASCII throughout, so the search starts at the first byte beyond ASCII.
+	rest := event
+	for len(rest) > 0 && rest[0] < utf8.RuneSelf {
+		rest = rest[1:]
+	}
+
+	if !bytes.ContainsFunc(rest, needsJSONEscape) {
+		return w.out.Write(event) //nolint:wrapcheck // The destination's error needs no context.
+	}
+
+	// Outside its strings, JSON holds only ASCII. Every character found here is
+	// inside a string, where an escape keeps its value.
+	escaped := append(make([]byte, 0, len(event)), event[:len(event)-len(rest)]...)
+
+	var units [2]uint16
+
+	for len(rest) > 0 {
+		char, size := utf8.DecodeRune(rest)
+
+		if needsJSONEscape(char) {
+			for _, unit := range utf16.AppendRune(units[:0], char) {
+				escaped = fmt.Appendf(escaped, `\u%04x`, unit)
+			}
+		} else {
+			escaped = append(escaped, rest[:size]...)
+		}
+
+		rest = rest[size:]
+	}
+
+	_, err := w.out.Write(escaped)
+	if err != nil {
+		return 0, err //nolint:wrapcheck // The destination's error needs no context.
+	}
+
+	return len(event), nil
 }
 
 // usePrettyAuto reports whether auto format should use colorized pretty output.
@@ -163,6 +242,18 @@ func formatLogfmtFieldValue(i any) string {
 		// Match zerolog consoleDefaultFormatFieldValue for remaining types.
 		return fmt.Sprintf("%s", i)
 	}
+}
+
+// needsJSONEscape reports whether [JSONWriter] escapes char.
+//
+// Parameters:
+//   - char: Character to check.
+//
+// Returns:
+//   - bool: True for a character beyond ASCII that changes how text shows.
+func needsJSONEscape(char rune) bool {
+	// zerolog escapes the ASCII ones itself.
+	return char > unicode.MaxASCII && changesDisplay(char)
 }
 
 // needsQuote reports whether a logfmt value should be quoted.

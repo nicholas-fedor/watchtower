@@ -1,10 +1,15 @@
 package logging
 
 import (
+	"bytes"
+	"encoding/json"
+	"maps"
 	"strings"
 	"testing"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/rs/zerolog"
 )
 
 // FuzzPrintable checks the invariants of printable text.
@@ -109,6 +114,66 @@ func FuzzPrintable_removesSequences(f *testing.F) {
 		raw := clean[:at] + sequence + clean[at:]
 		if out := printable(raw); out != clean {
 			t.Fatalf("inserting %q at %d gave %q, want %q", sequence, at, out, clean)
+		}
+	})
+}
+
+// FuzzJSONWriter checks that the JSON writer escapes what zerolog leaves raw
+// without changing any value.
+//
+// The writer takes zerolog's event in full. What it writes holds no character
+// beyond ASCII that printable text never holds, and decodes to the same values
+// as the event.
+//
+// The seed corpus covers plain and multi-byte text, C1 controls, bidirectional
+// and zero-width characters, line separators, tag characters and invalid
+// UTF-8.
+func FuzzJSONWriter(f *testing.F) {
+	for _, seed := range []string{
+		"plain text",
+		"héllo wörld",
+		"\u009b31mred\u0085",
+		"abc" + string(rune(0x202e)) + "def" + string(rune(0x200b)),
+		"a" + string(rune(0x2028)) + "b" + string(rune(0x2029)),
+		"ok" + string(rune(0xe0041)),
+		"a\xffb\xc2",
+		"\x1b]0;title\a",
+	} {
+		f.Add(seed)
+	}
+
+	f.Fuzz(func(t *testing.T, text string) {
+		var raw, escaped bytes.Buffer
+
+		log := zerolog.New(&raw)
+		log.Warn().Str("error", text).Str(text, "value").Msg(text)
+
+		n, err := JSONWriter(&escaped).Write(raw.Bytes())
+		if err != nil || n != raw.Len() {
+			t.Fatalf("Write(%q) = %d, %v, want %d, nil", raw.String(), n, err, raw.Len())
+		}
+
+		for _, char := range escaped.String() {
+			if char > unicode.MaxASCII && needsCleaning(char) {
+				t.Fatalf("output keeps %U: %q", char, escaped.String())
+			}
+		}
+
+		var want, got map[string]any
+
+		err = json.Unmarshal(raw.Bytes(), &want)
+		if err != nil {
+			t.Fatalf("zerolog wrote invalid JSON %q: %v", raw.String(), err)
+		}
+
+		err = json.Unmarshal(escaped.Bytes(), &got)
+		if err != nil {
+			t.Fatalf("output %q does not decode: %v", escaped.String(), err)
+		}
+
+		// Every value is a string, so the maps compare with ==.
+		if !maps.Equal(got, want) {
+			t.Fatalf("output decodes to %q, want %q", got, want)
 		}
 	})
 }

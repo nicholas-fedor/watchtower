@@ -51,6 +51,6 @@ import (
 // which handles CLI setup, flag parsing, and core logic for container updates
 // and notifications.
 func main() {
-	log := logging.New(os.Stderr, logging.InfoLevel)
+	log := logging.New(logging.JSONWriter(os.Stderr), logging.InfoLevel)
 	cmd.Execute(log)
 }
