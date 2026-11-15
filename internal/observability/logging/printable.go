@@ -89,7 +89,7 @@ func printable(text string) string {
 			out.WriteByte('\n')
 		case char == escape || (char >= 0x80 && char <= 0x9f):
 			index = escapeSequenceEnd(text, index, char)
-		case (unicode.IsControl(char) && char != '\n' && char != '\t') || unicode.Is(unicode.Cf, char):
+		case changesDisplay(char) && char != '\n' && char != '\t':
 			// Dropped.
 		default:
 			out.WriteRune(char)
@@ -124,6 +124,18 @@ func isPrintableASCIILine(text string) bool {
 	}
 
 	return true
+}
+
+// changesDisplay reports whether char can change how the text around it shows.
+//
+// Parameters:
+//   - char: Character to check.
+//
+// Returns:
+//   - bool: True for a control character, a Unicode format character, or a
+//     line or paragraph separator.
+func changesDisplay(char rune) bool {
+	return unicode.IsControl(char) || unicode.In(char, unicode.Cf, unicode.Zl, unicode.Zp)
 }
 
 // escapeSequenceEnd returns where the escape sequence that introducer starts ends in text.

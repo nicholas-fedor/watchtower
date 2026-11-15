@@ -2,6 +2,7 @@ package logging
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -11,14 +12,77 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// failingWriter is a destination whose every write fails.
+type failingWriter struct{}
+
+// errWriteFailed is the error every write to a failingWriter returns.
+var errWriteFailed = errors.New("write failed")
+
+// Write fails with errWriteFailed.
+//
+// Returns:
+//   - int: Always 0.
+//   - error: Always errWriteFailed.
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, errWriteFailed
+}
+
 // TestConfigureWriter_JSON verifies that the json format writes events to
-// stderr unchanged.
+// stderr through the escaping JSON writer.
 func TestConfigureWriter_JSON(t *testing.T) {
 	t.Parallel()
 
 	w, err := ConfigureWriter("json", false)
 	require.NoError(t, err)
-	assert.Equal(t, os.Stderr, w)
+	assert.Equal(t, jsonWriter{out: os.Stderr}, w)
+}
+
+// TestJSONWriter verifies that characters beyond ASCII that change how text
+// shows are written as escapes and everything else passes through unchanged.
+func TestJSONWriter(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		event string
+		want  string
+	}{
+		{name: "ASCII unchanged", event: `{"message":"done"}` + "\n", want: `{"message":"done"}` + "\n"},
+		{name: "printable text unchanged", event: `{"message":"héllo wörld"}`, want: `{"message":"héllo wörld"}`},
+		{name: "8-bit control sequence", event: `{"error":"a` + "\u009b" + `31m"}`, want: `{"error":"a\u009b31m"}`},
+		{name: "next line", event: `{"error":"a` + "\u0085" + `b"}`, want: `{"error":"a\u0085b"}`},
+		{name: "bidirectional override", event: `{"error":"abc` + "\u202e" + `def"}`, want: `{"error":"abc\u202edef"}`},
+		{name: "zero-width space", event: `{"error":"pass` + "\u200b" + `word"}`, want: `{"error":"pass\u200bword"}`},
+		{name: "line separator", event: `{"error":"a` + "\u2028" + `b"}`, want: `{"error":"a\u2028b"}`},
+		{name: "tag character as a surrogate pair", event: `{"error":"ok` + "\U000e0041" + `"}`, want: `{"error":"ok\udb40\udc41"}`},
+		{name: "in a key", event: `{"` + "\u202e" + `":"v"}`, want: `{"\u202e":"v"}`},
+		{name: "invalid UTF-8 kept", event: "{\"error\":\"a\xff\u0085\"}", want: "{\"error\":\"a\xff\\u0085\"}"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			var out bytes.Buffer
+
+			n, err := JSONWriter(&out).Write([]byte(tt.event))
+			require.NoError(t, err)
+			assert.Equal(t, len(tt.event), n)
+			assert.Equal(t, tt.want, out.String())
+		})
+	}
+}
+
+// TestJSONWriter_destinationError verifies that a failed write returns the
+// destination's error, whether or not the event needed escapes.
+func TestJSONWriter_destinationError(t *testing.T) {
+	t.Parallel()
+
+	for _, event := range []string{`{"message":"done"}`, `{"error":"a` + "\u202e" + `"}`} {
+		n, err := JSONWriter(failingWriter{}).Write([]byte(event))
+		require.ErrorIs(t, err, errWriteFailed, event)
+		assert.Zero(t, n, event)
+	}
 }
 
 // TestConfigureWriter_Pretty verifies that the pretty format writes colored
@@ -190,7 +254,7 @@ func TestConfigureWriter_CaseInsensitive(t *testing.T) {
 
 	w, err := ConfigureWriter("JSON", false)
 	require.NoError(t, err)
-	assert.Equal(t, os.Stderr, w)
+	assert.Equal(t, jsonWriter{out: os.Stderr}, w)
 }
 
 // TestConfigureWriter_Invalid verifies that an unknown format is an invalid

@@ -59,6 +59,8 @@ Environment Variable: WATCHTOWER_LOG_FORMAT
              Default: Auto
 ```
 
+JSON output writes control characters, Unicode format characters, and line and paragraph separators as JSON escapes, which decode to the same text. Text from outside Watchtower, such as a registry error, then cannot change how a terminal shows the raw log line. A log viewer that decodes the values and shows them as text gets the original characters back and must guard against them itself.
+
 ## Disable ANSI Colors
 
 Disables ANSI color escape codes in log output for plain text logs.
