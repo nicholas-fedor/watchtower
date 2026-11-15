@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
@@ -41,4 +42,92 @@ func LevelString(level zerolog.Level) string {
 	}
 
 	return level.String()
+}
+
+// printable returns a copy of the data whose untrusted text is printable on
+// one line.
+//
+// Log messages, log fields and the report's container text can hold text from
+// outside Watchtower, such as command output and image annotations. Each string
+// is cleaned as [logging.PrintableLine] describes, also inside nested field
+// values. The title, host, times and levels are Watchtower's own and stay as
+// they are. d itself is unchanged.
+//
+// Returns:
+//   - Data: The printable copy.
+func (d Data) printable() Data {
+	return Data{
+		StaticData: d.StaticData,
+		Report:     state.MapText(d.Report, logging.PrintableLine),
+		Entries:    printableEntries(d.Entries),
+	}
+}
+
+// printableEntries returns copies of log entries whose messages and fields are
+// printable on one line.
+//
+// Parameters:
+//   - entries: The entries to copy.
+//
+// Returns:
+//   - []*Entry: The printable copies, in the same order.
+func printableEntries(entries []*Entry) []*Entry {
+	printableList := make([]*Entry, len(entries))
+	for i, entry := range entries {
+		printableList[i] = &Entry{
+			Message: logging.PrintableLine(entry.Message),
+			Data:    printableFields(entry.Data),
+			Time:    entry.Time,
+			Level:   entry.Level,
+		}
+	}
+
+	return printableList
+}
+
+// printableFields returns a copy of log fields whose keys and string values are
+// printable on one line, also inside nested maps and lists.
+//
+// Parameters:
+//   - fields: Fields decoded from a log event, or nil.
+//
+// Returns:
+//   - map[string]any: The printable copy, or nil when fields is nil.
+func printableFields(fields map[string]any) map[string]any {
+	if fields == nil {
+		return nil
+	}
+
+	printableMap := make(map[string]any, len(fields))
+	for key, value := range fields {
+		printableMap[logging.PrintableLine(key)] = printableValue(value)
+	}
+
+	return printableMap
+}
+
+// printableValue returns a log field value with its strings printable on one
+// line. Other values, such as numbers and booleans, are returned unchanged.
+//
+// Parameters:
+//   - value: A value decoded from a log event's JSON.
+//
+// Returns:
+//   - any: The printable value.
+func printableValue(value any) any {
+	switch typed := value.(type) {
+	case string:
+		return logging.PrintableLine(typed)
+	case map[string]any:
+		return printableFields(typed)
+	case []any:
+		values := make([]any, len(typed))
+		for i, item := range typed {
+			values[i] = printableValue(item)
+		}
+
+		return values
+	default:
+		return value
+	}
 }

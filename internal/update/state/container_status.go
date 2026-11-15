@@ -1,6 +1,7 @@
 package state
 
 import (
+	"errors"
 	"time"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
@@ -245,6 +246,46 @@ func (u *ContainerStatus) CurrentImageVersion() string { return u.currentImageVe
 // Returns:
 //   - string: OCI version, or empty.
 func (u *ContainerStatus) LatestImageVersion() string { return u.latestImageVersion }
+
+// mapText returns a copy of the status whose strings are mapping's result.
+//
+// Parameters:
+//   - mapping: Returns the copy's text for a string of the status.
+//
+// Returns:
+//   - *ContainerStatus: The copy. Its error, if any, holds the mapped message.
+func (u *ContainerStatus) mapText(mapping func(string) string) *ContainerStatus {
+	var containerError error
+	if u.containerError != nil {
+		containerError = errors.New(mapping(u.containerError.Error())) //nolint:err113 // The copy keeps only the mapped message, which nothing matches.
+	}
+
+	return &ContainerStatus{
+		cooldownEligibleAt:   u.cooldownEligibleAt,
+		containerError:       containerError,
+		containerID:          u.containerID,
+		oldImage:             u.oldImage,
+		newImage:             u.newImage,
+		containerName:        mapping(u.containerName),
+		imageName:            mapping(u.imageName),
+		newContainerID:       u.newContainerID,
+		cooldownAge:          mapping(u.cooldownAge),
+		cooldownDelay:        mapping(u.cooldownDelay),
+		cooldownRemaining:    mapping(u.cooldownRemaining),
+		gitRepo:              mapping(u.gitRepo),
+		gitRef:               mapping(u.gitRef),
+		changelog:            mapping(u.changelog),
+		source:               mapping(u.source),
+		imageURL:             mapping(u.imageURL),
+		documentation:        mapping(u.documentation),
+		currentImageVersion:  mapping(u.currentImageVersion),
+		latestImageVersion:   mapping(u.latestImageVersion),
+		currentImageRevision: mapping(u.currentImageRevision),
+		latestImageRevision:  mapping(u.latestImageRevision),
+		state:                u.state,
+		monitorOnly:          u.monitorOnly,
+	}
+}
 
 // assignReportMeta sets Git and OCI report fields for this container.
 //

@@ -2,6 +2,7 @@ package format
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
@@ -9,8 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
+	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
@@ -668,4 +671,91 @@ func TestReportCategoryCount(t *testing.T) {
 		state.FreshState,
 	)
 	assert.Equal(t, 11, reportCategoryCount(report))
+}
+
+// TestTemplate_Render_printableText verifies that every kind of template shows
+// text from outside Watchtower printable on one line, and leaves the data it
+// renders unchanged. The text holds a window title sequence, colours, a
+// bidirectional control and a line break before a forged Watchtower message.
+// It reaches the templates in a log message, in nested log fields and in a
+// container's error and image annotations.
+func TestTemplate_Render_printableText(t *testing.T) {
+	t.Parallel()
+
+	const (
+		hostile = "\x1b]0;owned\a\x1b[31mbad\x1b[0m\u202eevil\nFound new image"
+		cleaned = "badevil | Found new image"
+	)
+
+	log := newTestLogger(t)
+	progress := state.Progress{}
+
+	updated, newImage := reportfixture.Container(0, state.UpdatedState)
+	progress.AddScanned(log, updated, newImage, updateParams.Params{})
+	progress.MarkForUpdate(log, updated.ID())
+	progress.SetReportMeta(log, updated.ID(), provenance.ReportMeta{
+		GitRepo:         hostile,
+		GitRef:          hostile,
+		Changelog:       hostile,
+		Source:          hostile,
+		ImageURL:        hostile,
+		Documentation:   hostile,
+		CurrentVersion:  hostile,
+		LatestVersion:   hostile,
+		CurrentRevision: hostile,
+		LatestRevision:  hostile,
+	})
+
+	failed, failedImage := reportfixture.Container(0, state.FailedState)
+	progress.AddScanned(log, failed, failedImage, updateParams.Params{})
+	progress.UpdateFailed(log, map[container.ContainerID]error{failed.ID(): errors.New(hostile)})
+
+	data := Data{
+		Title:  "Watchtower updates",
+		Host:   "host",
+		Report: progress.Report(log),
+		Entries: []*Entry{{
+			Message: hostile,
+			Data: map[string]any{
+				"error":             hostile,
+				"key\x1b[2J" + "\n": "value",
+				"nested":            map[string]any{"list": []any{hostile, json.Number("3")}},
+			},
+			Level: LevelString(zerolog.WarnLevel),
+		}},
+	}
+
+	tests := []struct {
+		name     string
+		template string
+		legacy   bool
+	}{
+		{name: "default report", template: "default"},
+		{name: "default legacy", template: "default-legacy", legacy: true},
+		{name: "JSON", template: "json.v1"},
+		{name: "porcelain JSON", template: "porcelain.json"},
+		{name: "porcelain summary", template: "porcelain.v1.summary-no-log"},
+		{
+			name: "custom",
+			template: `{{range .Entries}}{{.Message}}{{range $key, $value := .Data}}{{$key}}={{$value}};{{end}}{{end}}` +
+				`{{range .Report.All}}{{.Error}}{{.Changelog}}{{.CurrentImageVersion}}{{end}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			output := getTemplatedResult(t, tt.template, tt.legacy, data)
+
+			assert.Contains(t, output, cleaned)
+
+			for _, removed := range []string{"owned", "\x1b", `\u001b`, "\u202e", "\a", "evil\nFound", `evil\nFound`, "key\x1b"} {
+				assert.NotContains(t, output, removed)
+			}
+		})
+	}
+
+	assert.Equal(t, hostile, data.Entries[0].Message, "the entries are unchanged")
+	assert.Equal(t, hostile, data.Report.Failed()[0].Error(), "the report is unchanged")
 }

@@ -69,6 +69,69 @@ func NewSingleContainerReport(focus *ContainerStatus, session *Report) *Report {
 	return report
 }
 
+// MapText returns a copy of report whose text is mapping's result, such as the
+// text made safe to show in a notification.
+//
+// Every string the copy's container statuses return is mapped once, including
+// their error messages. The state name is Watchtower's own and stays as it is.
+// A container that report lists in several categories,
+// or as its focus, is one copy in all of them. A copied error keeps only its
+// mapped message, so it no longer matches the errors it wrapped. report itself
+// is unchanged.
+//
+// Parameters:
+//   - report: The report to copy, or nil.
+//   - mapping: Returns the copy's text for a string of report.
+//
+// Returns:
+//   - *Report: The copy, or nil when report is nil.
+func MapText(report *Report, mapping func(string) string) *Report {
+	if report == nil {
+		return nil
+	}
+
+	copies := make(map[*ContainerStatus]*ContainerStatus)
+
+	copyOf := func(status *ContainerStatus) *ContainerStatus {
+		if status == nil {
+			return nil
+		}
+
+		if copied, found := copies[status]; found {
+			return copied
+		}
+
+		copied := status.mapText(mapping)
+		copies[status] = copied
+
+		return copied
+	}
+
+	copyAll := func(statuses []*ContainerStatus) []*ContainerStatus {
+		if statuses == nil {
+			return nil
+		}
+
+		copied := make([]*ContainerStatus, len(statuses))
+		for i, status := range statuses {
+			copied[i] = copyOf(status)
+		}
+
+		return copied
+	}
+
+	return &Report{
+		focus:     copyOf(report.focus),
+		scanned:   copyAll(report.scanned),
+		updated:   copyAll(report.updated),
+		failed:    copyAll(report.failed),
+		skipped:   copyAll(report.skipped),
+		stale:     copyAll(report.stale),
+		fresh:     copyAll(report.fresh),
+		restarted: copyAll(report.restarted),
+	}
+}
+
 // Scanned returns scanned containers.
 //
 // Returns:

@@ -82,7 +82,9 @@ func (m *Template) Legacy() bool {
 // Render builds a notification message from data.
 //
 // A legacy template receives the log entries alone. Any other template
-// receives the full data, including the report.
+// receives the full data, including the report. Either receives its text
+// made printable on one line, since that text can come from outside
+// Watchtower. data itself is unchanged.
 //
 // Parameters:
 //   - log: Logger for diagnostics.
@@ -94,9 +96,12 @@ func (m *Template) Legacy() bool {
 func (m *Template) Render(log *zerolog.Logger, data Data) (string, error) {
 	var body bytes.Buffer
 
-	dataSource := any(data)
+	// A legacy template reads the entries alone, so it gets no report copy.
+	var dataSource any
 	if m.legacy {
-		dataSource = data.Entries // Use entries only for legacy mode.
+		dataSource = printableEntries(data.Entries)
+	} else {
+		dataSource = data.printable()
 	}
 
 	// Log template processing start with nil-safe report access.

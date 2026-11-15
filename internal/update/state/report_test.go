@@ -2,7 +2,10 @@ package state
 
 import (
 	"errors"
+	"reflect"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -854,4 +857,79 @@ func TestNewSingleContainerReport(t *testing.T) {
 			assert.Equal(t, tt.want, NewSingleContainerReport(tt.focus, session))
 		})
 	}
+}
+
+// TestMapText verifies that the copy of a report maps every string its
+// container statuses return and keeps every other value. The check walks the
+// exported methods, so a string method added later is covered. A container
+// listed in several categories and as the focus is one copy in all of them.
+// Nil lists stay nil and the original report is unchanged.
+func TestMapText(t *testing.T) {
+	t.Parallel()
+
+	assert.Nil(t, MapText(nil, strings.ToUpper))
+	assert.Nil(t, MapText(&Report{}, strings.ToUpper).Focus(), "a session report has no focus")
+
+	original := &ContainerStatus{
+		cooldownEligibleAt:   time.Date(2026, 11, 14, 0, 0, 0, 0, time.UTC),
+		containerError:       errors.New("pull failed"),
+		containerID:          "cont1",
+		oldImage:             "old",
+		newImage:             "new",
+		containerName:        "app",
+		imageName:            "org/app:latest",
+		newContainerID:       "cont2",
+		cooldownAge:          "1 day",
+		cooldownDelay:        "2 days",
+		cooldownRemaining:    "1 day",
+		gitRepo:              "https://example.com/org/app.git",
+		gitRef:               "main",
+		changelog:            "https://example.com/changelog",
+		source:               "https://example.com/org/app",
+		imageURL:             "https://example.com/image",
+		documentation:        "https://example.com/docs",
+		currentImageVersion:  "1.0.0",
+		latestImageVersion:   "1.1.0",
+		currentImageRevision: "aaaa",
+		latestImageRevision:  "bbbb",
+		state:                UpdatedState,
+		monitorOnly:          true,
+	}
+	report := &Report{
+		focus:   original,
+		scanned: []*ContainerStatus{original},
+		updated: []*ContainerStatus{original},
+	}
+
+	mapping := func(text string) string { return "mapped(" + text + ")" }
+	copied := MapText(report, mapping)
+
+	require.Len(t, copied.Updated(), 1)
+	status := copied.Updated()[0]
+
+	assert.NotSame(t, original, status)
+	assert.Same(t, status, copied.Scanned()[0])
+	assert.Same(t, status, copied.Focus())
+	assert.Nil(t, copied.Restarted())
+
+	statusValue := reflect.ValueOf(status)
+	originalValue := reflect.ValueOf(original)
+
+	for method := range statusValue.Type().Methods() {
+		if method.Type.NumIn() != 1 || method.Type.NumOut() != 1 {
+			continue
+		}
+
+		got := statusValue.Method(method.Index).Call(nil)[0].Interface()
+		before := originalValue.Method(method.Index).Call(nil)[0].Interface()
+
+		if text, ok := before.(string); ok && method.Name != "State" {
+			assert.Equal(t, mapping(text), got, method.Name)
+		} else {
+			assert.Equal(t, before, got, method.Name)
+		}
+	}
+
+	assert.Equal(t, "app", original.Name(), "the original is unchanged")
+	assert.Equal(t, "pull failed", original.Error(), "the original error is unchanged")
 }
