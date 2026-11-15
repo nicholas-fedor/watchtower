@@ -158,6 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/defanglabs/secret-detector digest to 4d8b46d by @renovate[bot] in [#3821](https://github.com/nicholas-fedor/watchtower/pull/3821)
 - Update module github.com/jedib0t/go-pretty/v6 to v6.9.2 by @renovate[bot] in [#3804](https://github.com/nicholas-fedor/watchtower/pull/3804)
 - Update golang.org/x/tools digest to cba9b80 by @renovate[bot] in [#3794](https://github.com/nicholas-fedor/watchtower/pull/3794)
 - Update golang.org/x/tools digest to 6f740e1 by @renovate[bot] in [#3788](https://github.com/nicholas-fedor/watchtower/pull/3788)
