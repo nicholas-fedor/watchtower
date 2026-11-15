@@ -503,6 +503,17 @@ Use the [Template Preview Tool](../template-preview/index.md) to test your templ
 !!! Note
     When the preview report toggle is off, simple templates can range over `.` just as they do in Watchtower. When the report toggle is on, range over `.Entries`.
 
+## Text from outside Watchtower
+
+Some text in a notification comes from outside Watchtower. That includes lifecycle hook output, image annotations and error messages from registries, the container engine and Git servers. Before a template runs, Watchtower makes each log message, log field and report field printable on one line:
+
+- It removes terminal escape sequences, such as colours, window titles and clipboard writes.
+- It removes control characters other than tabs.
+- It removes invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters. Emoji joined with zero-width joiners show as their separate parts.
+- It ends a line at each newline, carriage return and Unicode line or paragraph separator. It joins the trimmed, non-blank lines with ` | `. No value can then start a line that reads like a Watchtower message.
+
+Log field keys and values inside nested fields are cleaned too. The JSON and porcelain templates receive the same cleaned values. The title, the host name and the text a template writes itself, including its own line breaks, stay as written. Watchtower does not escape markup or mentions for each notification service, as [Lifecycle Hooks](../../advanced-features/lifecycle-hooks/index.md#hook_output_and_security) describes.
+
 ## Additional Resources
 
 - For detailed template syntax, refer to the [Go Template documentation](https://golang.org/pkg/text/template/){target="_blank" rel="noopener noreferrer"}.
