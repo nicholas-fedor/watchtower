@@ -742,6 +742,13 @@ func TestTemplate_Render_printableText(t *testing.T) {
 		},
 	}
 
+	// The parallel subtests run after this function returns, so the data is
+	// checked once they have all rendered it.
+	t.Cleanup(func() {
+		assert.Equal(t, hostile, data.Entries[0].Message, "the entries are unchanged")
+		assert.Equal(t, hostile, data.Report.Failed()[0].Error(), "the report is unchanged")
+	})
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -755,7 +762,4 @@ func TestTemplate_Render_printableText(t *testing.T) {
 			}
 		})
 	}
-
-	assert.Equal(t, hostile, data.Entries[0].Message, "the entries are unchanged")
-	assert.Equal(t, hostile, data.Report.Failed()[0].Error(), "the report is unchanged")
 }
