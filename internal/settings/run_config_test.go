@@ -57,9 +57,9 @@ func TestBuildRunConfigMultilineEndpointsEnv(t *testing.T) {
 func TestConfig_BuildRunConfig_names(t *testing.T) {
 	t.Parallel()
 
-	_, _, cmd := bindLoad(t)
+	cmd := newParsedCommand(t)
 
-	cfg, err := Load(newTestLogger(t), cmd, []string{"/web", "db"})
+	cfg, _, err := Load(newTestLogger(t), cmd, []string{"/web", "db"})
 	require.NoError(t, err)
 
 	run, err := cfg.BuildRunConfig()

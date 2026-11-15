@@ -56,7 +56,7 @@ func newTestCommand() *cobra.Command {
 }
 
 // parseWithEnv parses args, then applies the environment to unset flags, as
-// Prepare does first.
+// Load does first.
 func parseWithEnv(t *testing.T, cmd *cobra.Command, args ...string) {
 	t.Helper()
 
@@ -169,34 +169,10 @@ func Test_applyEnvToFlags_doesNotMarkChanged(t *testing.T) {
 	assert.Equal(t, "192.168.1.1", cliHost)
 }
 
-// TestPrepare verifies that Prepare applies the environment to the flags,
-// applies the alias flags and reads secret files into their flags.
-func TestPrepare(t *testing.T) {
-	t.Setenv("WATCHTOWER_CLEANUP", "true")
-
-	tokenFile := writeSecretFile(t, "s3cret\n")
-	cmd := newParsedCommand(t, "--interval", "30", "--http-api-token", tokenFile)
-
-	_, err := Prepare(newInfoTestLogger(t), cmd)
-	require.NoError(t, err)
-
-	schedule, err := cmd.PersistentFlags().GetString("schedule")
-	require.NoError(t, err)
-	assert.Equal(t, "@every 30s", schedule, "the interval alias sets the schedule")
-
-	cleanup, err := cmd.PersistentFlags().GetBool("cleanup")
-	require.NoError(t, err)
-	assert.True(t, cleanup, "the environment sets an unset flag")
-
-	token, err := cmd.PersistentFlags().GetString("http-api-token")
-	require.NoError(t, err)
-	assert.Equal(t, "s3cret", token, "the secret file is read into its flag")
-}
-
-// TestPrepare_failures verifies that each failing step returns an error that
-// wraps its sentinel and the step's own error, together with a logger to
-// report it.
-func TestPrepare_failures(t *testing.T) {
+// Test_prepareFlags_failures verifies that each failing step returns an error
+// that names the step and wraps the step's own error, together with a logger
+// to report it.
+func Test_prepareFlags_failures(t *testing.T) {
 	invalidSecret := writeSecretFile(t, "not-a-url\n")
 
 	tests := []struct {
@@ -204,30 +180,30 @@ func TestPrepare_failures(t *testing.T) {
 		env      map[string]string
 		args     []string
 		wantErr  error
-		wantStep error
+		wantStep string
 	}{
 		{
 			name:     "invalid environment value",
 			env:      map[string]string{"WATCHTOWER_HTTP_API_RATE_LIMIT": "many"},
-			wantStep: ErrApplyEnvironment,
+			wantStep: "apply environment configuration: ",
 		},
 		{
 			name:     "invalid log format",
 			args:     []string{"--log-format", "bogus"},
 			wantErr:  errInvalidLogFormat,
-			wantStep: ErrSetUpLogging,
+			wantStep: "set up logging: ",
 		},
 		{
 			name:     "interval with a schedule",
 			args:     []string{"--interval", "30", "--schedule", "@every 1h"},
 			wantErr:  errIntervalAndSchedule,
-			wantStep: ErrFlagAliases,
+			wantStep: "process flag aliases: ",
 		},
 		{
 			name:     "invalid secret file",
 			args:     []string{"--notification-url", invalidSecret},
 			wantErr:  errInvalidSecretURL,
-			wantStep: ErrSecretFiles,
+			wantStep: "load secrets from files: ",
 		},
 	}
 
@@ -237,8 +213,8 @@ func TestPrepare_failures(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			log, err := Prepare(newInfoTestLogger(t), newParsedCommand(t, tt.args...))
-			require.ErrorIs(t, err, tt.wantStep)
+			log, err := prepareFlags(newInfoTestLogger(t), newParsedCommand(t, tt.args...).PersistentFlags())
+			require.ErrorContains(t, err, tt.wantStep)
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
@@ -1354,7 +1330,7 @@ func testGetSecretsFromFiles(t *testing.T, flagName, expected string, args ...st
 
 	RegisterAll(cmd)
 	parseWithEnv(t, cmd, args...)
-	require.NoError(t, getSecretsFromFiles(newInfoTestLogger(t), cmd))
+	require.NoError(t, getSecretsFromFiles(newInfoTestLogger(t), cmd.PersistentFlags()))
 	flag := cmd.PersistentFlags().Lookup(flagName)
 	require.NotNil(t, flag)
 	value := flag.Value.String()

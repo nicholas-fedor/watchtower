@@ -54,37 +54,49 @@ var (
 	)
 )
 
-// Load reads resolved settings from a parsed Cobra command into Config.
+// Load prepares the flags of a parsed root command and reads the resolved
+// settings into Config.
 //
-// Callers must register and parse the flags and run [Prepare] before Load.
-// Load does not re-parse CLI arguments.
+// It first prepares the flags, which sets up logging and reads secret files
+// into their flags. Load changes the flags this way, so call it once per parsed
+// command. It does not re-parse CLI arguments.
 //
-// Values are resolved through a process-local Viper instance (flag > env >
+// Values are then resolved through a process-local Viper instance (flag > env >
 // static default) using FlagSpec metadata from every domain.
 //
 // Parameters:
-//   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
-//   - cmd: Parsed root command with persistent flags populated.
+//   - log: Process logger. Required and must be non-nil. Load logs its own
+//     diagnostics to a replacement that writes to standard error in the
+//     configured format and level.
+//   - cmd: Root command with its persistent flags registered and parsed.
 //   - args: Positional container name arguments for filtering.
 //
 // Returns:
 //   - Config: Immutable configuration snapshot.
-//   - error: Non-nil when required flags are missing or values are invalid.
-func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error) {
+//   - *zerolog.Logger: The logger with the configured format and level, also on
+//     a failure, for reporting it.
+//   - error: Non-nil when a flag cannot be prepared or bound or holds an
+//     invalid value. A failed preparation names its step.
+func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zerolog.Logger, error) {
 	flagSet := cmd.PersistentFlags()
+
+	log, err := prepareFlags(log, flagSet)
+	if err != nil {
+		return Config{}, log, err
+	}
 
 	vCfg := viper.New()
 
 	specs := AllSpecs()
 
-	err := BindAll(vCfg, flagSet, specs)
+	err = BindAll(vCfg, flagSet, specs)
 	if err != nil {
-		return Config{}, fmt.Errorf("bind configuration: %w", err)
+		return Config{}, log, fmt.Errorf("bind configuration: %w", err)
 	}
 
 	err = checkRanges(vCfg, flagSet, specs)
 	if err != nil {
-		return Config{}, err
+		return Config{}, log, err
 	}
 
 	cfg := Config{}
@@ -98,14 +110,14 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 
 	cfg.Update, err = loadUpdate(log, vCfg, flagSet)
 	if err != nil {
-		return Config{}, err
+		return Config{}, log, err
 	}
 
 	cfg.Lifecycle = loadLifecycle(vCfg)
 
 	cfg.Filter, err = loadFilter(log, vCfg, flagSet, args)
 	if err != nil {
-		return Config{}, err
+		return Config{}, log, err
 	}
 
 	cfg.Registry = loadRegistry(vCfg)
@@ -116,15 +128,15 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, error
 
 	cfg.Git, err = loadGit(vCfg, flagSet)
 	if err != nil {
-		return Config{}, err
+		return Config{}, log, err
 	}
 
 	err = validate(log, cfg)
 	if err != nil {
-		return Config{}, err
+		return Config{}, log, err
 	}
 
-	return cfg, nil
+	return cfg, log, nil
 }
 
 // loadDocker reads Docker connection settings from Viper after BindAll.

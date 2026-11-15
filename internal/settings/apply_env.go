@@ -16,9 +16,9 @@ import (
 
 // applyEnvToFlags copies bound environment values onto flags that were not set on the CLI.
 //
-// [Prepare] runs it first, so the logging setup and the alias flags see
-// env-sourced values through the flags. Load continues to resolve
-// through Viper with flag > env > default precedence. Static pflag defaults are
+// It runs before the logging setup and the alias flags, so they see
+// env-sourced values through the flags. Load then resolves through Viper with
+// flag > env > default precedence. Static pflag defaults are
 // never env-baked at registration time.
 //
 // Parameters:

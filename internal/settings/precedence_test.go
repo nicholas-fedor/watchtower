@@ -1,7 +1,6 @@
 package settings
 
 import (
-	"io"
 	"os"
 	"testing"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
 // newTestLogger returns a logger that writes each event to the test's log, so a
@@ -43,8 +41,7 @@ func newLoadedCommand(t *testing.T, env map[string]string, args ...string) Confi
 }
 
 // loadWithEnv loads the configuration from env and args on a command with
-// every flag registered. It prepares the flags with Prepare, as startup does,
-// before it calls Load.
+// every flag registered, as startup does.
 //
 // Parameters:
 //   - t: Test that owns the environment.
@@ -61,12 +58,9 @@ func loadWithEnv(t *testing.T, env map[string]string, args ...string) (Config, e
 		t.Setenv(k, v)
 	}
 
-	cmd := newParsedCommand(t, args...)
+	cfg, _, err := Load(newTestLogger(t), newParsedCommand(t, args...), nil)
 
-	_, err := Prepare(logging.New(io.Discard, logging.InfoLevel), cmd)
-	require.NoError(t, err)
-
-	return Load(newTestLogger(t), cmd, nil)
+	return cfg, err
 }
 
 func TestLoad_FlagOverridesEnv(t *testing.T) {
