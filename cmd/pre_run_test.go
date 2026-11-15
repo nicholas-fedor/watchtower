@@ -385,6 +385,35 @@ func TestPreRun_Configuration(t *testing.T) {
 	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
 }
 
+// TestPreRun_loadsSettingsOnce verifies that a run of the root command loads
+// its settings once, in preRun, with the positional container names. A
+// warning from loading the settings is then logged once, before notifications
+// are set up, so no notification carries it. The logger:// service writes each
+// notification to the same output, so a notified copy would appear there too.
+func TestPreRun_loadsSettingsOnce(t *testing.T) {
+	mockClient := mockCmd.NewMockDockerClient(t)
+	mockClient.EXPECT().GetVersion().Return("1.47")
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
+
+	setPreRunState(t, mockClient, selfDetection{})
+
+	// Outside a container, so the run has no restart policy to disable.
+	processID = func() int { return 4242 }
+
+	readStderr := captureStderr(t)
+	proc := newRunProcess()
+
+	require.NoError(t, newExecuteCommand(t, proc,
+		"--run-once", "--monitor-only", "--no-pull", "--notification-url", "logger://", "web",
+	).Execute())
+
+	// Closing the notifier sends what it still holds.
+	notifier.Close()
+
+	assert.Equal(t, []string{"web"}, appCfg.Filter.Names)
+	assert.Equal(t, 1, strings.Count(readStderr(), "Combining monitor-only and no-pull might result in no updates"))
+}
+
 // TestPreRun_RegistryTLSSettings verifies that the container client and the
 // update parameters receive registry TLS settings that follow the
 // registry-tls-skip and registry-tls-min-version configuration options,

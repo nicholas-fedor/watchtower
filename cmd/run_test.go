@@ -261,7 +261,7 @@ func containerLabel(arg any) string {
 func runUntilCanceled(t *testing.T, args ...string) {
 	t.Helper()
 
-	cmd := newTestRootCommand(t, args...)
+	cmd := newRunCommand(t, args...)
 
 	synctest.Test(t, func(t *testing.T) {
 		cancel, done := runInBackground(t, newRunProcess(), cmd)
@@ -282,6 +282,29 @@ func runUntilCanceled(t *testing.T, args ...string) {
 // newRunProcess returns a process that logs nothing.
 func newRunProcess() *process {
 	return &process{log: new(zerolog.Nop())}
+}
+
+// newRunCommand returns a test root command parsed from args, with its
+// configuration loaded as preRun loads it, for tests that call run without
+// preRun. Call it after setRunState, which clears the configuration.
+//
+// Parameters:
+//   - t: Test that fails when the configuration cannot be loaded.
+//   - args: Command arguments, including positional container names.
+//
+// Returns:
+//   - *cobra.Command: The parsed command.
+func newRunCommand(t *testing.T, args ...string) *cobra.Command {
+	t.Helper()
+
+	cmd := newTestRootCommand(t, args...)
+
+	loaded, err := settings.Load(new(zerolog.Nop()), cmd, cmd.Flags().Args())
+	require.NoError(t, err)
+
+	appCfg = loaded
+
+	return cmd
 }
 
 // localAPIArgs picks a free loopback address for the HTTP API and returns it
@@ -453,7 +476,7 @@ func TestRun_RunOnce(t *testing.T) {
 				processID = func() int { return 4242 }
 			}
 
-			require.NoError(t, newRunProcess().run(newTestRootCommand(t, "--run-once"), nil))
+			require.NoError(t, newRunProcess().run(newRunCommand(t, "--run-once"), nil))
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
@@ -483,7 +506,7 @@ func TestRun_RunOnceStoppedAtStartup(t *testing.T) {
 
 	log, output := logcapture.New(zerolog.InfoLevel)
 
-	require.NoError(t, (&process{log: log}).run(newTestRootCommand(t, "--run-once"), nil))
+	require.NoError(t, (&process{log: log}).run(newRunCommand(t, "--run-once"), nil))
 
 	assert.NotContains(t, output.String(), "Running a one time update",
 		"a stopping run-once process wrote the startup message")
@@ -690,7 +713,7 @@ func TestRun_ScheduledUpdate(t *testing.T) {
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	cmd := newTestRootCommand(t, "--schedule", "@every 1h")
+	cmd := newRunCommand(t, "--schedule", "@every 1h")
 
 	synctest.Test(t, func(t *testing.T) {
 		cancel, done := runInBackground(t, newRunProcess(), cmd)
@@ -738,7 +761,7 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	cmd := newTestRootCommand(t, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
+	cmd := newRunCommand(t, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
 
 	synctest.Test(t, func(t *testing.T) {
 		cancel, done := runInBackground(t, newRunProcess(), cmd)
@@ -794,7 +817,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	notifier = drainNotifier
 
 	addr, args := localAPIArgs(t, "--http-api-endpoints=containers", "--http-api-periodic-polls")
-	cmd := newTestRootCommand(t, args...)
+	cmd := newRunCommand(t, args...)
 
 	cancelRun, done := runInBackground(t, newRunProcess(), cmd)
 
@@ -890,7 +913,7 @@ func TestRun_APISharesUpdateLock(t *testing.T) {
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
 	addr, args := localAPIArgs(t, "--update-on-start", "--http-api-endpoints=update", "--http-api-periodic-polls")
-	cmd := newTestRootCommand(t, args...)
+	cmd := newRunCommand(t, args...)
 
 	runInBackground(t, newRunProcess(), cmd)
 
@@ -937,7 +960,7 @@ func TestRun_APIOnlyWritesOneStartupMessage(t *testing.T) {
 	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
 	addr, args := localAPIArgs(t, "--http-api-endpoints=update")
-	cmd := newTestRootCommand(t, args...)
+	cmd := newRunCommand(t, args...)
 
 	log, output := logcapture.New(zerolog.InfoLevel)
 	cancelRun, done := runInBackground(t, &process{log: log}, cmd)
@@ -987,7 +1010,7 @@ func TestRun_HealthCheck(t *testing.T) {
 			processID = func() int { return tt.pid }
 			parentProcessID = func() int { return tt.ppid }
 
-			err := newRunProcess().run(newTestRootCommand(t, "--health-check"), nil)
+			err := newRunProcess().run(newRunCommand(t, "--health-check"), nil)
 
 			assert.Empty(t, runCalls(mockClient))
 
@@ -1024,14 +1047,6 @@ func TestRun_Exit(t *testing.T) {
 		// logged message and its cause.
 		wantOutput string
 	}{
-		{
-			// Loading the configuration rejects the combination, so runMain's own
-			// check for it is never reached through run. Because a real start
-			// rejects it in preRun before notifications are set up, the case
-			// runs without them.
-			helperCase: "rolling-restart-with-monitor-only",
-			wantOutput: "rolling-restart and monitor-only cannot both be enabled",
-		},
 		{
 			// The run configuration is checked after the configuration loads.
 			// A failure there happens again on the next start too.
@@ -1083,14 +1098,7 @@ func runExitHelper(t *testing.T, helperCase string) {
 
 	var args []string
 
-	// notified gives the case a notifier, as when the failure comes after
-	// startup has set notifications up.
-	notified := true
-
 	switch helperCase {
-	case "rolling-restart-with-monitor-only":
-		args = []string{"--rolling-restart", "--monitor-only"}
-		notified = false
 	case "invalid-run-configuration":
 		args = []string{"--http-api-host", "not-an-ip"}
 	case "rolling-restart-validation-fails":
@@ -1114,11 +1122,9 @@ func runExitHelper(t *testing.T, helperCase string) {
 	log := logging.New(os.Stderr, logging.InfoLevel)
 
 	// The notifier holds every line until the startup message, as at startup.
-	if notified {
-		notifier = newLoggerNotifier(t, log)
-	}
+	notifier = newLoggerNotifier(t, log)
 
-	cmd := newTestRootCommand(t, args...)
+	cmd := newRunCommand(t, args...)
 
 	proc := &process{log: log}
 	proc.exit(cmd, proc.run(cmd, nil))
@@ -1142,7 +1148,7 @@ func TestRun_OldInstanceStops(t *testing.T) {
 
 	setRunState(t, runTestState{client: mockClient, current: oldSelf, currentID: oldSelf.ID()})
 
-	cmd := newTestRootCommand(t, "--update-on-start")
+	cmd := newRunCommand(t, "--update-on-start")
 
 	synctest.Test(t, func(t *testing.T) {
 		_, done := runInBackground(t, newRunProcess(), cmd)
