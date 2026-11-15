@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,8 +43,8 @@ func newLoadedCommand(t *testing.T, env map[string]string, args ...string) Confi
 }
 
 // loadWithEnv loads the configuration from env and args on a command with
-// every flag registered. It applies the environment, flag aliases and secret
-// files the way startup does before it calls Load.
+// every flag registered. It prepares the flags with Prepare, as startup does,
+// before it calls Load.
 //
 // Parameters:
 //   - t: Test that owns the environment.
@@ -62,17 +61,10 @@ func loadWithEnv(t *testing.T, env map[string]string, args ...string) (Config, e
 		t.Setenv(k, v)
 	}
 
-	cmd := &cobra.Command{Use: "watchtower"}
+	cmd := newParsedCommand(t, args...)
 
-	RegisterAll(cmd)
-	require.NoError(t, cmd.ParseFlags(args))
-
-	flagSet := cmd.PersistentFlags()
-	require.NoError(t, ApplyEnvToFlags(flagSet, AllSpecs()))
-
-	log := logging.New(io.Discard, logging.InfoLevel)
-	require.NoError(t, ProcessFlagAliases(log, flagSet))
-	require.NoError(t, GetSecretsFromFiles(log, cmd))
+	_, err := Prepare(logging.New(io.Discard, logging.InfoLevel), cmd)
+	require.NoError(t, err)
 
 	return Load(newTestLogger(t), cmd, nil)
 }

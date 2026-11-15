@@ -115,7 +115,7 @@ func (w jsonWriter) Write(event []byte) (int, error) {
 // usePrettyAuto reports whether auto format should use colorized pretty output.
 //
 // NO_COLOR follows this repo's presence semantics (any set value, including empty
-// string), matching internal/settings ApplyEnvToFlags rather than only non-empty values.
+// string), as the settings package applies it to the no-color flag, rather than only non-empty values.
 //
 // Parameters:
 //   - noColor: Explicit --no-color flag value.

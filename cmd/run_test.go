@@ -285,8 +285,8 @@ func newRunProcess() *process {
 }
 
 // newRunCommand returns a test root command parsed from args, with its
-// configuration loaded as preRun loads it, for tests that call run without
-// preRun. Call it after setRunState, which clears the configuration.
+// configuration prepared and loaded as preRun does it, for tests that call run
+// without preRun. Call it after setRunState, which clears the configuration.
 //
 // Parameters:
 //   - t: Test that fails when the configuration cannot be loaded.
@@ -298,6 +298,11 @@ func newRunCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
 	cmd := newTestRootCommand(t, args...)
+
+	// Prepare returns a logger that writes to stderr, so Load keeps one that
+	// logs nothing.
+	_, err := settings.Prepare(new(zerolog.Nop()), cmd)
+	require.NoError(t, err)
 
 	loaded, err := settings.Load(new(zerolog.Nop()), cmd, cmd.Flags().Args())
 	require.NoError(t, err)

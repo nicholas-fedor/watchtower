@@ -659,6 +659,33 @@ func TestIsContainerMainProcess(t *testing.T) {
 	}
 }
 
+// Test_prepareFailure verifies the exit message for each failed step of
+// settings.Prepare, and a general one for any other error.
+func Test_prepareFailure(t *testing.T) {
+	t.Parallel()
+
+	cause := errors.New("cause")
+
+	tests := []struct {
+		err  error
+		want string
+	}{
+		{err: fmt.Errorf("%w: %w", settings.ErrApplyEnvironment, cause), want: "Failed to apply environment configuration"},
+		{err: fmt.Errorf("%w: %w", settings.ErrSetUpLogging, cause), want: "Failed to initialize logging"},
+		{err: fmt.Errorf("%w: %w", settings.ErrFlagAliases, cause), want: "Invalid configuration"},
+		{err: fmt.Errorf("%w: %w", settings.ErrSecretFiles, cause), want: "Failed to load secret from file"},
+		{err: cause, want: "Failed to prepare configuration"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, prepareFailure(tt.err))
+		})
+	}
+}
+
 // TestExitError_Error verifies the text of an exit error with and without a
 // message and a cause.
 func TestExitError_Error(t *testing.T) {

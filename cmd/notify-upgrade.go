@@ -71,39 +71,14 @@ func (p *process) runNotifyUpgrade(cmd *cobra.Command, args []string) error {
 //   - log: Process logger, reconfigured from --log-format / --log-level so subcommand output honors those flags.
 //
 // Returns:
-//   - *zerolog.Logger: Logger after SetupLogging (format/level applied) for outer error reporting.
+//   - *zerolog.Logger: Logger with the configured format and level, for outer error reporting.
 //   - error: Non-nil if the settings cannot be loaded or turned into notification URLs. Non-nil also if the
 //     environment file cannot be written. A failure to remove the file afterwards is only logged.
 func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*zerolog.Logger, error) {
-	// Process flag aliases and expand secrets before resolving configuration.
-	// Use Root().PersistentFlags so env/alias bridging matches settings.Load's bind source across subcommands.
-	flagSet := cmd.Root().PersistentFlags()
-
-	err := settings.ApplyEnvToFlags(flagSet, settings.AllSpecs())
+	// The settings live on the root command's flags, which Load reads too.
+	log, err := settings.Prepare(log, cmd.Root())
 	if err != nil {
-		return log, fmt.Errorf("apply environment configuration: %w", err)
-	}
-
-	// Format before aliases so their errors use the selected --log-format.
-	log, err = settings.SetupLogging(log, flagSet)
-	if err != nil {
-		return log, fmt.Errorf("setup logging: %w", err)
-	}
-
-	err = settings.ProcessFlagAliases(log, flagSet)
-	if err != nil {
-		return log, fmt.Errorf("process flag aliases: %w", err)
-	}
-
-	// Re-apply after aliases so debug/trace forced log-level values take effect.
-	log, err = settings.SetupLogging(log, flagSet)
-	if err != nil {
-		return log, fmt.Errorf("setup logging: %w", err)
-	}
-
-	err = settings.GetSecretsFromFiles(log, cmd.Root())
-	if err != nil {
-		return log, fmt.Errorf("load secrets from files: %w", err)
+		return log, err //nolint:wrapcheck // Prepare names the failed step.
 	}
 
 	cfg, loadErr := settings.Load(log, cmd.Root(), nil)

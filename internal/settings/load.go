@@ -56,8 +56,8 @@ var (
 
 // Load reads resolved settings from a parsed Cobra command into Config.
 //
-// Callers must run flag registration, ProcessFlagAliases, SetupLogging, and
-// GetSecretsFromFiles before Load. Load does not re-parse CLI arguments.
+// Callers must register and parse the flags and run [Prepare] before Load.
+// Load does not re-parse CLI arguments.
 //
 // Values are resolved through a process-local Viper instance (flag > env >
 // static default) using FlagSpec metadata from every domain.
@@ -505,7 +505,7 @@ func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 // loadLogging reads logging settings from Viper.
 //
 // NO_COLOR is presence-based and has no Viper environment binding, so NoColor
-// comes from the no-color flag, which ApplyEnvToFlags sets from NO_COLOR.
+// comes from the no-color flag, which applyEnvToFlags sets from NO_COLOR.
 //
 // Parameters:
 //   - vCfg: Bound configuration.

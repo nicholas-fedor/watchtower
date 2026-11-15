@@ -24,7 +24,8 @@ var (
 // register registers pflags from FlagSpec rows using static defaults only.
 //
 // Environment values are not baked into pflag defaults.
-// ApplyEnvToFlags and Viper bind resolve env after parse.
+// The settings package applies the environment to the flags after parsing, and
+// Viper resolves it when the settings load.
 //
 // Parameters:
 //   - flagSet: Target flag set that receives the registered flags.

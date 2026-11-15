@@ -17,9 +17,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// newSecretsCommand returns a command with every flag registered, as in
+// newParsedCommand returns a command with every flag registered, as in
 // production, parsed from args.
-func newSecretsCommand(t *testing.T, args ...string) *cobra.Command {
+//
+// Parameters:
+//   - t: Test that fails when the arguments do not parse.
+//   - args: Command-line arguments.
+//
+// Returns:
+//   - *cobra.Command: The parsed command.
+func newParsedCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
 	cmd := new(cobra.Command)
@@ -94,7 +101,7 @@ func TestGetSecretFromFile_FileErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := newSecretsCommand(t, "--"+tt.flag, tt.value)
+			cmd := newParsedCommand(t, "--"+tt.flag, tt.value)
 			flags := cmd.PersistentFlags()
 
 			err := getSecretFromFile(newInfoTestLogger(t), flags, tt.flag)
@@ -147,7 +154,7 @@ func TestGetSecretFromFile_ClosesEachListFile(t *testing.T) {
 	fifo := filepath.Join(t.TempDir(), "fifo")
 	require.NoError(t, exec.CommandContext(t.Context(), mkfifo, fifo).Run())
 
-	flags := newSecretsCommand(t, "--notification-url", first, "--notification-url", fifo).PersistentFlags()
+	flags := newParsedCommand(t, "--notification-url", first, "--notification-url", fifo).PersistentFlags()
 
 	done := make(chan error, 1)
 
@@ -213,7 +220,7 @@ func TestGetSecretFromFile_NotificationURLRules(t *testing.T) {
 			}
 
 			path := writeSecretFile(t, content)
-			cmd := newSecretsCommand(t, "--notification-url", path)
+			cmd := newParsedCommand(t, "--notification-url", path)
 
 			err := getSecretFromFile(newInfoTestLogger(t), cmd.PersistentFlags(), "notification-url")
 
@@ -289,7 +296,7 @@ func TestGetSecretFromFile_StringSecrets(t *testing.T) {
 				value = writeSecretFile(t, tt.content)
 			}
 
-			cmd := newSecretsCommand(t, "--"+tt.flag, value)
+			cmd := newParsedCommand(t, "--"+tt.flag, value)
 			flags := cmd.PersistentFlags()
 
 			require.NoError(t, getSecretFromFile(newInfoTestLogger(t), flags, tt.flag))
@@ -335,7 +342,7 @@ func TestGetSecretFromFile_ChangedState(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := newSecretsCommand(t, tt.args...)
+			cmd := newParsedCommand(t, tt.args...)
 			flags := cmd.PersistentFlags()
 
 			require.NoError(t, getSecretFromFile(newInfoTestLogger(t), flags, tt.flag))
@@ -344,11 +351,11 @@ func TestGetSecretFromFile_ChangedState(t *testing.T) {
 	}
 }
 
-// TestGetSecretsFromFiles_ReadsEverySecret verifies which flags are read from
+// Test_getSecretsFromFiles_readsEverySecret verifies which flags are read from
 // files. Every registered string and list flag points at its own file, and the
 // flags whose values were replaced by file contents must be exactly the
 // expected secrets, so a secret added to or removed from the list is noticed.
-func TestGetSecretsFromFiles_ReadsEverySecret(t *testing.T) {
+func Test_getSecretsFromFiles_readsEverySecret(t *testing.T) {
 	want := []string{
 		"git-auth-token",
 		"git-password",
@@ -361,7 +368,7 @@ func TestGetSecretsFromFiles_ReadsEverySecret(t *testing.T) {
 		"notification-url",
 	}
 
-	cmd := newSecretsCommand(t)
+	cmd := newParsedCommand(t)
 	flags := cmd.PersistentFlags()
 
 	// Each flag's file holds a value naming the flag. List flags get a URL so
@@ -384,7 +391,7 @@ func TestGetSecretsFromFiles_ReadsEverySecret(t *testing.T) {
 		require.NoError(t, flags.Set(flag.Name, writeSecretFile(t, content+"\n")))
 	})
 
-	require.NoError(t, GetSecretsFromFiles(newInfoTestLogger(t), cmd))
+	require.NoError(t, getSecretsFromFiles(newInfoTestLogger(t), cmd))
 
 	var read []string
 
@@ -405,13 +412,13 @@ func TestGetSecretsFromFiles_ReadsEverySecret(t *testing.T) {
 	assert.Equal(t, want, read)
 }
 
-// TestGetSecretsFromFiles_InvalidSecret verifies that a secret file that
+// Test_getSecretsFromFiles_invalidSecret verifies that a secret file that
 // fails to load is returned as an error that names the flag.
-func TestGetSecretsFromFiles_InvalidSecret(t *testing.T) {
+func Test_getSecretsFromFiles_invalidSecret(t *testing.T) {
 	path := writeSecretFile(t, "not-a-url\n")
-	cmd := newSecretsCommand(t, "--notification-url", path)
+	cmd := newParsedCommand(t, "--notification-url", path)
 
-	err := GetSecretsFromFiles(newInfoTestLogger(t), cmd)
+	err := getSecretsFromFiles(newInfoTestLogger(t), cmd)
 	require.ErrorIs(t, err, errInvalidSecretURL)
 	assert.ErrorContains(t, err, "notification-url")
 }

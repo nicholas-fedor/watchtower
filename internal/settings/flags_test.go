@@ -55,17 +55,18 @@ func newTestCommand() *cobra.Command {
 	return cmd
 }
 
-// parseWithEnv parses flags then applies environment values (mirrors production preRun).
+// parseWithEnv parses args, then applies the environment to unset flags, as
+// Prepare does first.
 func parseWithEnv(t *testing.T, cmd *cobra.Command, args ...string) {
 	t.Helper()
 
 	require.NoError(t, cmd.ParseFlags(args))
-	require.NoError(t, ApplyEnvToFlags(cmd.PersistentFlags(), AllSpecs()))
+	require.NoError(t, applyEnvToFlags(cmd.PersistentFlags()))
 }
 
-// TestApplyEnvToFlags_EmptyBoolEnvDoesNotEnable verifies empty non-NO_COLOR bool
+// Test_applyEnvToFlags_emptyBoolEnvDoesNotEnable verifies empty non-NO_COLOR bool
 // env vars are treated as unset, while NO_COLOR presence still enables no-color.
-func TestApplyEnvToFlags_EmptyBoolEnvDoesNotEnable(t *testing.T) {
+func Test_applyEnvToFlags_emptyBoolEnvDoesNotEnable(t *testing.T) {
 	t.Setenv("WATCHTOWER_CLEANUP", "")
 	t.Setenv("WATCHTOWER_DEBUG", "")
 	t.Setenv("NO_COLOR", "")
@@ -88,9 +89,9 @@ func TestApplyEnvToFlags_EmptyBoolEnvDoesNotEnable(t *testing.T) {
 	assert.True(t, noColor, "NO_COLOR presence (empty value) must enable no-color")
 }
 
-// TestApplyEnvToFlags_NOColorPresenceAlwaysEnables verifies NO_COLOR uses
+// Test_applyEnvToFlags_noColorPresenceAlwaysEnables verifies NO_COLOR uses
 // presence semantics (including 0/false) and a static false default.
-func TestApplyEnvToFlags_NOColorPresenceAlwaysEnables(t *testing.T) {
+func Test_applyEnvToFlags_noColorPresenceAlwaysEnables(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
 		value string
@@ -119,9 +120,9 @@ func TestApplyEnvToFlags_NOColorPresenceAlwaysEnables(t *testing.T) {
 	}
 }
 
-// TestApplyEnvToFlags_DoesNotMarkChanged ensures env bridging leaves pflag.Changed false
+// Test_applyEnvToFlags_doesNotMarkChanged ensures env bridging leaves pflag.Changed false
 // so API *Changed fields only reflect CLI overrides.
-func TestApplyEnvToFlags_DoesNotMarkChanged(t *testing.T) {
+func Test_applyEnvToFlags_doesNotMarkChanged(t *testing.T) {
 	t.Setenv("WATCHTOWER_HTTP_API_HOST", "127.0.0.1")
 	t.Setenv("WATCHTOWER_HTTP_API_PORT", "9090")
 	t.Setenv("WATCHTOWER_HTTP_API_RATE_LIMIT", "30")
@@ -166,6 +167,86 @@ func TestApplyEnvToFlags_DoesNotMarkChanged(t *testing.T) {
 	cliHost, err := cmdCLI.PersistentFlags().GetString("http-api-host")
 	require.NoError(t, err)
 	assert.Equal(t, "192.168.1.1", cliHost)
+}
+
+// TestPrepare verifies that Prepare applies the environment to the flags,
+// applies the alias flags and reads secret files into their flags.
+func TestPrepare(t *testing.T) {
+	t.Setenv("WATCHTOWER_CLEANUP", "true")
+
+	tokenFile := writeSecretFile(t, "s3cret\n")
+	cmd := newParsedCommand(t, "--interval", "30", "--http-api-token", tokenFile)
+
+	_, err := Prepare(newInfoTestLogger(t), cmd)
+	require.NoError(t, err)
+
+	schedule, err := cmd.PersistentFlags().GetString("schedule")
+	require.NoError(t, err)
+	assert.Equal(t, "@every 30s", schedule, "the interval alias sets the schedule")
+
+	cleanup, err := cmd.PersistentFlags().GetBool("cleanup")
+	require.NoError(t, err)
+	assert.True(t, cleanup, "the environment sets an unset flag")
+
+	token, err := cmd.PersistentFlags().GetString("http-api-token")
+	require.NoError(t, err)
+	assert.Equal(t, "s3cret", token, "the secret file is read into its flag")
+}
+
+// TestPrepare_failures verifies that each failing step returns an error that
+// wraps its sentinel and the step's own error, together with a logger to
+// report it.
+func TestPrepare_failures(t *testing.T) {
+	invalidSecret := writeSecretFile(t, "not-a-url\n")
+
+	tests := []struct {
+		name     string
+		env      map[string]string
+		args     []string
+		wantErr  error
+		wantStep error
+	}{
+		{
+			name:     "invalid environment value",
+			env:      map[string]string{"WATCHTOWER_HTTP_API_RATE_LIMIT": "many"},
+			wantStep: ErrApplyEnvironment,
+		},
+		{
+			name:     "invalid log format",
+			args:     []string{"--log-format", "bogus"},
+			wantErr:  errInvalidLogFormat,
+			wantStep: ErrSetUpLogging,
+		},
+		{
+			name:     "interval with a schedule",
+			args:     []string{"--interval", "30", "--schedule", "@every 1h"},
+			wantErr:  errIntervalAndSchedule,
+			wantStep: ErrFlagAliases,
+		},
+		{
+			name:     "invalid secret file",
+			args:     []string{"--notification-url", invalidSecret},
+			wantErr:  errInvalidSecretURL,
+			wantStep: ErrSecretFiles,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for key, value := range tt.env {
+				t.Setenv(key, value)
+			}
+
+			log, err := Prepare(newInfoTestLogger(t), newParsedCommand(t, tt.args...))
+			require.ErrorIs(t, err, tt.wantStep)
+
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			}
+
+			assert.NotNil(t, log, "a logger is returned to report the failure")
+		})
+	}
 }
 
 // TestEnvConfig tests EnvConfig functionality with various configurations.
@@ -452,8 +533,8 @@ func TestEnvConfig(t *testing.T) {
 	}
 }
 
-// TestGetSecretsFromFiles tests GetSecretsFromFiles functionality with various scenarios.
-func TestGetSecretsFromFiles(t *testing.T) {
+// Test_getSecretsFromFiles tests getSecretsFromFiles functionality with various scenarios.
+func Test_getSecretsFromFiles(t *testing.T) {
 	testCases := []struct {
 		name     string
 		envVars  map[string]string
@@ -611,8 +692,8 @@ func TestIsFile(t *testing.T) {
 	)
 }
 
-// TestProcessFlagAliases tests flag alias processing with various configurations.
-func TestProcessFlagAliases(t *testing.T) {
+// Test_processFlagAliases tests flag alias processing with various configurations.
+func Test_processFlagAliases(t *testing.T) {
 	testCases := []struct {
 		name    string
 		envVars map[string]string
@@ -703,8 +784,8 @@ func TestProcessFlagAliases(t *testing.T) {
 			}
 
 			cmd := newTestCommand()
-			require.NoError(t, cmd.ParseFlags(tc.flags))
-			require.NoError(t, ProcessFlagAliases(newInfoTestLogger(t), cmd.Flags()))
+			parseWithEnv(t, cmd, tc.flags...)
+			require.NoError(t, processFlagAliases(newInfoTestLogger(t), cmd.Flags()))
 
 			if tc.checks != nil {
 				tc.checks(t, cmd.Flags())
@@ -713,9 +794,9 @@ func TestProcessFlagAliases(t *testing.T) {
 	}
 }
 
-// TestProcessFlagAliases_Errors verifies that an invalid porcelain version
+// Test_processFlagAliases_errors verifies that an invalid porcelain version
 // and an interval set together with a schedule are returned as errors.
-func TestProcessFlagAliases_Errors(t *testing.T) {
+func Test_processFlagAliases_errors(t *testing.T) {
 	tests := []struct {
 		name    string
 		flags   []string
@@ -738,20 +819,20 @@ func TestProcessFlagAliases_Errors(t *testing.T) {
 			cmd := newTestCommand()
 			require.NoError(t, cmd.ParseFlags(tt.flags))
 
-			err := ProcessFlagAliases(newInfoTestLogger(t), cmd.Flags())
+			err := processFlagAliases(newInfoTestLogger(t), cmd.Flags())
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
 }
 
-// TestSetupLogging tests logging setup with various formats and levels.
+// Test_setupLogging tests logging setup with various formats and levels.
 //
 // Format writer shape (JSON vs ConsoleWriter pretty/logfmt) is unit-tested in
-// internal/observability/logging/config_test.go. Here we assert SetupLogging integration:
+// internal/observability/logging/config_test.go. Here we assert setupLogging integration:
 // success/error contracts, applied levels, and that the returned logger accepts
 // write-through without panic. Optional: capture writer output samples per
 // format via injectable writer or subprocess if ConfigureWriter gains a test seam.
-func TestSetupLogging(t *testing.T) {
+func Test_setupLogging(t *testing.T) {
 	testCases := []struct {
 		name        string
 		flags       []string
@@ -831,7 +912,7 @@ func TestSetupLogging(t *testing.T) {
 			cmd := newTestCommand()
 			require.NoError(t, cmd.ParseFlags(tc.flags))
 
-			log, err := SetupLogging(newInfoTestLogger(t), cmd.Flags())
+			log, err := setupLogging(newInfoTestLogger(t), cmd.Flags())
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -1156,7 +1237,7 @@ func TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret(t *testing.T) {
 		"--porcelain", "v1",
 	})
 	require.NoError(t, err)
-	require.NoError(t, ProcessFlagAliases(newInfoTestLogger(t), cmd.PersistentFlags()))
+	require.NoError(t, processFlagAliases(newInfoTestLogger(t), cmd.PersistentFlags()))
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
@@ -1174,9 +1255,9 @@ func TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret(t *testing.T) {
 	assert.True(t, flag.Changed)
 }
 
-// TestApplyEnvToFlags_DoesNotReBrideExpandedSecret verifies that re-running
-// ApplyEnvToFlags does not overwrite an expanded secret with the raw file path.
-func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
+// Test_applyEnvToFlags_doesNotRebridgeExpandedSecret verifies that re-running
+// applyEnvToFlags does not overwrite an expanded secret with the raw file path.
+func Test_applyEnvToFlags_doesNotRebridgeExpandedSecret(t *testing.T) {
 	cmd := newTestCommand()
 	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
 	require.NoError(t, err)
@@ -1189,7 +1270,7 @@ func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
 
 	err = cmd.ParseFlags([]string{})
 	require.NoError(t, err)
-	err = ApplyEnvToFlags(cmd.PersistentFlags(), AllSpecs())
+	err = applyEnvToFlags(cmd.PersistentFlags())
 	require.NoError(t, err)
 
 	flag := cmd.PersistentFlags().Lookup("notification-url")
@@ -1205,8 +1286,8 @@ func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
 	assert.Equal(t, []string{"gotify://host/token"}, urls)
 	assert.True(t, flag.Changed)
 
-	// Step 3: re-running ApplyEnvToFlags must not overwrite the expanded value
-	err = ApplyEnvToFlags(cmd.PersistentFlags(), AllSpecs())
+	// Step 3: re-running applyEnvToFlags must not overwrite the expanded value
+	err = applyEnvToFlags(cmd.PersistentFlags())
 	require.NoError(t, err)
 
 	urls, err = cmd.PersistentFlags().GetStringArray("notification-url")
@@ -1215,8 +1296,8 @@ func TestApplyEnvToFlags_DoesNotReBrideExpandedSecret(t *testing.T) {
 	assert.True(t, flag.Changed)
 }
 
-// TestProcessFlagAliases_FlagSetErrors tests error logging for flag operations.
-func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
+// Test_processFlagAliases_flagSetErrors tests error logging for flag operations.
+func Test_processFlagAliases_flagSetErrors(t *testing.T) {
 	// Capture log output to verify debug logging
 	var logOutput bytes.Buffer
 
@@ -1236,7 +1317,7 @@ func TestProcessFlagAliases_FlagSetErrors(t *testing.T) {
 
 	defer func() { flag.Value = originalValue }() // Restore original value
 
-	require.NoError(t, ProcessFlagAliases(log, flags))
+	require.NoError(t, processFlagAliases(log, flags))
 	assert.Contains(
 		t,
 		logOutput.String(),
@@ -1254,12 +1335,12 @@ func (e *errorStringValue) String() string   { return "" }
 func (e *errorStringValue) Set(string) error { return e.err }
 func (e *errorStringValue) Type() string     { return "string" }
 
-// TestSetupLogging_FlagErrors tests error handling in SetupLogging.
-func TestSetupLogging_FlagErrors(t *testing.T) {
+// Test_setupLogging_flagErrors tests error handling in setupLogging.
+func Test_setupLogging_flagErrors(t *testing.T) {
 	cmd := new(cobra.Command)
 
 	// Don't register flags to force retrieval errors
-	_, err := SetupLogging(newInfoTestLogger(t), cmd.Flags())
+	_, err := setupLogging(newInfoTestLogger(t), cmd.Flags())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to set flag value")
 }
@@ -1273,7 +1354,7 @@ func testGetSecretsFromFiles(t *testing.T, flagName, expected string, args ...st
 
 	RegisterAll(cmd)
 	parseWithEnv(t, cmd, args...)
-	require.NoError(t, GetSecretsFromFiles(newInfoTestLogger(t), cmd))
+	require.NoError(t, getSecretsFromFiles(newInfoTestLogger(t), cmd))
 	flag := cmd.PersistentFlags().Lookup(flagName)
 	require.NotNil(t, flag)
 	value := flag.Value.String()
@@ -1609,8 +1690,8 @@ func TestNotificationParsingFlagOverridesEnv(t *testing.T) {
 	assert.Equal(t, []string{"slack"}, notifications)
 }
 
-// TestGetSecretsFromFilesReadErrors verifies file read errors.
-func TestGetSecretsFromFilesReadErrors(t *testing.T) {
+// Test_getSecretsFromFiles_readErrors verifies file read errors.
+func Test_getSecretsFromFiles_readErrors(t *testing.T) {
 	// Create a file and then remove it to simulate read error
 	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
 	require.NoError(t, err)
@@ -1660,7 +1741,7 @@ func TestRegexpSplittingLogic(t *testing.T) {
 }
 
 // TestNotificationURLEnvToFlagWiring verifies WATCHTOWER_NOTIFICATION_URL reaches
-// notification-url via ApplyEnvToFlags and ListNotificationURLs parsing for
+// notification-url via applyEnvToFlags and ListNotificationURLs parsing for
 // representative comma-in-query and mixed-separator cases.
 //
 // Full SplitNotificationValues coverage lives in internal/settings/flags/utils.
