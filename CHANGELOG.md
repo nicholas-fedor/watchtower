@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Prepare the flags inside Load by @nicholas-fedor in [#3825](https://github.com/nicholas-fedor/watchtower/pull/3825)
 - Load settings once at startup by @nicholas-fedor in [#3816](https://github.com/nicholas-fedor/watchtower/pull/3816)
 - Shorten long untrusted text in notifications by @nicholas-fedor in [#3814](https://github.com/nicholas-fedor/watchtower/pull/3814)
 - Escape display-changing text in logfmt and pretty logs by @nicholas-fedor in [#3812](https://github.com/nicholas-fedor/watchtower/pull/3812)
@@ -3737,7 +3738,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update mock client for tests by @simonaronsson
 - Fix #472 by @mbrandau
 - Fix according to remarks
-- 🐛 bump alpine version by @codingCoffee
+- 🐛 bump alpine version by @codingcoffee
 - Fixed small typo by @jnidzwetzki
 - Fixed wrong filename in documentation by @jnidzwetzki
 - Fix some var ref errors by @simonaronsson
@@ -4453,7 +4454,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - @Germs2004 made their first contribution
 - @pagdot made their first contribution
 - @raymondelooff made their first contribution
-- @codingCoffee made their first contribution
+- @codingcoffee made their first contribution
 - @jnidzwetzki made their first contribution
 - @mindrunner made their first contribution
 - @jsclayton made their first contribution
