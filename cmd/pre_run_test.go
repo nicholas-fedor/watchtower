@@ -414,6 +414,35 @@ func TestPreRun_loadsSettingsOnce(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(readStderr(), "Combining monitor-only and no-pull might result in no updates"))
 }
 
+// TestPreRun_scopeLabel verifies that a run without an explicit scope takes
+// the scope from Watchtower's own scope label and builds its filter for that
+// scope. A replacement from a self-update keeps the scope of the instance it
+// replaced this way.
+func TestPreRun_scopeLabel(t *testing.T) {
+	self := selfContainer("/watchtower", "")
+	self.SetLabel(scopeLabelKey, "prod")
+
+	mockClient := mockCmd.NewMockDockerClient(t)
+	mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(self, nil)
+	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
+	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil).Maybe()
+	mockClient.EXPECT().ListLabeledContainers(mock.Anything, mock.Anything).Return(nil, nil).Maybe()
+	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	setPreRunState(t, mockClient, selfDetection{mountinfo: mountinfoWithSelf()})
+
+	require.NoError(t, newExecuteCommand(t, newRunProcess(), "--run-once", "--log-level", "error").Execute())
+
+	assert.Equal(t, "prod", appCfg.Filter.Scope)
+	assert.Equal(t, "Only checking containers in scope prod", appCfg.Filter.Desc)
+
+	inScope := runFixtureContainer("a1a1", "/app", "2026-10-01T12:00:00Z", map[string]string{scopeLabelKey: "prod"})
+	unscoped := runFixtureContainer("b2b2", "/other", "2026-10-01T12:00:00Z", nil)
+
+	assert.True(t, appCfg.Filter.Predicate(inScope), "a container in the label's scope is selected")
+	assert.False(t, appCfg.Filter.Predicate(unscoped), "a container without a scope is not selected")
+}
+
 // TestPreRun_RegistryTLSSettings verifies that the container client and the
 // update parameters receive registry TLS settings that follow the
 // registry-tls-skip and registry-tls-min-version configuration options,

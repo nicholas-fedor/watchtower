@@ -1,6 +1,12 @@
 package filter
 
-import "github.com/nicholas-fedor/watchtower/internal/container/filters"
+import (
+	"fmt"
+
+	"github.com/rs/zerolog"
+
+	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+)
 
 // Filter holds raw filter inputs and the resolved predicate.
 type Filter struct {
@@ -24,4 +30,61 @@ type Filter struct {
 	Names []string
 	// LabelEnable restricts watching to containers with the enable label.
 	LabelEnable bool
+}
+
+// Build returns a copy of f with its predicate and description built from its
+// settings.
+//
+// Parameters:
+//   - log: Logger for the filter's debug output. May be nil.
+//
+// Returns:
+//   - Filter: The copy with Predicate and Desc set.
+//   - error: Non-nil when an enable or disable label pair is malformed.
+func (f Filter) Build(log *zerolog.Logger) (Filter, error) {
+	predicate, desc, err := filters.BuildFilter(
+		log,
+		f.Names,
+		f.DisableContainers,
+		f.MonitorImageNames,
+		f.SkipImageNames,
+		f.EnableContainersByLabel,
+		f.DisableContainersByLabel,
+		f.LabelEnable,
+		f.Scope,
+	)
+	if err != nil {
+		return Filter{}, fmt.Errorf("build filter: %w", err)
+	}
+
+	f.Predicate = predicate
+	f.Desc = desc
+
+	return f, nil
+}
+
+// WithLabelScope returns f for the scope that Watchtower's own scope label
+// gives, rebuilt when that scope applies.
+//
+// A scope set in the configuration wins. Without one, a non-empty label value
+// becomes the scope, "none" included. A replacement from a self-update keeps
+// the scope of the instance it replaced this way.
+//
+// Parameters:
+//   - log: Logger for the filter's debug output. May be nil.
+//   - label: Value of the scope label on Watchtower's own container. It is
+//     empty when the container has no scope label.
+//
+// Returns:
+//   - Filter: f unchanged when the label does not apply. Otherwise a copy with
+//     the label's scope and a rebuilt predicate and description.
+//   - error: Non-nil when an enable or disable label pair is malformed.
+func (f Filter) WithLabelScope(log *zerolog.Logger, label string) (Filter, error) {
+	if f.Scope != "" || label == "" {
+		return f, nil
+	}
+
+	f.Scope = label
+
+	return f.Build(log)
 }

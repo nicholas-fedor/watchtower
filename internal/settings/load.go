@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/client"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/compatibility"
@@ -381,22 +380,7 @@ func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, 
 		names[i] = container.NormalizeContainerName(name)
 	}
 
-	predicate, desc, err := filters.BuildFilter(
-		log,
-		names,
-		disableContainers,
-		monitorImages,
-		skipImages,
-		enableByLabel,
-		disableByLabel,
-		labelEnable,
-		scope,
-	)
-	if err != nil {
-		return filter.Filter{}, fmt.Errorf("build filter: %w", err)
-	}
-
-	return filter.Filter{
+	inputs := filter.Filter{
 		LabelEnable:              labelEnable,
 		DisableContainers:        disableContainers,
 		MonitorImageNames:        monitorImages,
@@ -405,9 +389,9 @@ func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, 
 		DisableContainersByLabel: disableByLabel,
 		Scope:                    scope,
 		Names:                    names,
-		Predicate:                predicate,
-		Desc:                     desc,
-	}, nil
+	}
+
+	return inputs.Build(log) //nolint:wrapcheck // Build names the failure.
 }
 
 // loadRegistry reads the registry request settings.

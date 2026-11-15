@@ -35,8 +35,6 @@ const defaultHookTimeout = 1
 
 // Errors for label and scope operations.
 var (
-	// errCurrentContainerNotCached indicates the current container is not cached for scope derivation.
-	errCurrentContainerNotCached = errors.New("current container not cached for scope derivation")
 	// errLabelNotFound indicates a requested label is not present in the container's metadata.
 	errLabelNotFound = errors.New("label not found")
 	// errInvalidHookTimeout indicates a lifecycle hook timeout label is not a
@@ -486,42 +484,6 @@ func (c *Container) NormalizedScope() string {
 	scope, _ := c.Scope()
 
 	return labels.NormalizeScope(scope)
-}
-
-// GetEffectiveScope determines the effective operational scope by prioritizing explicit scope
-// over scope derived from the container's label. This is crucial for self-update scenarios where
-// a new Watchtower instance needs to inherit the same scope as the instance being replaced
-// to maintain proper isolation and prevent cross-scope interference during the update process.
-//
-// Parameters:
-//   - container: The current Watchtower container.
-//   - currentScope: The explicit scope value (takes priority if non-empty).
-//
-// Returns:
-//   - string: The effective scope.
-//   - error: Non-nil if derivation fails.
-func GetEffectiveScope(container *Container, currentScope string) (string, error) {
-	// Skip derivation if scope is already explicitly set.
-	if currentScope != "" {
-		return currentScope, nil
-	}
-
-	// Container not available.
-	if container == nil {
-		return "", fmt.Errorf("%w", errCurrentContainerNotCached)
-	}
-
-	// Extract the scope label from the container.
-	derivedScope, ok := container.Scope()
-	if ok && derivedScope != "" {
-		nopLog().Debug().
-			Str("derived_scope", derivedScope).
-			Msg("Derived operational scope from current container's scope label")
-
-		return derivedScope, nil
-	}
-
-	return currentScope, nil
 }
 
 // GetContainerChain returns the container chain label value.
