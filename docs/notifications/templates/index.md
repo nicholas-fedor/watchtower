@@ -505,14 +505,24 @@ Use the [Template Preview Tool](../template-preview/index.md) to test your templ
 
 ## Text from outside Watchtower
 
-Some text in a notification comes from outside Watchtower. That includes lifecycle hook output, image annotations and error messages from registries, the container engine and Git servers. Before a template runs, Watchtower makes each log message, log field and report field printable on one line:
+Some text in a notification comes from outside Watchtower. That includes lifecycle hook output, image annotations and error messages from registries, the container engine and Git servers. Before a template runs, Watchtower makes that text printable on one line and limits its length. This applies to every log message, log field key and value, and report field, including the values inside nested fields.
+
+The JSON and porcelain templates receive the same values. The title, the host name and the text a template writes itself, including its own line breaks, stay as written. Watchtower does not escape markup or mentions for each notification service, as [Lifecycle Hooks](../../advanced-features/lifecycle-hooks/index.md#hook_output_and_security) describes.
+
+### Printable on one line
+
+Watchtower cleans each piece of text in these ways:
 
 - It removes terminal escape sequences, such as colours, window titles and clipboard writes.
 - It removes control characters other than tabs.
 - It removes invisible Unicode format characters, such as bidirectional text controls, zero-width characters and tag characters. Emoji joined with zero-width joiners show as their separate parts.
 - It ends a line at each newline, carriage return and Unicode line or paragraph separator. It joins the trimmed, non-blank lines with ` | `. No value can then start a line that reads like a Watchtower message.
 
-Log field keys and values inside nested fields are cleaned too. The JSON and porcelain templates receive the same cleaned values. The title, the host name and the text a template writes itself, including its own line breaks, stay as written. Watchtower does not escape markup or mentions for each notification service, as [Lifecycle Hooks](../../advanced-features/lifecycle-hooks/index.md#hook_output_and_security) describes.
+### Length limit
+
+After cleaning, text longer than 1,024 characters keeps its first 511 and last 512 characters with `…` between them. A long error page or command output then cannot fill a notification. The start of an error usually names the failure, and the end of command output usually holds its result.
+
+The limit applies to each piece of text rather than to the whole message. A notification with many entries can still exceed a service's own message limit. Watchtower's own log is not shortened this way.
 
 ## Additional Resources
 
