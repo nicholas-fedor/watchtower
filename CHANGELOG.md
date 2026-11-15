@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Escape unicode controls in json logs by @nicholas-fedor in [#3810](https://github.com/nicholas-fedor/watchtower/pull/3810)
 - Clean untrusted text in every notification by @nicholas-fedor in [#3808](https://github.com/nicholas-fedor/watchtower/pull/3808)
 - Build the digest GET fallback on the HEAD round's results by @nicholas-fedor in [#3806](https://github.com/nicholas-fedor/watchtower/pull/3806)
 - Log mirror endpoints as the host requests go to by @nicholas-fedor in [#3802](https://github.com/nicholas-fedor/watchtower/pull/3802)
