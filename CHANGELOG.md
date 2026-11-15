@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Escape display-changing text in logfmt and pretty logs by @nicholas-fedor in [#3812](https://github.com/nicholas-fedor/watchtower/pull/3812)
 - Escape unicode controls in json logs by @nicholas-fedor in [#3810](https://github.com/nicholas-fedor/watchtower/pull/3810)
 - Clean untrusted text in every notification by @nicholas-fedor in [#3808](https://github.com/nicholas-fedor/watchtower/pull/3808)
 - Build the digest GET fallback on the HEAD round's results by @nicholas-fedor in [#3806](https://github.com/nicholas-fedor/watchtower/pull/3806)
@@ -1780,7 +1781,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Resolve gosec SARIF validation error by @nicholas-fedor in [#1374](https://github.com/nicholas-fedor/watchtower/pull/1374)
-- Return HTTP 429 for full updates when another update is running by @veeceey in [#1304](https://github.com/nicholas-fedor/watchtower/pull/1304)
+- Return HTTP 429 for full updates when another update is running by @veeceey
 - Propagate context throughout watchtower for improved cancellation and timeout handling by @nicholas-fedor in [#1335](https://github.com/nicholas-fedor/watchtower/pull/1335)
 - Log container startup failures at warning level by @nicholas-fedor in [#1332](https://github.com/nicholas-fedor/watchtower/pull/1332)
 
@@ -1836,7 +1837,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Contributors
 
-- @veeceey made their first contribution in [#1304](https://github.com/nicholas-fedor/watchtower/pull/1304)
+- @veeceey made their first contribution
 
 ## [1.14.2] - 2026-02-17
 
