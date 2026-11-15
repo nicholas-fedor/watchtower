@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Load settings once at startup by @nicholas-fedor in [#3816](https://github.com/nicholas-fedor/watchtower/pull/3816)
 - Shorten long untrusted text in notifications by @nicholas-fedor in [#3814](https://github.com/nicholas-fedor/watchtower/pull/3814)
 - Escape display-changing text in logfmt and pretty logs by @nicholas-fedor in [#3812](https://github.com/nicholas-fedor/watchtower/pull/3812)
 - Escape unicode controls in json logs by @nicholas-fedor in [#3810](https://github.com/nicholas-fedor/watchtower/pull/3810)
