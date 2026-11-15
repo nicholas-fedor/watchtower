@@ -187,7 +187,7 @@ A hook runs inside the container. Its output therefore comes from whatever runs 
 - It puts the output on one line, joining its lines with ` | `. No line of hook output can then pass for one of Watchtower's own notification lines.
 - The output never changes what Watchtower does. Only the exit code decides whether the update continues, is skipped or fails.
 
-Notifications clean all other text from outside Watchtower the same way, as [Text from outside Watchtower](../../notifications/templates/index.md#text_from_outside_watchtower) describes.
+Notifications clean all other text from outside Watchtower the same way. They also show at most 1,024 characters of any such text, including hook output. [Text from outside Watchtower](../../notifications/templates/index.md#text_from_outside_watchtower) describes both.
 
 The kept output goes to these places:
 
