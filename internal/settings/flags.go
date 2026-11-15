@@ -46,6 +46,69 @@ var (
 	errIntervalAndSchedule = errors.New("cannot define both interval and schedule")
 )
 
+// Errors from [Prepare], one for each step that can fail.
+var (
+	// ErrApplyEnvironment reports that environment variables could not be
+	// applied to the flags.
+	ErrApplyEnvironment = errors.New("apply environment configuration")
+	// ErrSetUpLogging reports an invalid log format or level.
+	ErrSetUpLogging = errors.New("setup logging")
+	// ErrFlagAliases reports an invalid configuration found while applying
+	// alias flags, such as an interval set with a schedule.
+	ErrFlagAliases = errors.New("process flag aliases")
+	// ErrSecretFiles reports a secret file that could not be read.
+	ErrSecretFiles = errors.New("load secrets from files")
+)
+
+// Prepare readies the parsed flags of rootCmd for [Load] and returns the logger
+// to use from then on.
+//
+// It applies environment variables to unset flags, sets the log format and
+// level, then applies the alias flags, which can force a debug or trace level.
+// It sets the logging up again so that level applies, then reads secret files
+// into their flags. Setting the format before the aliases makes their errors
+// use the chosen format.
+//
+// Parameters:
+//   - log: Logger to reconfigure.
+//   - rootCmd: Root command, with its flags registered and parsed.
+//
+// Returns:
+//   - *zerolog.Logger: The logger with the configured format and level. On a
+//     failure it is the last logger set up, for reporting the failure.
+//   - error: Non-nil when a step fails, wrapping [ErrApplyEnvironment],
+//     [ErrSetUpLogging], [ErrFlagAliases] or [ErrSecretFiles].
+func Prepare(log *zerolog.Logger, rootCmd *cobra.Command) (*zerolog.Logger, error) {
+	flagSet := rootCmd.PersistentFlags()
+
+	err := applyEnvToFlags(flagSet)
+	if err != nil {
+		return log, fmt.Errorf("%w: %w", ErrApplyEnvironment, err)
+	}
+
+	log, err = setupLogging(log, flagSet)
+	if err != nil {
+		return log, fmt.Errorf("%w: %w", ErrSetUpLogging, err)
+	}
+
+	err = processFlagAliases(log, flagSet)
+	if err != nil {
+		return log, fmt.Errorf("%w: %w", ErrFlagAliases, err)
+	}
+
+	log, err = setupLogging(log, flagSet)
+	if err != nil {
+		return log, fmt.Errorf("%w: %w", ErrSetUpLogging, err)
+	}
+
+	err = getSecretsFromFiles(log, rootCmd)
+	if err != nil {
+		return log, fmt.Errorf("%w: %w", ErrSecretFiles, err)
+	}
+
+	return log, nil
+}
+
 // EnvConfig sets Docker environment variables from flags.
 //
 // Parameters:
@@ -167,7 +230,7 @@ func setEnvOptBool(log *zerolog.Logger, env string, opt bool) error {
 	return nil
 }
 
-// GetSecretsFromFiles updates flags with file contents for secrets.
+// getSecretsFromFiles updates flags with file contents for secrets.
 //
 // Parameters:
 //   - log: Logger for secret-loading diagnostics.
@@ -177,7 +240,7 @@ func setEnvOptBool(log *zerolog.Logger, env string, opt bool) error {
 //   - error: Non-nil when a secret file cannot be loaded, naming its flag.
 //
 //nolint:godox
-func GetSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) error {
+func getSecretsFromFiles(log *zerolog.Logger, rootCmd *cobra.Command) error {
 	flags := rootCmd.PersistentFlags()
 	secrets := []string{
 		// TODO: Remove just before v2 Release.
@@ -381,37 +444,19 @@ func isFilePath(path string) bool {
 	return !errors.Is(err, os.ErrNotExist)
 }
 
-// ProcessFlagAliases applies environment values then syncs flag aliases.
+// processFlagAliases applies the alias flags: porcelain mode, an interval as a
+// schedule, and the debug and trace log levels.
 //
-// It bridges env onto unset flags, then applies porcelain mode, interval versus
-// schedule conflicts, and debug/trace log-level forcing.
-//
-// Intended production order (see cmd preRun / notify-upgrade):
-//
-//  1. ApplyEnvToFlags (or rely on the bridge inside this function)
-//  2. SetupLogging, which applies --log-format and the current level, so the
-//     caller logs an error from here in the selected format
-//  3. ProcessFlagAliases, which may force the log level to debug or trace
-//  4. SetupLogging again, which applies the level after alias changes
-//  5. GetSecretsFromFiles / EnvConfig / Load
-//
-// Call after Cobra parse. Do not call only after a single post-alias SetupLogging
-// if format-before-fatal matters. Sandwich this between the two SetupLogging calls.
+// [Prepare] runs it after the environment reaches the flags and between its
+// two logging setups.
 //
 // Parameters:
 //   - log: Logger for alias diagnostics.
 //   - flags: Parsed persistent flag set.
 //
 // Returns:
-//   - error: Non-nil when the flags or the environment hold an invalid
-//     configuration.
-func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) error {
-	// Ensure env-sourced values are visible to alias logic via flag Gets.
-	err := ApplyEnvToFlags(flags, AllSpecs())
-	if err != nil {
-		return fmt.Errorf("apply environment configuration: %w", err)
-	}
-
+//   - error: Non-nil when the flags hold an invalid configuration.
+func processFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) error {
 	// Handle porcelain mode.
 	porcelain, err := flags.GetString("porcelain")
 	if err != nil {
@@ -510,7 +555,7 @@ func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) error {
 	return nil
 }
 
-// SetupLogging configures format and level on the provided logger.
+// setupLogging configures format and level on the provided logger.
 //
 // Parameters:
 //   - log: Logger to reconfigure (typically from logging.New at process start).
@@ -519,7 +564,7 @@ func ProcessFlagAliases(log *zerolog.Logger, flags *pflag.FlagSet) error {
 // Returns:
 //   - *zerolog.Logger: Logger with format writer and level applied.
 //   - error: Non-nil if config fails, nil on success.
-func SetupLogging(log *zerolog.Logger, flags *pflag.FlagSet) (*zerolog.Logger, error) {
+func setupLogging(log *zerolog.Logger, flags *pflag.FlagSet) (*zerolog.Logger, error) {
 	logFormat, err := flags.GetString("log-format")
 	if err != nil {
 		log.Debug().
@@ -579,8 +624,8 @@ func SetupLogging(log *zerolog.Logger, flags *pflag.FlagSet) (*zerolog.Logger, e
 	// so GetString is rarely empty. The empty branch is defensive for tests or
 	// partial flag sets (for example orchestrator paths that never registered logging
 	// flags) and preserves the level already on log (typically InfoLevel from main).
-	// ProcessFlagAliases may have already forced debug/trace onto the log-level flag.
-	// Invalid levels fail fast (same contract as the previous SetupLogging behavior).
+	// processFlagAliases may have already forced debug/trace onto the log-level flag.
+	// Invalid levels fail fast.
 	if rawLogLevel != "" {
 		level, parseErr := logging.ParseLevel(rawLogLevel)
 		if parseErr != nil {
@@ -648,7 +693,7 @@ func appendFlagValue(log *zerolog.Logger, flags *pflag.FlagSet, name string, val
 }
 
 // setFlagIfDefault sets a flag's value unless it was set by a flag or by an
-// environment variable. ApplyEnvToFlags leaves environment values unmarked, so
+// environment variable. applyEnvToFlags leaves environment values unmarked, so
 // they are checked separately.
 //
 // Parameters:
@@ -677,7 +722,7 @@ func setFlagIfDefault(log *zerolog.Logger, flags *pflag.FlagSet, name, value str
 }
 
 // setByEnv reports whether an environment variable supplies the flag's value,
-// using the same rule as ApplyEnvToFlags.
+// using the same rule as applyEnvToFlags.
 //
 // Parameters:
 //   - name: Flag name.

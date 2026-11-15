@@ -14,21 +14,20 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/utils"
 )
 
-// ApplyEnvToFlags copies bound environment values onto flags that were not set on the CLI.
+// applyEnvToFlags copies bound environment values onto flags that were not set on the CLI.
 //
-// Call after Cobra parse and before ProcessFlagAliases / SetupLogging so those
-// helpers still see env-sourced values via flag Gets. Load continues to resolve
+// [Prepare] runs it first, so the logging setup and the alias flags see
+// env-sourced values through the flags. Load continues to resolve
 // through Viper with flag > env > default precedence. Static pflag defaults are
 // never env-baked at registration time.
 //
 // Parameters:
 //   - flagSet: Parsed persistent flag set.
-//   - specs: Aggregated FlagSpec rows.
 //
 // Returns:
 //   - error: Non-nil when a flag cannot be set from env.
-func ApplyEnvToFlags(flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
-	for _, flagSpec := range specs {
+func applyEnvToFlags(flagSet *pflag.FlagSet) error {
+	for _, flagSpec := range AllSpecs() {
 		if flagSet.Lookup(flagSpec.Name) == nil {
 			continue
 		}

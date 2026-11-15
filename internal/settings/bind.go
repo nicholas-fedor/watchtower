@@ -50,7 +50,7 @@ func BindAll(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) e
 		}
 
 		// Bind all non-presence env aliases in one call so earlier EnvKeys keep precedence.
-		// Presence-only keys (NO_COLOR) are applied via ApplyEnvToFlags only.
+		// Presence-only keys (NO_COLOR) are applied via applyEnvToFlags only.
 		envAliases := make([]string, 0, len(flagSpec.EnvKeys))
 		for _, envKey := range flagSpec.EnvKeys {
 			if isPresenceEnvKey(envKey) {
