@@ -70,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Prepare the startup flags in one place by @nicholas-fedor in [#3823](https://github.com/nicholas-fedor/watchtower/pull/3823)
 - Resolve the scope once at startup by @nicholas-fedor in [#3818](https://github.com/nicholas-fedor/watchtower/pull/3818)
 - Split the digest lookup into endpoint phases by @nicholas-fedor in [#3800](https://github.com/nicholas-fedor/watchtower/pull/3800)
 - Decompose the project checkout into phases by @nicholas-fedor in [#3792](https://github.com/nicholas-fedor/watchtower/pull/3792)
