@@ -6,8 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
@@ -20,8 +18,6 @@ var errInvalidAPIHost = errors.New(
 
 // RunConfig encapsulates the configuration parameters for the runMain function.
 type RunConfig struct {
-	// Command is the cobra.Command instance representing the executed command, providing access to parsed flags.
-	Command *cobra.Command
 	// Filter is the filters.Filter function determining which containers are processed during updates.
 	Filter filters.Filter
 	// FilterDesc is a human-readable description of the applied filter, used in logging and notifications.
@@ -92,27 +88,15 @@ type RunConfig struct {
 	UpdateAPITimeoutChanged bool
 }
 
-// RunConfigInput supplies runtime values needed to project Config into RunConfig.
-type RunConfigInput struct {
-	// Command is the cobra command retained on RunConfig for callers that still
-	// carry a command reference through orchestration (not used for policy flag reads).
-	Command *cobra.Command
-	// Names are normalized container names for filtering display.
-	Names []string
-}
-
 // BuildRunConfig projects Config into RunConfig for process orchestration.
 //
 // It applies the API port default and validates the API host. It resolves
 // endpoint enablement from cfg.API and returns a complete RunConfig snapshot.
 //
-// Parameters:
-//   - input: Runtime inputs (command pointer and normalized names).
-//
 // Returns:
 //   - RunConfig: Orchestration snapshot for runMain.
 //   - error: Non-nil when API host or endpoint configuration is invalid.
-func (c Config) BuildRunConfig(input RunConfigInput) (RunConfig, error) {
+func (c Config) BuildRunConfig() (RunConfig, error) {
 	// Default port when unset so HTTP API bind always has a concrete value.
 	apiPort := c.API.Port
 	if apiPort == "" {
@@ -135,8 +119,7 @@ func (c Config) BuildRunConfig(input RunConfigInput) (RunConfig, error) {
 	}
 
 	cfg := RunConfig{
-		Command:                 input.Command,
-		Names:                   append([]string(nil), input.Names...),
+		Names:                   append([]string(nil), c.Filter.Names...),
 		Filter:                  c.Filter.Predicate,
 		FilterDesc:              c.Filter.Desc,
 		RunOnce:                 c.Mode.RunOnce,

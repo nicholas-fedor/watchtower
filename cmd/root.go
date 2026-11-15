@@ -72,7 +72,8 @@ var (
 	//
 	// It is the single source of operational policy for run-once, schedule, and API paths.
 	// Values originate from CLI flags and environment variables registered in internal/settings
-	// and are resolved once at startup (and again in run when positional container names apply).
+	// and are loaded once at startup, in preRun. run replaces the filter's scope when the
+	// container's scope label supplies one.
 	appCfg settings.Config
 
 	// client is the Docker client instance used to interact with container operations in Watchtower.
@@ -345,12 +346,12 @@ func (p *process) exit(cmd *cobra.Command, err error) {
 //
 // Parameters:
 //   - cmd: The cobra.Command instance being executed, providing access to parsed flags.
-//   - _: A slice of string arguments (unused here, as container names are applied in run when
-//     reloading configuration for filtering).
+//   - args: Container names given as positional arguments, which limit the containers
+//     Watchtower monitors.
 //
 // Returns:
 //   - error: An [exitError] when Watchtower must not continue.
-func (p *process) preRun(cmd *cobra.Command, _ []string) error {
+func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	// Execute reports the errors returned from here on. Flag and argument
 	// errors come earlier, so Cobra still prints them with the usage text.
 	cmd.SilenceErrors = true
@@ -396,8 +397,7 @@ func (p *process) preRun(cmd *cobra.Command, _ []string) error {
 		return &exitError{err: err, msg: "Failed to configure Docker environment", code: 1}
 	}
 
-	// Load without positional names. run reloads with args for the final filter.
-	appCfg, err = settings.Load(p.log, cmd, nil)
+	appCfg, err = settings.Load(p.log, cmd, args)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
@@ -568,32 +568,17 @@ func (p *process) setUpNotifications() error {
 
 // run executes the main Watchtower logic based on parsed command-line flags.
 //
-// It reloads process configuration with positional container names, derives the effective
-// operational scope (including scope persistence across self-updates), handles health-check
-// early exit, builds the HTTP API RunConfig from appCfg, and delegates to runMain for core
-// execution. It bridges configuration loading and the application's primary workflow.
+// It uses the configuration preRun loaded, derives the effective operational scope (including
+// scope persistence across self-updates), handles health-check early exit, builds the HTTP API
+// RunConfig from appCfg, and delegates to runMain for core execution.
 //
 // Parameters:
-//   - command: The cobra.Command instance being executed, providing access to parsed flags.
-//   - args: A slice of container names provided as positional arguments, used for filtering.
+//   - _: The cobra.Command instance being executed, whose settings preRun already loaded.
+//   - _: Positional arguments, which preRun already loaded as container names.
 //
 // Returns:
 //   - error: An [exitError] when Watchtower cannot continue or its run failed.
-func (p *process) run(command *cobra.Command, args []string) error {
-	p.log.Debug().
-		Strs("positional_args", args).
-		Msg("Received positional arguments for container filtering")
-
-	// Reload configuration with positional names so the filter includes them.
-	loaded, err := settings.Load(p.log, command, args)
-	if err != nil {
-		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
-	}
-
-	appCfg = loaded
-
-	normalizedContainerNames := append([]string(nil), appCfg.Filter.Names...)
-
+func (p *process) run(_ *cobra.Command, _ []string) error {
 	// Prefer explicit scope, then scope derived from the container label (self-update persistence).
 	effectiveScope, scopeErr := container.GetEffectiveScope(
 		currentWatchtowerContainer,
@@ -640,10 +625,7 @@ func (p *process) run(command *cobra.Command, args []string) error {
 		return nil
 	}
 
-	cfg, err := appCfg.BuildRunConfig(settings.RunConfigInput{
-		Command: command,
-		Names:   normalizedContainerNames,
-	})
+	cfg, err := appCfg.BuildRunConfig()
 	if err != nil {
 		return &exitError{err: err, msg: logging.RunConfigurationFailed, code: 1}
 	}

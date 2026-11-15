@@ -192,7 +192,7 @@ func TestLoad_APIChangedReflectsCLIOnly(t *testing.T) {
 		assert.False(t, cfg.API.CheckTimeoutChanged)
 		assert.False(t, cfg.API.UpdateTimeoutChanged)
 
-		run, err := cfg.BuildRunConfig(RunConfigInput{})
+		run, err := cfg.BuildRunConfig()
 		require.NoError(t, err)
 		assert.False(t, AnyHTTPAPIConfig(run),
 			"env-only host/port/rate/timeouts must not trip the no-endpoint warning")
@@ -209,7 +209,7 @@ func TestLoad_APIChangedReflectsCLIOnly(t *testing.T) {
 		assert.True(t, cfg.API.PortChanged)
 		assert.True(t, cfg.API.RateLimitChanged)
 
-		run, err := cfg.BuildRunConfig(RunConfigInput{})
+		run, err := cfg.BuildRunConfig()
 		require.NoError(t, err)
 		assert.True(t, AnyHTTPAPIConfig(run),
 			"CLI host/port/rate-limit should still trip the no-endpoint warning")

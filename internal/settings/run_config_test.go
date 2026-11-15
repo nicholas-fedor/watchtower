@@ -44,9 +44,28 @@ func TestBuildRunConfigMultilineEndpointsEnv(t *testing.T) {
 		"WATCHTOWER_HTTP_API_ENDPOINTS": "health\nmetrics\n",
 	})
 
-	run, err := cfg.BuildRunConfig(RunConfigInput{})
+	run, err := cfg.BuildRunConfig()
 	require.NoError(t, err)
 	assert.True(t, run.EnableHealthAPI)
 	assert.True(t, run.EnableMetricsAPI)
 	assert.False(t, run.EnableUpdateAPI)
+}
+
+// TestConfig_BuildRunConfig_names verifies that the run configuration lists the
+// container names loaded from the positional arguments, normalized without a
+// leading slash, in a copy of its own.
+func TestConfig_BuildRunConfig_names(t *testing.T) {
+	t.Parallel()
+
+	_, _, cmd := bindLoad(t)
+
+	cfg, err := Load(newTestLogger(t), cmd, []string{"/web", "db"})
+	require.NoError(t, err)
+
+	run, err := cfg.BuildRunConfig()
+	require.NoError(t, err)
+	assert.Equal(t, []string{"web", "db"}, run.Names)
+
+	run.Names[0] = "changed"
+	assert.Equal(t, []string{"web", "db"}, cfg.Filter.Names)
 }
