@@ -178,6 +178,76 @@ func FuzzJSONWriter(f *testing.F) {
 	})
 }
 
+// FuzzConsoleWriters checks that the logfmt and pretty formats write no
+// character that changes how text shows.
+//
+// Each format logs the fuzzed text as the message, the time, an error list, a
+// string field and a field name. Its line ends with a newline and holds no
+// other control character, Unicode format character, or line or paragraph
+// separator. Pretty output shows non-empty text without such a character
+// unquoted.
+//
+// The seed corpus covers plain and multi-byte text, terminal escape sequences,
+// C1 controls, bidirectional and zero-width characters, line breaks, tabs,
+// DEL and invalid UTF-8.
+func FuzzConsoleWriters(f *testing.F) {
+	for _, seed := range []string{
+		"plain text",
+		"héllo wörld",
+		"\x1b]0;title\a\x1b[31mred",
+		"\u009b31mred\u0085",
+		"abc" + string(rune(0x202e)) + "def" + string(rune(0x200b)),
+		"a\nb\rc" + string(rune(0x2028)) + "d",
+		"a\tb",
+		"a\x7fb",
+		"a\xffb",
+	} {
+		f.Add(seed)
+	}
+
+	// raw reports whether char may not appear in a line before its newline.
+	raw := func(char rune) bool {
+		return char == '\n' || char == '\t' || needsCleaning(char)
+	}
+
+	f.Fuzz(func(t *testing.T, text string) {
+		lines := make(map[string]string)
+
+		for _, format := range []struct {
+			name   string
+			writer zerolog.ConsoleWriter
+		}{
+			{name: "logfmt", writer: LogfmtWriter(nil)},
+			{name: "pretty", writer: newPrettyWriter(true)},
+		} {
+			var out bytes.Buffer
+
+			format.writer.Out = &out
+
+			log := zerolog.New(format.writer)
+			log.Warn().Str(zerolog.TimestampFieldName, text).Strs("error", []string{text}).Str("image", text).
+				Str("key "+text, "value").Msg(text)
+
+			line, ended := strings.CutSuffix(out.String(), "\n")
+			if !ended {
+				t.Fatalf("%s line does not end with a newline: %q", format.name, out.String())
+			}
+
+			if index := strings.IndexFunc(line, raw); index >= 0 {
+				char, _ := utf8.DecodeRuneInString(line[index:])
+				t.Fatalf("%s line keeps %U: %q", format.name, char, line)
+			}
+
+			lines[format.name] = line
+		}
+
+		if text != "" && utf8.ValidString(text) && !strings.ContainsFunc(text, raw) &&
+			!strings.Contains(lines["pretty"], "WRN "+text+" error=") {
+			t.Fatalf("pretty line quotes or changes %q: %q", text, lines["pretty"])
+		}
+	})
+}
+
 // FuzzPrintableLine checks the invariants of a printable line.
 //
 // The result is valid UTF-8 on one line. It has no control characters other

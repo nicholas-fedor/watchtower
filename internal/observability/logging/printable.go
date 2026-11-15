@@ -135,6 +135,12 @@ func isPrintableASCIILine(text string) bool {
 //   - bool: True for a control character, a Unicode format character, or a
 //     line or paragraph separator.
 func changesDisplay(char rune) bool {
+	// No ASCII character is a format character or a separator, so the common
+	// ASCII case needs only the control check.
+	if char < utf8.RuneSelf {
+		return unicode.IsControl(char)
+	}
+
 	return unicode.IsControl(char) || unicode.In(char, unicode.Cf, unicode.Zl, unicode.Zp)
 }
 
