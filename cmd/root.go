@@ -72,8 +72,8 @@ var (
 	//
 	// It is the single source of operational policy for run-once, schedule, and API paths.
 	// Values originate from CLI flags and environment variables registered in internal/settings
-	// and are loaded once at startup, in preRun. run replaces the filter's scope when the
-	// container's scope label supplies one.
+	// and are loaded once at startup, in preRun. preRun then takes the scope from Watchtower's
+	// own scope label when no scope is set.
 	appCfg settings.Config
 
 	// client is the Docker client instance used to interact with container operations in Watchtower.
@@ -339,10 +339,17 @@ func (p *process) exit(cmd *cobra.Command, err error) {
 
 // preRun prepares the environment and configuration before the main command execution begins.
 //
-// It processes command-line flag aliases, configures logging based on verbosity settings,
-// expands secrets from files, maps Docker flags into the process environment, loads the
-// immutable appconfig snapshot, initializes the Docker client and notification client, and
-// handles early-exit paths (ephemeral self-update orchestrator and invalid old-container restarts).
+// It runs these steps in order:
+//  1. Applies flag aliases, logging settings and secrets from files.
+//  2. Maps the Docker flags into the process environment and loads the configuration.
+//  3. Creates the Docker client and finds Watchtower's own container.
+//  4. Ends the process for the ephemeral self-update orchestrator and for an old container
+//     restarted after a self-update replaced it.
+//  5. Sets up notifications.
+//  6. Takes the scope from Watchtower's own scope label when no scope is set. Exits when
+//     that label is needed but cannot be read.
+//  7. Warns when Watchtower cannot identify or inspect its own container.
+//  8. Warns about deprecated notification settings.
 //
 // Parameters:
 //   - cmd: The cobra.Command instance being executed, providing access to parsed flags.
@@ -405,13 +412,6 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	p.log.Debug().
 		Str("scheduleSpec", appCfg.Schedule.Spec).
 		Msg("Retrieved cron schedule specification from configuration")
-
-	// Log the scope if specified, aiding debugging by confirming the operational boundary.
-	if appCfg.Filter.Scope != "" {
-		p.log.Debug().
-			Str("scope", appCfg.Filter.Scope).
-			Msg("Configured operational scope")
-	}
 
 	// Initialize the Docker client from the resolved ClientOptions projection,
 	// with the rate limiter that update sessions also use for release tag lookups.
@@ -500,16 +500,9 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Without the container's labels, a scope set only by its scope label is
-	// unknown. Running without a scope would update containers that belong to
-	// another Watchtower instance, so Watchtower exits instead. A health check
-	// runs no updates, so it continues.
-	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
-		// Disable restarts first, so the runtime does not start Watchtower again.
-		p.disableRestarts()
-		p.log.Error().Err(inspectErr).Msg(logging.ScopeLabelUnreadable)
-
-		return &exitError{err: inspectErr, msg: "", code: 1}
+	err = p.resolveScope(inspectErr)
+	if err != nil {
+		return err
 	}
 
 	if currentWatchtowerContainerUnknown {
@@ -566,11 +559,56 @@ func (p *process) setUpNotifications() error {
 	return nil
 }
 
+// resolveScope settles the scope Watchtower runs in, taking it from
+// Watchtower's own scope label when the configuration sets none.
+//
+// Without its own container, Watchtower keeps the configured scope. When its
+// container could not be inspected and no scope is set, the scope label is
+// unknown. Running without a scope would update containers that belong to
+// another Watchtower instance, so Watchtower exits instead. A health check
+// runs no updates, so it continues.
+//
+// Parameters:
+//   - inspectErr: The error from inspecting Watchtower's own container. It is
+//     nil when the inspect succeeded.
+//
+// Returns:
+//   - error: An [exitError] when the scope label cannot be read or the filter
+//     cannot be built.
+func (p *process) resolveScope(inspectErr error) error {
+	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
+		// Disable restarts first, so the runtime does not start Watchtower again.
+		p.disableRestarts()
+		p.log.Error().Err(inspectErr).Msg(logging.ScopeLabelUnreadable)
+
+		return &exitError{err: inspectErr, msg: "", code: 1}
+	}
+
+	var label string
+	if currentWatchtowerContainer != nil {
+		label, _ = currentWatchtowerContainer.Scope()
+	}
+
+	scoped, err := appCfg.Filter.WithLabelScope(p.log, label)
+	if err != nil {
+		return &exitError{err: err, msg: "Failed to build container filter", code: 1}
+	}
+
+	appCfg.Filter = scoped
+
+	if appCfg.Filter.Scope != "" {
+		p.log.Debug().
+			Str("scope", appCfg.Filter.Scope).
+			Msg("Resolved operational scope")
+	}
+
+	return nil
+}
+
 // run executes the main Watchtower logic based on parsed command-line flags.
 //
-// It uses the configuration preRun loaded, derives the effective operational scope (including
-// scope persistence across self-updates), handles health-check early exit, builds the HTTP API
-// RunConfig from appCfg, and delegates to runMain for core execution.
+// It uses the configuration preRun prepared. A health check exits early. Otherwise run builds
+// the RunConfig from appCfg and hands it to runMain for core execution.
 //
 // Parameters:
 //   - _: The cobra.Command instance being executed, whose settings preRun already loaded.
@@ -579,38 +617,6 @@ func (p *process) setUpNotifications() error {
 // Returns:
 //   - error: An [exitError] when Watchtower cannot continue or its run failed.
 func (p *process) run(_ *cobra.Command, _ []string) error {
-	// Prefer explicit scope, then scope derived from the container label (self-update persistence).
-	effectiveScope, scopeErr := container.GetEffectiveScope(
-		currentWatchtowerContainer,
-		appCfg.Filter.Scope,
-	)
-	if scopeErr != nil {
-		p.log.Debug().
-			Err(scopeErr).
-			Msg("Scope derivation failed, continuing with current scope")
-	} else if effectiveScope != appCfg.Filter.Scope {
-		appCfg.Filter.Scope = effectiveScope
-
-		// Rebuild the filter predicate with the effective scope.
-		predicate, desc, filterErr := filters.BuildFilter(
-			p.log,
-			appCfg.Filter.Names,
-			appCfg.Filter.DisableContainers,
-			appCfg.Filter.MonitorImageNames,
-			appCfg.Filter.SkipImageNames,
-			appCfg.Filter.EnableContainersByLabel,
-			appCfg.Filter.DisableContainersByLabel,
-			appCfg.Filter.LabelEnable,
-			appCfg.Filter.Scope,
-		)
-		if filterErr != nil {
-			return &exitError{err: filterErr, msg: "Failed to build container filter", code: 1}
-		}
-
-		appCfg.Filter.Predicate = predicate
-		appCfg.Filter.Desc = desc
-	}
-
 	if appCfg.Mode.HealthCheck {
 		if isContainerMainProcess() {
 			sleepFunc(1 * time.Second)
