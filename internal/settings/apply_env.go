@@ -17,9 +17,9 @@ import (
 // applyEnvToFlags copies bound environment values onto flags that were not set on the CLI.
 //
 // It runs before the logging setup and the alias flags, so they see
-// env-sourced values through the flags. Load then resolves through Viper with
-// flag > env > default precedence. Static pflag defaults are
-// never env-baked at registration time.
+// env-sourced values through the flags. The flags stay unmarked as changed, so
+// the command line alone decides which settings count as explicitly set.
+// Static pflag defaults are never env-baked at registration time.
 //
 // Parameters:
 //   - flagSet: Parsed persistent flag set.

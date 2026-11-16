@@ -291,10 +291,6 @@ func getSecretFromFile(log *zerolog.Logger, flags *pflag.FlagSet, secret string)
 			return fmt.Errorf("%w: %w", errReplaceSliceFailed, err)
 		}
 
-		// Mark the flag as explicitly set so downstream consumers read the expanded
-		// value from the flag rather than re-deriving from raw os.Getenv.
-		flag.Changed = true
-
 		return nil
 	}
 
