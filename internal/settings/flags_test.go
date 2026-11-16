@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -233,22 +234,51 @@ func TestEnvConfig(t *testing.T) {
 		flags         []string
 		setupCmd      func(*cobra.Command)
 		expectEnv     map[string]string
+		expectUnset   []string
 		expectError   bool
+		expectErrIs   error
 		expectWarning string
 	}{
 		{
 			name: "defaults",
-			envVars: map[string]string{
-				"DOCKER_TLS_VERIFY": "",
-				"DOCKER_HOST":       "",
-				"DOCKER_CERT_PATH":  "",
-			},
 			expectEnv: map[string]string{
-				"DOCKER_HOST":        "unix:///var/run/docker.sock",
-				"DOCKER_TLS_VERIFY":  "",
-				"DOCKER_API_VERSION": "",
-				"DOCKER_CERT_PATH":   "",
+				"DOCKER_HOST": "unix:///var/run/docker.sock",
 			},
+			expectUnset: []string{"DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"},
+		},
+		{
+			// With a certificate path, the Docker client verifies whenever DOCKER_TLS_VERIFY has any value.
+			name: "false tls verify env var is unset",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "0",
+			},
+			expectUnset: []string{"DOCKER_TLS_VERIFY"},
+		},
+		{
+			// Startup rejects this value, so the exit path must not read it as false.
+			name: "unparsable tls verify env var fails",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "yes",
+			},
+			expectErrIs: strconv.ErrSyntax,
+		},
+		{
+			name: "tlsverify flag false overrides env var",
+			envVars: map[string]string{
+				"DOCKER_TLS_VERIFY": "1",
+			},
+			flags:       []string{"--tlsverify=false"},
+			expectUnset: []string{"DOCKER_TLS_VERIFY"},
+		},
+		{
+			name: "empty flags override env vars",
+			envVars: map[string]string{
+				"DOCKER_HOST":        "tcp://example.com:2375",
+				"DOCKER_API_VERSION": "1.41",
+				"DOCKER_CERT_PATH":   "/env/certs",
+			},
+			flags:       []string{"--host=", "--api-version=", "--cert-path="},
+			expectUnset: []string{"DOCKER_HOST", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"},
 		},
 		{
 			name: "custom",
@@ -427,13 +457,11 @@ func TestEnvConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "edge case empty api version",
+			name: "empty api version env var is unset",
 			envVars: map[string]string{
 				"DOCKER_API_VERSION": "",
 			},
-			expectEnv: map[string]string{
-				"DOCKER_API_VERSION": "",
-			},
+			expectUnset: []string{"DOCKER_API_VERSION"},
 		},
 	}
 
@@ -444,16 +472,12 @@ func TestEnvConfig(t *testing.T) {
 				"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH",
 			} {
 				t.Setenv(key, "")
-				os.Unsetenv(key)
+				require.NoError(t, os.Unsetenv(key))
 			}
 
 			// Set env vars for this case.
 			for k, v := range tc.envVars {
-				if v == "" {
-					os.Unsetenv(k)
-				} else {
-					t.Setenv(k, v)
-				}
+				t.Setenv(k, v)
 			}
 
 			cmd := new(cobra.Command)
@@ -479,6 +503,12 @@ func TestEnvConfig(t *testing.T) {
 
 			err := EnvConfig(log, cmd)
 
+			if tc.expectErrIs != nil {
+				require.ErrorIs(t, err, tc.expectErrIs)
+
+				return
+			}
+
 			if tc.expectError {
 				require.Error(t, err)
 				// Partial flag registration fails during BindAll (flag not registered)
@@ -498,6 +528,11 @@ func TestEnvConfig(t *testing.T) {
 
 			for k, v := range tc.expectEnv {
 				assert.Equal(t, v, os.Getenv(k))
+			}
+
+			for _, k := range tc.expectUnset {
+				value, ok := os.LookupEnv(k)
+				assert.False(t, ok, "%s is set to %q", k, value)
 			}
 
 			if tc.expectWarning != "" {
@@ -977,14 +1012,21 @@ func TestFlagsArePresentInDocumentation(t *testing.T) {
 	}
 }
 
-// TestSetEnvOptStr_Error tests error handling in setEnvOptStr.
-// Note: This test is limited without mocking os.Setenv; real failure requires system-specific conditions.
-func TestSetEnvOptStr_Error(t *testing.T) {
-	// Mocking os.Setenv is complex without dependency injection; test assumes rare failure case
-	// For coverage, ensure environment is writable and check logic
-	err := setEnvOptStr(newInfoTestLogger(t), "TEST_ENV", "value")
-	assert.NoError(t, err) // Normally succeeds; mock needed for failure
-	// To truly test setenv failure, use a system where Setenv fails (e.g., read-only env)
+// TestExportEnv checks that a value sets the variable and an empty value unsets it.
+// It also checks that a failed set returns errSetEnvFailed.
+func TestExportEnv(t *testing.T) {
+	t.Setenv("WATCHTOWER_TEST_EXPORT_ENV", "old")
+
+	require.NoError(t, exportEnv("WATCHTOWER_TEST_EXPORT_ENV", "new"))
+	assert.Equal(t, "new", os.Getenv("WATCHTOWER_TEST_EXPORT_ENV"))
+
+	require.NoError(t, exportEnv("WATCHTOWER_TEST_EXPORT_ENV", ""))
+
+	_, ok := os.LookupEnv("WATCHTOWER_TEST_EXPORT_ENV")
+	assert.False(t, ok)
+
+	// An empty name is invalid, so the set fails.
+	require.ErrorIs(t, exportEnv("", "value"), errSetEnvFailed)
 }
 
 // TestGetSecretFromFile_SkipCommentsAndEmptyLines verifies that comment and empty
