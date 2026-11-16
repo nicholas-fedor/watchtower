@@ -17,6 +17,7 @@ import (
 	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 )
 
 // TestInjectLabels verifies that labels are merged onto the named service only,
@@ -99,6 +100,35 @@ func TestAppliedImageID(t *testing.T) {
 		container.ImageID("sha256:fromps"),
 		appliedImageID(api.ContainerSummary{Name: "x", Image: "sha256:fromps"}, nil),
 	)
+}
+
+// TestExportConnection checks that the DOCKER_* connection variables follow
+// the Docker settings, and that an empty or false setting unsets its variable
+// rather than leaving the environment's value in place. It sets environment
+// variables, so it does not run in parallel.
+func TestExportConnection(t *testing.T) {
+	t.Setenv("DOCKER_HOST", "tcp://old.example.com:2375")
+	t.Setenv("DOCKER_TLS_VERIFY", "0")
+	t.Setenv("DOCKER_API_VERSION", "1.41")
+	t.Setenv("DOCKER_CERT_PATH", "/old/certs")
+
+	require.NoError(t, ExportConnection(dockerConfig.Docker{
+		Host:       "https://docker.example.com:2376",
+		TLSVerify:  true,
+		APIVersion: "1.47",
+		CertPath:   "/certs",
+	}))
+	assert.Equal(t, "https://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
+	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
+	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
+	assert.Equal(t, "/certs", os.Getenv("DOCKER_CERT_PATH"))
+
+	require.NoError(t, ExportConnection(dockerConfig.Docker{}))
+
+	for _, name := range []string{"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
+		value, ok := os.LookupEnv(name)
+		assert.False(t, ok, "%s is set to %q", name, value)
+	}
 }
 
 // TestClientApplyScopesStartProject verifies that applying a service scopes the project to that service and its dependencies.

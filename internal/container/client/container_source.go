@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"os"
 	"slices"
 	"strings"
 	"time"
@@ -132,7 +131,7 @@ func inspectListedContainers(log *zerolog.Logger,
 			Str("error_type", fmt.Sprintf("%T", err)).
 			Str("endpoint", "/containers/json").
 			Str("api_version", strings.Trim(api.ClientVersion(), "\"")).
-			Str("docker_host", os.Getenv("DOCKER_HOST")).
+			Str("docker_host", api.DaemonHost()).
 			Str("list_options", fmt.Sprintf("%+v", listOptions)).
 			Msg("ContainerList API call failed")
 
@@ -142,7 +141,7 @@ func inspectListedContainers(log *zerolog.Logger,
 				Err(err).
 				Str("endpoint", "/containers/json").
 				Str("api_version", strings.Trim(api.ClientVersion(), "\"")).
-				Str("docker_host", os.Getenv("DOCKER_HOST")).
+				Str("docker_host", api.DaemonHost()).
 				Msg("Docker API returned 404 for container list. Treating as empty list")
 
 			return []*container.Container{}, nil
@@ -169,7 +168,7 @@ func inspectListedContainers(log *zerolog.Logger,
 				Err(err).
 				Str("error_type", fmt.Sprintf("%T", err)).
 				Str("api_version", strings.Trim(api.ClientVersion(), "\"")).
-				Str("docker_host", os.Getenv("DOCKER_HOST")).
+				Str("docker_host", api.DaemonHost()).
 				Msg("Failed to inspect individual container during list")
 
 			// Handle race condition where containers disappear between API calls
@@ -236,7 +235,7 @@ func getSourceContainer(log *zerolog.Logger,
 			Err(err).
 			Str("error_type", fmt.Sprintf("%T", err)).
 			Str("api_version", strings.Trim(api.ClientVersion(), "\"")).
-			Str("docker_host", os.Getenv("DOCKER_HOST")).
+			Str("docker_host", api.DaemonHost()).
 			Msg("ContainerInspect API call failed")
 
 		clog.Debug().

@@ -9,11 +9,14 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v7"
+	"github.com/docker/go-connections/tlsconfig"
 	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -30,6 +33,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/recreate"
 	containerRuntime "github.com/nicholas-fedor/watchtower/internal/container/runtime"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 )
@@ -135,7 +139,9 @@ type ClientOptions struct {
 	Fs fs.FS
 	// RateLimiter paces image pulls, digest checks, and image age requests per
 	// registry host. NewClient creates one when it is nil.
-	RateLimiter      *ratelimit.Limiter
+	RateLimiter *ratelimit.Limiter
+	// Docker holds the settings for connecting to the Docker daemon.
+	Docker           dockerConfig.Docker
 	CPUCopyMode      string
 	WarnOnHeadFailed containerImage.WarningStrategy
 	// Registry holds the settings for registry digest and image age requests.
@@ -161,8 +167,8 @@ type ImageDiskUsage struct {
 
 // NewClient initializes a new Client instance for Docker API interactions.
 //
-// It configures the client using environment variables (e.g., DOCKER_HOST, DOCKER_API_VERSION)
-// and validates the API version, falling back to autonegotiation if necessary.
+// It connects to the daemon that opts.Docker names and validates the API version, falling back
+// to autonegotiation if necessary.
 //
 // Parameters:
 //   - ctx: Bounds the wait for a daemon that is not serving its API yet. The wait ends after
@@ -175,14 +181,20 @@ type ImageDiskUsage struct {
 //   - error: Non-nil when the client cannot be built or rebuilt. An unanswered ping is not an
 //     error.
 func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*Client, error) {
-	// Initialize client from environment. FromEnv reads DOCKER_HOST, DOCKER_TLS_VERIFY,
-	// DOCKER_CERT_PATH, and DOCKER_API_VERSION. When DOCKER_API_VERSION is set, the client
-	// uses that fixed version. Otherwise, it defaults to the maximum supported version
-	// with automatic negotiation enabled.
+	connection, err := connectionOptions(opts.Docker)
+	if err != nil {
+		return nil, fmt.Errorf("create Docker client: %w", err)
+	}
+
+	// With an API version, the client uses that fixed version. Without one, WithAPIVersion
+	// does nothing, and the client defaults to the maximum supported version with automatic
+	// negotiation enabled.
 	//
 	// Construction does not use the context. It bounds only the ping and API negotiation
 	// that follow.
-	cli, err := dockerClient.New(dockerClient.FromEnv)
+	cli, err := dockerClient.New(
+		slices.Concat(connection, []dockerClient.Opt{dockerClient.WithAPIVersion(opts.Docker.APIVersion)})...,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("create Docker client: %w", err)
 	}
@@ -191,12 +203,13 @@ func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*C
 		opts.RateLimiter = ratelimit.New()
 	}
 
-	cli, result, err := negotiateDockerAPI(ctx, log, cli)
+	cli, result, err := negotiateDockerAPI(ctx, log, cli, connection)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Debug().
+		Str("docker_host", cli.DaemonHost()).
 		Str("client_version", cli.ClientVersion()).
 		Str("server_version", result.APIVersion).
 		Msg("Initialized Docker client")
@@ -212,16 +225,18 @@ func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*C
 // It waits for a daemon that is not serving its API yet until ctx ends, for three minutes at
 // most.
 //
-// When DOCKER_API_VERSION is incompatible with the server, it recreates the client without a
-// fixed version so negotiation can select a supported API. A fixed version is incompatible when
-// the ping fails with a not-found error, or when it is newer than the API version the daemon
-// reports. Other ping failures are non-fatal: the client is returned and version negotiation is
-// deferred until the first API call.
+// When the configured API version is incompatible with the server, it recreates the client
+// without a fixed version so negotiation can select a supported API. A fixed version is
+// incompatible when the ping fails with a not-found error, or when it is newer than the API
+// version the daemon reports. Other ping failures are non-fatal: the client is returned and
+// version negotiation is deferred until the first API call.
 //
 // Parameters:
 //   - ctx: Bounds the wait for the daemon.
 //   - log: Process logger.
-//   - cli: Docker client created from the environment.
+//   - cli: Docker client created from the Docker settings.
+//   - connection: Options that connect to the daemon without an API version, for recreating
+//     the client.
 //
 // Returns:
 //   - *dockerClient.Client: Client to use for subsequent API calls (possibly recreated).
@@ -231,9 +246,10 @@ func negotiateDockerAPI(
 	ctx context.Context,
 	log *zerolog.Logger,
 	cli *dockerClient.Client,
+	connection []dockerClient.Opt,
 ) (*dockerClient.Client, dockerClient.PingResult, error) {
-	// Ping triggers API version negotiation, or only pings when DOCKER_API_VERSION fixes the
-	// version.
+	// Ping triggers API version negotiation, or only pings when the configured API version
+	// fixes the version.
 	result, err := pingUntilServing(ctx, log, cli)
 
 	// The ping uses the unversioned endpoint, so a daemon older than the fixed version still
@@ -248,12 +264,8 @@ func negotiateDockerAPI(
 			Str("server_api_version", result.APIVersion).
 			Msg("DOCKER_API_VERSION incompatible with server. Falling back to autonegotiation")
 
-		// FromEnv would read DOCKER_API_VERSION again, so the client is recreated from the
-		// host and TLS settings alone.
-		recreated, recreateErr := dockerClient.New(
-			dockerClient.WithTLSClientConfigFromEnv(),
-			dockerClient.WithHostFromEnv(),
-		)
+		// The client is recreated from the host and TLS settings alone.
+		recreated, recreateErr := dockerClient.New(connection...)
 		if recreateErr != nil {
 			return cli, dockerClient.PingResult{}, fmt.Errorf("%w: %w", errRecreateDockerClient, recreateErr)
 		}
@@ -271,6 +283,49 @@ func negotiateDockerAPI(
 	}
 
 	return cli, result, nil
+}
+
+// connectionOptions returns the Docker SDK options that connect to the daemon the settings
+// name, without an API version.
+//
+// A certificate path loads ca.pem, cert.pem and key.pem from that directory for TLS 1.2 or
+// later, and the daemon's certificate is verified only when TLS verification is on. An empty
+// host keeps the SDK's default socket.
+//
+// Parameters:
+//   - settings: Docker connection settings.
+//
+// Returns:
+//   - []dockerClient.Opt: Options for the TLS transport and the host.
+//   - error: Non-nil when the certificate files cannot be loaded.
+func connectionOptions(settings dockerConfig.Docker) ([]dockerClient.Opt, error) {
+	var options []dockerClient.Opt
+
+	// These match the SDK's own environment options. The TLS option replaces the HTTP client,
+	// so it comes first, and the host option then configures the new transport.
+	if settings.CertPath != "" {
+		tlsConfig, err := tlsconfig.Client(tlsconfig.Options{
+			CAFile:             filepath.Join(settings.CertPath, "ca.pem"),
+			CertFile:           filepath.Join(settings.CertPath, "cert.pem"),
+			KeyFile:            filepath.Join(settings.CertPath, "key.pem"),
+			InsecureSkipVerify: !settings.TLSVerify,
+			MinVersion:         tls.VersionTLS12,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("configure TLS from %q: %w", settings.CertPath, err)
+		}
+
+		options = append(options, dockerClient.WithHTTPClient(&http.Client{
+			Transport:     &http.Transport{TLSClientConfig: tlsConfig},
+			CheckRedirect: dockerClient.CheckRedirect,
+		}))
+	}
+
+	if settings.Host != "" {
+		options = append(options, dockerClient.WithHost(settings.Host))
+	}
+
+	return options, nil
 }
 
 // pingUntilServing pings the daemon until it answers, for up to three minutes or until ctx

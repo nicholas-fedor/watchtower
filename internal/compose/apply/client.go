@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"strings"
 	"sync"
 
@@ -19,6 +20,7 @@ import (
 
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 )
 
 // Client applies a Compose project through docker/compose v5.
@@ -59,6 +61,45 @@ type Container struct {
 //   - *Client: Lazy Compose service.
 func NewClient() *Client {
 	return &Client{}
+}
+
+// ExportConnection sets the DOCKER_* connection variables to the Docker connection settings.
+//
+// The Compose service connects through the Docker CLI, which reads its host and API version
+// from these variables. The build tools Compose starts inherit the process environment and
+// read all four. A variable whose setting is empty or false is unset, because those tools
+// treat any value as set, even "0".
+//
+// Parameters:
+//   - settings: Docker connection settings.
+//
+// Returns:
+//   - error: Non-nil when a variable cannot be set or unset.
+func ExportConnection(settings dockerConfig.Docker) error {
+	tlsVerify := ""
+	if settings.TLSVerify {
+		tlsVerify = "1"
+	}
+
+	for _, variable := range []struct{ name, value string }{
+		{name: "DOCKER_HOST", value: settings.Host},
+		{name: "DOCKER_TLS_VERIFY", value: tlsVerify},
+		{name: "DOCKER_API_VERSION", value: settings.APIVersion},
+		{name: "DOCKER_CERT_PATH", value: settings.CertPath},
+	} {
+		var err error
+		if variable.value == "" {
+			err = os.Unsetenv(variable.name)
+		} else {
+			err = os.Setenv(variable.name, variable.value)
+		}
+
+		if err != nil {
+			return fmt.Errorf("%w: %s: %w", errExportEnvFailed, variable.name, err)
+		}
+	}
+
+	return nil
 }
 
 // Apply loads the project and runs compose up, or compose build when BuildOnly is set.

@@ -14,6 +14,7 @@ import (
 //   - container.ClientOptions: Options for container.NewClient.
 func (c Config) ClientOptions() containerClient.ClientOptions {
 	return containerClient.ClientOptions{
+		Docker:                  c.Docker,
 		IncludeStopped:          c.Client.IncludeStopped,
 		IncludeRestarting:       c.Client.IncludeRestarting,
 		ReviveStopped:           c.Client.ReviveStopped,

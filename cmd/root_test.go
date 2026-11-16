@@ -30,6 +30,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 )
@@ -258,13 +259,13 @@ func TestCreateSignalContextDefault(t *testing.T) {
 // TestNewClient_FailureLeavesNoClient verifies that newClient returns a nil
 // client when the Docker client cannot be created. preRun and the exit path
 // compare the client with nil, which an interface holding a nil pointer would
-// not equal. It sets environment variables, so it does not run in parallel.
+// not equal.
 func TestNewClient_FailureLeavesNoClient(t *testing.T) {
-	t.Setenv("DOCKER_HOST", "tcp://[::1")
-	t.Setenv("DOCKER_TLS_VERIFY", "")
-	t.Setenv("DOCKER_API_VERSION", "")
+	t.Parallel()
 
-	got, err := newClient(t.Context(), newTestLogger(t), containerClient.ClientOptions{})
+	got, err := newClient(t.Context(), newTestLogger(t), containerClient.ClientOptions{
+		Docker: dockerConfig.Docker{Host: "tcp://[::1"},
+	})
 	require.Error(t, err)
 	// assert.Nil counts an interface holding a nil pointer as nil, so the
 	// interface is compared with nil directly.

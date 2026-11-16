@@ -13,6 +13,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.10.0+incompatible
 	github.com/docker/compose/v5 v5.7.1
+	github.com/docker/go-connections v0.8.2
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/gofiber/contrib/v3/swaggo v1.0.17
 	github.com/gofiber/contrib/v3/zerolog v1.1.11
@@ -31,7 +32,6 @@ require (
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
-	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.12.1
 	github.com/swaggo/swag v1.16.6
 	github.com/valyala/fasthttp v1.79.0
@@ -68,7 +68,6 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/docker/docker-credential-helpers v0.9.13 // indirect
-	github.com/docker/go-connections v0.8.2 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/secrets-engine/client v0.2.2 // indirect
 	github.com/docker/secrets-engine/x v0.8.5 // indirect
@@ -141,7 +140,6 @@ require (
 	github.com/morikuni/aec v1.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pandatix/go-abnf v0.5.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/philhofer/fwd v1.2.1 // indirect
 	github.com/pjbgf/sha1cd v0.7.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
@@ -150,17 +148,13 @@ require (
 	github.com/prometheus/procfs v0.23.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
-	github.com/sagikazarmark/locafero v0.12.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
 	github.com/skeema/knownhosts v1.3.3 // indirect
-	github.com/spf13/afero v1.15.0 // indirect
-	github.com/spf13/cast v1.10.0 // indirect
 	github.com/stretchr/objx v0.8.0 // indirect
-	github.com/subosito/gotenv v1.6.0 // indirect
 	github.com/swaggo/files/v2 v2.0.2 // indirect
 	github.com/tilt-dev/fsnotify v1.4.8-0.20220602155310-fff9c274a375 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect

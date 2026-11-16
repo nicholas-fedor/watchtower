@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -9,10 +10,13 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
+	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
@@ -257,14 +261,155 @@ func TestLoad_InvalidAndNegativeCooldown(t *testing.T) {
 	})
 }
 
+// TestLoadDocker checks the Docker connection settings LoadDocker reads from the
+// flags and the environment. With TLS verification on, a tcp:// host becomes
+// https://, and a host that cannot use TLS logs a warning.
 func TestLoadDocker(t *testing.T) {
-	values := parsedValues(t, "-H", "tcp://127.0.0.1:2375", "--tlsverify", "--api-version", `"1.43"`, "--cert-path", "/certs")
+	const defaultHost = "unix:///var/run/docker.sock"
 
-	got := loadDocker(values)
-	assert.Equal(t, "tcp://127.0.0.1:2375", got.Host)
-	assert.True(t, got.TLSVerify)
-	assert.Equal(t, "1.43", got.APIVersion)
-	assert.Equal(t, "/certs", got.CertPath)
+	testCases := []struct {
+		name        string
+		env         map[string]string
+		flags       []string
+		register    func(*cobra.Command)
+		want        docker.Docker
+		wantErr     string
+		wantWarning string
+	}{
+		{
+			name: "defaults",
+			want: docker.Docker{Host: defaultHost},
+		},
+		{
+			name: "flags",
+			flags: []string{
+				"-H", "tcp://127.0.0.1:2375", "--tlsverify", "--api-version", `"1.43"`, "--cert-path", "/certs",
+			},
+			want: docker.Docker{Host: "https://127.0.0.1:2375", TLSVerify: true, APIVersion: "1.43", CertPath: "/certs"},
+		},
+		{
+			name: "environment",
+			env: map[string]string{
+				"DOCKER_HOST":        "tcp://example.com:2376",
+				"DOCKER_TLS_VERIFY":  "1",
+				"DOCKER_API_VERSION": "1.41",
+				"DOCKER_CERT_PATH":   "/env/certs",
+			},
+			want: docker.Docker{Host: "https://example.com:2376", TLSVerify: true, APIVersion: "1.41", CertPath: "/env/certs"},
+		},
+		{
+			name:  "host without a scheme keeps its form",
+			flags: []string{"--host", "some-custom-docker-host", "--tlsverify"},
+			want:  docker.Docker{Host: "some-custom-docker-host", TLSVerify: true},
+		},
+		{
+			name: "tcp host without tls verification keeps its scheme",
+			env:  map[string]string{"DOCKER_HOST": "tcp://example.com:2375"},
+			want: docker.Docker{Host: "tcp://example.com:2375"},
+		},
+		{
+			name: "https host with tls verification",
+			env:  map[string]string{"DOCKER_HOST": "https://example.com:2376", "DOCKER_TLS_VERIFY": "1"},
+			want: docker.Docker{Host: "https://example.com:2376", TLSVerify: true},
+		},
+		{
+			name: "false tls verify env var",
+			env:  map[string]string{"DOCKER_TLS_VERIFY": "0"},
+			want: docker.Docker{Host: defaultHost},
+		},
+		{
+			name:  "tlsverify flag false overrides env var",
+			env:   map[string]string{"DOCKER_TLS_VERIFY": "1"},
+			flags: []string{"--tlsverify=false"},
+			want:  docker.Docker{Host: defaultHost},
+		},
+		{
+			name: "empty flags override env vars",
+			env: map[string]string{
+				"DOCKER_HOST":        "tcp://example.com:2375",
+				"DOCKER_API_VERSION": "1.41",
+				"DOCKER_CERT_PATH":   "/env/certs",
+			},
+			flags: []string{"--host=", "--api-version=", "--cert-path="},
+			want:  docker.Docker{},
+		},
+		{
+			// The exit path reads the Docker settings after a failed Load, so
+			// other settings, such as an invalid log format, must not stop it.
+			name: "invalid log format env var is not read",
+			env:  map[string]string{"DOCKER_HOST": "tcp://socket-proxy:2375", "WATCHTOWER_LOG_FORMAT": "bogus"},
+			want: docker.Docker{Host: "tcp://socket-proxy:2375"},
+		},
+		{
+			name: "empty api version env var",
+			env:  map[string]string{"DOCKER_API_VERSION": ""},
+			want: docker.Docker{Host: defaultHost},
+		},
+		{
+			name:        "http host with tls verification warns",
+			env:         map[string]string{"DOCKER_TLS_VERIFY": "1"},
+			flags:       []string{"--host", "http://example.com"},
+			want:        docker.Docker{Host: "http://example.com", TLSVerify: true},
+			wantWarning: "TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
+		},
+		{
+			name:        "unix host with tls verification warns",
+			env:         map[string]string{"DOCKER_TLS_VERIFY": "1"},
+			want:        docker.Docker{Host: defaultHost, TLSVerify: true},
+			wantWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification.",
+		},
+		{
+			// Startup rejects this value, so the exit path must not read it as false.
+			name:    "unparsable tls verify env var fails",
+			env:     map[string]string{"DOCKER_TLS_VERIFY": "yes"},
+			wantErr: `tlsverify: parse bool: strconv.ParseBool: parsing "yes": invalid syntax`,
+		},
+		{
+			name:     "unregistered flags fail",
+			register: func(*cobra.Command) {},
+			wantErr:  "read host:",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, key := range []string{"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
+				t.Setenv(key, "")
+				require.NoError(t, os.Unsetenv(key))
+			}
+
+			for key, value := range tc.env {
+				t.Setenv(key, value)
+			}
+
+			cmd := new(cobra.Command)
+			if tc.register != nil {
+				tc.register(cmd)
+			} else {
+				RegisterAll(cmd)
+			}
+
+			require.NoError(t, cmd.ParseFlags(tc.flags))
+
+			var logOutput bytes.Buffer
+
+			got, err := LoadDocker(testLoggerAt(&logOutput, logging.InfoLevel), cmd)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+
+			if tc.wantWarning != "" {
+				assert.Contains(t, logOutput.String(), tc.wantWarning)
+			} else {
+				assert.Empty(t, logOutput.String())
+			}
+		})
+	}
 }
 
 func TestLoadClient(t *testing.T) {

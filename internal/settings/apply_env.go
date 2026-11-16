@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -14,6 +15,13 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/utils"
 )
 
+var (
+	// errFlagNotRegistered indicates a FlagSpec name was not found on the flag set.
+	errFlagNotRegistered = errors.New("flag not registered")
+	// errUnsupportedFlagKind indicates a FlagSpec kind is not supported.
+	errUnsupportedFlagKind = errors.New("unsupported flag kind")
+)
+
 // applyEnvToFlags copies bound environment values onto flags that were not set on the CLI.
 //
 // It runs before the logging setup and the alias flags, so they see
@@ -23,11 +31,13 @@ import (
 //
 // Parameters:
 //   - flagSet: Parsed persistent flag set.
+//   - specs: Settings whose environment values to apply. A spec without a
+//     registered flag is skipped.
 //
 // Returns:
 //   - error: Non-nil when a flag cannot be set from env.
-func applyEnvToFlags(flagSet *pflag.FlagSet) error {
-	for _, flagSpec := range AllSpecs() {
+func applyEnvToFlags(flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
+	for _, flagSpec := range specs {
 		if flagSet.Lookup(flagSpec.Name) == nil {
 			continue
 		}

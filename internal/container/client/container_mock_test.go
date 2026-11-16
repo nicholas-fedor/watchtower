@@ -138,7 +138,7 @@ var (
 	}
 )
 
-// newDockerAPI returns a mocked Docker API whose client version is available
+// newDockerAPI returns a mocked Docker API whose client version and daemon host are available
 // for diagnostic logs.
 //
 // Parameters:
@@ -151,6 +151,7 @@ func newDockerAPI(t *testing.T) *mockContainer.MockAPIClient {
 
 	api := mockContainer.NewMockAPIClient(t)
 	api.EXPECT().ClientVersion().Return("1.47").Maybe()
+	api.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").Maybe()
 
 	return api
 }
