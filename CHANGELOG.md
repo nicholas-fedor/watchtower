@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Read integer settings from the flags by @nicholas-fedor in [#3833](https://github.com/nicholas-fedor/watchtower/pull/3833)
 - Prepare the flags inside Load by @nicholas-fedor in [#3825](https://github.com/nicholas-fedor/watchtower/pull/3825)
 - Load settings once at startup by @nicholas-fedor in [#3816](https://github.com/nicholas-fedor/watchtower/pull/3816)
 - Shorten long untrusted text in notifications by @nicholas-fedor in [#3814](https://github.com/nicholas-fedor/watchtower/pull/3814)
@@ -162,6 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang:alpine3.24 docker digest to 70bd7dd by @renovate[bot] in [#3832](https://github.com/nicholas-fedor/watchtower/pull/3832)
+- Update golang:1.27.4-alpine docker digest to 70bd7dd by @renovate[bot] in [#3831](https://github.com/nicholas-fedor/watchtower/pull/3831)
 - Update github.com/defanglabs/secret-detector digest to 4d8b46d by @renovate[bot] in [#3821](https://github.com/nicholas-fedor/watchtower/pull/3821)
 - Update module github.com/jedib0t/go-pretty/v6 to v6.9.2 by @renovate[bot] in [#3804](https://github.com/nicholas-fedor/watchtower/pull/3804)
 - Update golang.org/x/tools digest to cba9b80 by @renovate[bot] in [#3794](https://github.com/nicholas-fedor/watchtower/pull/3794)
@@ -1789,7 +1792,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Resolve gosec SARIF validation error by @nicholas-fedor in [#1374](https://github.com/nicholas-fedor/watchtower/pull/1374)
-- Return HTTP 429 for full updates when another update is running by @veeceey
+- Return HTTP 429 for full updates when another update is running by @veeceey in [#1304](https://github.com/nicholas-fedor/watchtower/pull/1304)
 - Propagate context throughout watchtower for improved cancellation and timeout handling by @nicholas-fedor in [#1335](https://github.com/nicholas-fedor/watchtower/pull/1335)
 - Log container startup failures at warning level by @nicholas-fedor in [#1332](https://github.com/nicholas-fedor/watchtower/pull/1332)
 
@@ -1845,7 +1848,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### New Contributors
 
-- @veeceey made their first contribution
+- @veeceey made their first contribution in [#1304](https://github.com/nicholas-fedor/watchtower/pull/1304)
 
 ## [1.14.2] - 2026-02-17
 
