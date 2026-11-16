@@ -1115,10 +1115,9 @@ func TestGetSecretFromFile_StringPathStillMarksChanged(t *testing.T) {
 	assert.Equal(t, "supersecretstring", flag.Value.String())
 }
 
-// TestGetSecretFromFile_SlicePath_MarksChangedAfterReplace verifies that
-// getSecretFromFile marks Changed=true after expanding a file path so the
-// pflag value is preferred over raw os.Getenv.
-func TestGetSecretFromFile_SlicePath_MarksChangedAfterReplace(t *testing.T) {
+// TestGetSecretFromFile_SlicePath_ReadsFile verifies that getSecretFromFile
+// replaces a file path in a list secret with the file's content.
+func TestGetSecretFromFile_SlicePath_ReadsFile(t *testing.T) {
 	cmd := newTestCommand()
 	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
 	require.NoError(t, err)
@@ -1130,20 +1129,16 @@ func TestGetSecretFromFile_SlicePath_MarksChangedAfterReplace(t *testing.T) {
 	require.NoError(t, err)
 	parseWithEnv(t, cmd)
 
-	flag := cmd.PersistentFlags().Lookup("notification-url")
-	require.NotNil(t, flag)
-
 	err = getSecretFromFile(newInfoTestLogger(t), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gotify://gotify.example.com/token123"}, urls)
-	assert.True(t, flag.Changed, "slice secret expansion must mark Changed=true")
 }
 
 // TestGetSecretFromFile_SlicePath_MultiLineFile verifies that a multi-line
-// docker secret file expands into multiple slice values with Changed=true.
+// docker secret file expands into multiple slice values.
 func TestGetSecretFromFile_SlicePath_MultiLineFile(t *testing.T) {
 	cmd := newTestCommand()
 	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
@@ -1162,14 +1157,10 @@ func TestGetSecretFromFile_SlicePath_MultiLineFile(t *testing.T) {
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gotify://host1/token1", "discord://host2/token2"}, urls)
-
-	flag := cmd.PersistentFlags().Lookup("notification-url")
-	assert.True(t, flag.Changed)
 }
 
 // TestGetSecretFromFile_SlicePath_LiteralURLsUnchanged verifies that literal
-// notification URLs survive getSecretFromFile without modification and that
-// Changed=true is set on the processed flag.
+// notification URLs survive getSecretFromFile without modification.
 func TestGetSecretFromFile_SlicePath_LiteralURLsUnchanged(t *testing.T) {
 	cmd := newTestCommand()
 
@@ -1180,24 +1171,17 @@ func TestGetSecretFromFile_SlicePath_LiteralURLsUnchanged(t *testing.T) {
 	require.NoError(t, err)
 	parseWithEnv(t, cmd)
 
-	flag := cmd.PersistentFlags().Lookup("notification-url")
-	require.NotNil(t, flag)
-
 	err = getSecretFromFile(newInfoTestLogger(t), cmd.PersistentFlags(), "notification-url")
 	require.NoError(t, err)
 
 	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"gotify://gotify.example.com/token123", "discord://token@channel"}, urls)
-
-	// Changed is true after Replace regardless of whether expansion occurred; the
-	// processed value is explicit user config and downstream consumers must read it.
-	assert.True(t, flag.Changed)
 }
 
 // TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret verifies that
 // porcelain mode appends logger:// before secret expansion and the merged
-// slice retains both values with Changed=true.
+// slice retains both values.
 func TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret(t *testing.T) {
 	t.Setenv("WATCHTOWER_NOTIFICATION_URL", "/file/that/does/not/exist") // placeholder; real file used via flag
 
@@ -1226,50 +1210,6 @@ func TestGetSecretsFromFile_PorcelainAppendPreservedWithSecret(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, urls, "logger://")
 	assert.Contains(t, urls, "gotify://host/token")
-
-	flag := cmd.PersistentFlags().Lookup("notification-url")
-	assert.True(t, flag.Changed)
-}
-
-// Test_applyEnvToFlags_doesNotRebridgeExpandedSecret verifies that re-running
-// applyEnvToFlags does not overwrite an expanded secret with the raw file path.
-func Test_applyEnvToFlags_doesNotRebridgeExpandedSecret(t *testing.T) {
-	cmd := newTestCommand()
-	file, err := os.CreateTemp(t.TempDir(), "watchtower-")
-	require.NoError(t, err)
-	_, err = file.WriteString("gotify://host/token")
-	require.NoError(t, err)
-	require.NoError(t, file.Close())
-
-	// Step 1: env bridge sets pflag to the file path
-	t.Setenv("WATCHTOWER_NOTIFICATION_URL", file.Name())
-
-	err = cmd.ParseFlags([]string{})
-	require.NoError(t, err)
-	err = applyEnvToFlags(cmd.PersistentFlags())
-	require.NoError(t, err)
-
-	flag := cmd.PersistentFlags().Lookup("notification-url")
-	require.NotNil(t, flag)
-	assert.False(t, flag.Changed, "env bridge must leave Changed=false")
-
-	// Step 2: secret expansion replaces content and marks Changed=true
-	err = getSecretFromFile(newInfoTestLogger(t), cmd.PersistentFlags(), "notification-url")
-	require.NoError(t, err)
-
-	urls, err := cmd.PersistentFlags().GetStringArray("notification-url")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"gotify://host/token"}, urls)
-	assert.True(t, flag.Changed)
-
-	// Step 3: re-running applyEnvToFlags must not overwrite the expanded value
-	err = applyEnvToFlags(cmd.PersistentFlags())
-	require.NoError(t, err)
-
-	urls, err = cmd.PersistentFlags().GetStringArray("notification-url")
-	require.NoError(t, err)
-	assert.Equal(t, []string{"gotify://host/token"}, urls, "re-applying env must not clobber expanded secret")
-	assert.True(t, flag.Changed)
 }
 
 // Test_processFlagAliases_flagSetErrors tests error logging for flag operations.

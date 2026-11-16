@@ -66,18 +66,21 @@ func loadWithEnv(t *testing.T, env map[string]string, args ...string) (Config, e
 func TestLoad_FlagOverridesEnv(t *testing.T) {
 	cfg := newLoadedCommand(t,
 		map[string]string{
-			"WATCHTOWER_CLEANUP":      "false",
-			"WATCHTOWER_MONITOR_ONLY": "true",
-			"WATCHTOWER_TIMEOUT":      "30",
+			"WATCHTOWER_CLEANUP":            "false",
+			"WATCHTOWER_MONITOR_ONLY":       "true",
+			"WATCHTOWER_TIMEOUT":            "30",
+			"WATCHTOWER_DISABLE_CONTAINERS": "db",
 		},
 		"--cleanup",
 		"--monitor-only=false",
 		"--stop-timeout", "10s",
+		"--disable-containers", "web",
 	)
 
 	assert.True(t, cfg.Update.Cleanup, "flag must override env for cleanup")
 	assert.False(t, cfg.Update.MonitorOnly, "flag must override env for monitor-only")
 	assert.Equal(t, 10*time.Second, cfg.Update.StopTimeout, "flag must override env for timeout")
+	assert.Equal(t, []string{"web"}, cfg.Filter.DisableContainers, "flag must override env for a list")
 }
 
 func TestLoad_EnvOverridesDefault(t *testing.T) {

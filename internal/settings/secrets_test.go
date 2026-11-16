@@ -306,9 +306,8 @@ func TestGetSecretFromFile_StringSecrets(t *testing.T) {
 }
 
 // TestGetSecretFromFile_ChangedState records which flags are marked as set
-// after secret expansion. List secrets are always marked as set, even when no
-// value was given and nothing was read. String secrets keep the state the
-// command line gave them unless they are read from a file.
+// after secret expansion. List secrets keep the state the command line gave
+// them. String secrets keep it too unless they are read from a file.
 func TestGetSecretFromFile_ChangedState(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -319,7 +318,7 @@ func TestGetSecretFromFile_ChangedState(t *testing.T) {
 		{
 			name:        "unset list secret",
 			flag:        "notification-url",
-			wantChanged: true,
+			wantChanged: false,
 		},
 		{
 			name:        "list secret with a literal URL",

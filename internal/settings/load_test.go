@@ -378,26 +378,26 @@ func TestLoadLifecycle(t *testing.T) {
 	assert.Equal(t, 1001, got.GID)
 }
 
+// TestNormalizedStringSlice verifies that normalizedStringSlice applies the
+// transform to each element of a list flag and reads an unset list as empty.
 func TestNormalizedStringSlice(t *testing.T) {
-	t.Run("lowercases values", func(t *testing.T) {
-		vCfg, flagSet := bindLoad(t, "--disable-containers", "/Foo,Bar")
+	t.Parallel()
 
-		got := normalizedStringSlice(
-			vCfg, flagSet, "disable-containers",
-			[]string{"WATCHTOWER_DISABLE_CONTAINERS"},
-			strings.ToLower,
-		)
+	t.Run("lowercases values", func(t *testing.T) {
+		t.Parallel()
+
+		flagSet := newParsedCommand(t, "--disable-containers", "/Foo,Bar").PersistentFlags()
+
+		got := normalizedStringSlice(flagSet, "disable-containers", strings.ToLower)
 		assert.Equal(t, []string{"/foo", "bar"}, got)
 	})
 
 	t.Run("empty when unset", func(t *testing.T) {
-		vCfg, flagSet := bindLoad(t)
+		t.Parallel()
 
-		got := normalizedStringSlice(
-			vCfg, flagSet, "disable-containers",
-			[]string{"WATCHTOWER_DISABLE_CONTAINERS"},
-			strings.ToLower,
-		)
+		flagSet := newParsedCommand(t).PersistentFlags()
+
+		got := normalizedStringSlice(flagSet, "disable-containers", strings.ToLower)
 		assert.Empty(t, got)
 	})
 }
@@ -766,19 +766,37 @@ func TestValidate(t *testing.T) {
 	})
 }
 
-func TestFlagChanged(t *testing.T) {
-	t.Run("missing flag", func(t *testing.T) {
-		flagSet := pflag.NewFlagSet("test", pflag.ContinueOnError)
-		assert.False(t, flagChanged(flagSet, "http-api-host"))
-	})
+// TestStringSliceValue_emptyWhenUnset verifies that an unset list reads as an
+// empty list rather than nil.
+func TestStringSliceValue_emptyWhenUnset(t *testing.T) {
+	t.Parallel()
 
-	t.Run("unchanged", func(t *testing.T) {
-		_, flagSet := bindLoad(t)
-		assert.False(t, flagChanged(flagSet, "http-api-host"))
-	})
+	got := stringSliceValue(newParsedCommand(t).PersistentFlags(), "notification-url")
+	require.NotNil(t, got)
+	assert.Empty(t, got)
+}
 
-	t.Run("changed", func(t *testing.T) {
-		_, flagSet := bindLoad(t, "--http-api-host", "127.0.0.1")
-		assert.True(t, flagChanged(flagSet, "http-api-host"))
-	})
+// TestStringSliceValue_returnsCopy verifies that changing the returned list
+// leaves the flag's own value alone, since callers normalize the elements in
+// place.
+func TestStringSliceValue_returnsCopy(t *testing.T) {
+	t.Parallel()
+
+	flagSet := newParsedCommand(t, "--disable-containers", "web").PersistentFlags()
+
+	values := stringSliceValue(flagSet, "disable-containers")
+	values[0] = "changed"
+
+	assert.Equal(t, []string{"web"}, stringSliceValue(flagSet, "disable-containers"))
+}
+
+// TestStringSliceValue_notAList verifies that a flag that is not registered or
+// is not a list reads as an empty list.
+func TestStringSliceValue_notAList(t *testing.T) {
+	t.Parallel()
+
+	flagSet := newParsedCommand(t).PersistentFlags()
+
+	assert.Equal(t, []string{}, stringSliceValue(flagSet, "not-registered"))
+	assert.Equal(t, []string{}, stringSliceValue(flagSet, "scope"))
 }

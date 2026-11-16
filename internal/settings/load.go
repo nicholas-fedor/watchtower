@@ -61,7 +61,8 @@ var (
 // into their flags. Load changes the flags this way, so call it once per parsed
 // command. It does not re-parse CLI arguments.
 //
-// Values are then resolved through a process-local Viper instance (flag > env >
+// List and duration settings are then read from the prepared flags. The other
+// settings are resolved through a process-local Viper instance (flag > env >
 // static default) using FlagSpec metadata from every domain.
 //
 // Parameters:
@@ -139,6 +140,38 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 	return cfg, log, nil
 }
 
+// checkRanges returns an error for the first integer or duration setting whose
+// value is outside the range its spec allows.
+//
+// Parameters:
+//   - vCfg: Bound Viper instance.
+//   - flagSet: Parsed flag set.
+//   - specs: Specs of every setting.
+//
+// Returns:
+//   - error: The spec's range error, naming the setting and its value.
+func checkRanges(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
+	for _, flagSpec := range specs {
+		var err error
+
+		switch flagSpec.Kind {
+		case spec.KindInt:
+			err = flagSpec.CheckInt(vCfg.GetInt(flagSpec.Name))
+		case spec.KindDuration:
+			duration, _ := flagSet.GetDuration(flagSpec.Name)
+			err = flagSpec.CheckDuration(duration)
+		case spec.KindBool, spec.KindString, spec.KindStringSlice, spec.KindStringArray:
+		default:
+		}
+
+		if err != nil {
+			return err //nolint:wrapcheck // The spec's error already names the setting and its value.
+		}
+	}
+
+	return nil
+}
+
 // loadDocker reads Docker connection settings from Viper after BindAll.
 func loadDocker(vCfg *viper.Viper) docker.Docker {
 	return docker.Docker{
@@ -188,9 +221,9 @@ func loadMode(vCfg *viper.Viper) mode.Mode {
 	}
 }
 
-// loadUpdate reads update policy settings from Viper.
+// loadUpdate reads update policy settings.
 func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error) {
-	stopTimeout := durationValue(vCfg, flagSet, "stop-timeout")
+	stopTimeout, _ := flagSet.GetDuration("stop-timeout")
 
 	if stopTimeout > 0 && stopTimeout < time.Second {
 		log.Warn().
@@ -324,26 +357,45 @@ func loadLifecycle(vCfg *viper.Viper) lifecycle.Lifecycle {
 	}
 }
 
-// normalizedStringSlice loads a comma- or space-separated list flag/env value
-// and applies normalize to each element.
+// stringSliceValue returns a copy of a list flag's value.
+//
+// Load applies the environment to unset flags first, so the flag holds the
+// command-line value, the environment value or its default.
 //
 // Parameters:
-//   - vCfg: Bound Viper instance.
-//   - flagSet: Parsed flag set.
+//   - flagSet: Parsed and prepared flag set.
 //   - name: Flag name.
-//   - envKeys: Environment variable aliases.
+//
+// Returns:
+//   - []string: The values, never nil. Empty when the flag is not a
+//     registered list.
+func stringSliceValue(flagSet *pflag.FlagSet, name string) []string {
+	flag := flagSet.Lookup(name)
+	if flag == nil {
+		return []string{}
+	}
+
+	sliceValue, ok := flag.Value.(pflag.SliceValue)
+	if !ok {
+		return []string{}
+	}
+
+	// GetSlice of a string slice flag returns the flag's own slice, so callers
+	// that change elements need this copy.
+	return append([]string{}, sliceValue.GetSlice()...)
+}
+
+// normalizedStringSlice reads a list flag and applies normalize to each element.
+//
+// Parameters:
+//   - flagSet: Parsed and prepared flag set.
+//   - name: Flag name.
 //   - normalize: Per-element transform (for example TrimSpace or NormalizeContainerName).
 //
 // Returns:
 //   - []string: Normalized list (empty when unset).
-func normalizedStringSlice(
-	vCfg *viper.Viper,
-	flagSet *pflag.FlagSet,
-	name string,
-	envKeys []string,
-	normalize func(string) string,
-) []string {
-	values := stringSliceValue(vCfg, flagSet, name, envKeys, spec.ListCommaOrSpace)
+func normalizedStringSlice(flagSet *pflag.FlagSet, name string, normalize func(string) string) []string {
+	values := stringSliceValue(flagSet, name)
 	for i := range values {
 		values[i] = normalize(values[i])
 	}
@@ -355,35 +407,15 @@ func normalizedStringSlice(
 func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, args []string) (filter.Filter, error) {
 	labelEnable := vCfg.GetBool("label-enable")
 
-	disableContainers := normalizedStringSlice(
-		vCfg, flagSet, "disable-containers",
-		[]string{"WATCHTOWER_DISABLE_CONTAINERS"},
-		container.NormalizeContainerName,
-	)
+	disableContainers := normalizedStringSlice(flagSet, "disable-containers", container.NormalizeContainerName)
 
-	monitorImages := normalizedStringSlice(
-		vCfg, flagSet, "monitor-image-names",
-		[]string{"WATCHTOWER_MONITOR_IMAGE_NAMES"},
-		strings.TrimSpace,
-	)
+	monitorImages := normalizedStringSlice(flagSet, "monitor-image-names", strings.TrimSpace)
 
-	skipImages := normalizedStringSlice(
-		vCfg, flagSet, "skip-image-names",
-		[]string{"WATCHTOWER_SKIP_IMAGE_NAMES"},
-		strings.TrimSpace,
-	)
+	skipImages := normalizedStringSlice(flagSet, "skip-image-names", strings.TrimSpace)
 
-	enableByLabel := stringSliceValue(
-		vCfg, flagSet, "enable-containers-by-label",
-		[]string{"WATCHTOWER_ENABLE_CONTAINERS_BY_LABEL"},
-		spec.ListCommaOnly,
-	)
+	enableByLabel := stringSliceValue(flagSet, "enable-containers-by-label")
 
-	disableByLabel := stringSliceValue(
-		vCfg, flagSet, "disable-containers-by-label",
-		[]string{"WATCHTOWER_DISABLE_CONTAINERS_BY_LABEL"},
-		spec.ListCommaOnly,
-	)
+	disableByLabel := stringSliceValue(flagSet, "disable-containers-by-label")
 
 	scope := vCfg.GetString("scope")
 
@@ -428,59 +460,42 @@ func loadRegistry(vCfg *viper.Viper) registry.Registry {
 	}
 }
 
-// loadAPI reads HTTP API settings from Viper.
+// loadAPI reads HTTP API settings.
 func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) api.API {
+	checkTimeout, _ := flagSet.GetDuration("http-api-check-timeout")
+	updateTimeout, _ := flagSet.GetDuration("http-api-update-timeout")
+
 	return api.API{
-		Endpoints: stringSliceValue(
-			vCfg, flagSet, "http-api-endpoints",
-			[]string{"WATCHTOWER_HTTP_API_ENDPOINTS"},
-			spec.ListCommaOrSpace,
-		),
-		LegacyUpdate:     vCfg.GetBool("http-api-update"),
-		LegacyMetrics:    vCfg.GetBool("http-api-metrics"),
-		LegacyContainers: vCfg.GetBool("http-api-containers"),
-		Host:             vCfg.GetString("http-api-host"),
-		HostChanged:      flagChanged(flagSet, "http-api-host"),
-		Port:             vCfg.GetString("http-api-port"),
-		PortChanged:      flagChanged(flagSet, "http-api-port"),
-		Token:            vCfg.GetString("http-api-token"),
-		EventsToken:      vCfg.GetString("http-api-events-token"),
-		PeriodicPolls:    vCfg.GetBool("http-api-periodic-polls"),
-		RateLimit:        vCfg.GetInt("http-api-rate-limit"),
-		RateLimitChanged: flagChanged(flagSet, "http-api-rate-limit"),
-		TLSCert:          vCfg.GetString("http-api-tls-cert"),
-		TLSKey:           vCfg.GetString("http-api-tls-key"),
-		TrustedProxies: stringSliceValue(
-			vCfg, flagSet, "http-api-trusted-proxies",
-			[]string{"WATCHTOWER_HTTP_API_TRUSTED_PROXIES"},
-			spec.ListCommaOrSpace,
-		),
-		ProxyHeader: vCfg.GetString("http-api-proxy-header"),
-		CORSOrigins: stringSliceValue(
-			vCfg, flagSet, "http-api-cors-origins",
-			[]string{"WATCHTOWER_HTTP_API_CORS_ORIGINS"},
-			spec.ListCommaOrSpace,
-		),
-		CheckTimeout:         durationValue(vCfg, flagSet, "http-api-check-timeout"),
-		CheckTimeoutChanged:  flagChanged(flagSet, "http-api-check-timeout"),
-		UpdateTimeout:        durationValue(vCfg, flagSet, "http-api-update-timeout"),
-		UpdateTimeoutChanged: flagChanged(flagSet, "http-api-update-timeout"),
+		Endpoints:            stringSliceValue(flagSet, "http-api-endpoints"),
+		LegacyUpdate:         vCfg.GetBool("http-api-update"),
+		LegacyMetrics:        vCfg.GetBool("http-api-metrics"),
+		LegacyContainers:     vCfg.GetBool("http-api-containers"),
+		Host:                 vCfg.GetString("http-api-host"),
+		HostChanged:          flagSet.Changed("http-api-host"),
+		Port:                 vCfg.GetString("http-api-port"),
+		PortChanged:          flagSet.Changed("http-api-port"),
+		Token:                vCfg.GetString("http-api-token"),
+		EventsToken:          vCfg.GetString("http-api-events-token"),
+		PeriodicPolls:        vCfg.GetBool("http-api-periodic-polls"),
+		RateLimit:            vCfg.GetInt("http-api-rate-limit"),
+		RateLimitChanged:     flagSet.Changed("http-api-rate-limit"),
+		TLSCert:              vCfg.GetString("http-api-tls-cert"),
+		TLSKey:               vCfg.GetString("http-api-tls-key"),
+		TrustedProxies:       stringSliceValue(flagSet, "http-api-trusted-proxies"),
+		ProxyHeader:          vCfg.GetString("http-api-proxy-header"),
+		CORSOrigins:          stringSliceValue(flagSet, "http-api-cors-origins"),
+		CheckTimeout:         checkTimeout,
+		CheckTimeoutChanged:  flagSet.Changed("http-api-check-timeout"),
+		UpdateTimeout:        updateTimeout,
+		UpdateTimeoutChanged: flagSet.Changed("http-api-update-timeout"),
 	}
 }
 
-// loadNotify reads notification settings from Viper.
+// loadNotify reads notification settings.
 func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
 	return notify.Notify{
-		URLs: stringSliceValue(
-			vCfg, flagSet, "notification-url",
-			[]string{"WATCHTOWER_NOTIFICATION_URL"},
-			spec.ListNotificationURLs,
-		),
-		LegacyTypes: stringSliceValue(
-			vCfg, flagSet, "notifications",
-			[]string{"WATCHTOWER_NOTIFICATIONS"},
-			spec.ListCommaOrSpace,
-		),
+		URLs:             stringSliceValue(flagSet, "notification-url"),
+		LegacyTypes:      stringSliceValue(flagSet, "notifications"),
 		Level:            vCfg.GetString("notifications-level"),
 		Template:         vCfg.GetString("notification-template"),
 		TemplateFile:     vCfg.GetString("notification-template-file"),
@@ -542,21 +557,17 @@ func loadLogging(vCfg *viper.Viper, flagSet *pflag.FlagSet) logging.Logging {
 	}
 }
 
-// loadGit reads Git association and watcher settings from Viper.
+// loadGit reads Git association and watcher settings.
 //
 // Parameters:
 //   - vCfg: Bound configuration.
-//   - flagSet: Command flag set used for list-valued flags.
+//   - flagSet: Prepared flag set, for the list and duration settings.
 //
 // Returns:
 //   - cfggit.Git: Parsed Git settings.
 //   - error: Non-nil when a mapping, host, or CA bundle is invalid.
 func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
-	rawImages := stringSliceValue(
-		vCfg, flagSet, "git-image",
-		[]string{"WATCHTOWER_GIT_IMAGE"},
-		spec.ListNewline,
-	)
+	rawImages := stringSliceValue(flagSet, "git-image")
 
 	images, err := gitConfig.ParseImageMappings(rawImages)
 	if err != nil {
@@ -568,16 +579,14 @@ func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
 		return gitConfig.Git{}, fmt.Errorf("git-ca-bundle: %w", err)
 	}
 
-	rawProjects := stringSliceValue(
-		vCfg, flagSet, "compose-project",
-		[]string{"WATCHTOWER_COMPOSE_PROJECT"},
-		spec.ListNewline,
-	)
+	rawProjects := stringSliceValue(flagSet, "compose-project")
 
 	projects, err := gitConfig.ParseComposeProjects(rawProjects)
 	if err != nil {
 		return gitConfig.Git{}, fmt.Errorf("compose-project: %w", err)
 	}
+
+	timeout, _ := flagSet.GetDuration("git-timeout")
 
 	return gitConfig.Git{
 		Enable:          vCfg.GetBool("git-enable"),
@@ -586,7 +595,7 @@ func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
 		Images:          images,
 		Dockerfile:      strings.TrimSpace(vCfg.GetString("git-dockerfile")),
 		Context:         strings.TrimSpace(vCfg.GetString("git-context")),
-		Timeout:         durationValue(vCfg, flagSet, "git-timeout"),
+		Timeout:         timeout,
 		Token:           vCfg.GetString("git-auth-token"),
 		Username:        vCfg.GetString("git-username"),
 		Password:        vCfg.GetString("git-password"),
@@ -635,14 +644,4 @@ func validate(log *zerolog.Logger, cfg Config) error {
 	}
 
 	return nil
-}
-
-// flagChanged reports whether a flag was set on the command line.
-func flagChanged(flagSet *pflag.FlagSet, name string) bool {
-	flag := flagSet.Lookup(name)
-	if flag == nil {
-		return false
-	}
-
-	return flag.Changed
 }
