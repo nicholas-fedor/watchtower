@@ -6,16 +6,12 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	"github.com/nicholas-fedor/watchtower/internal/settings/flags/docker"
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/schedule"
 )
 
@@ -25,8 +21,6 @@ var (
 	errInvalidLogFormat = errors.New("invalid log format specified")
 	// errInvalidLogLevel indicates an invalid log level was specified in configuration.
 	errInvalidLogLevel = errors.New("invalid log level specified")
-	// errSetEnvFailed indicates a failure to set or unset an environment variable during configuration.
-	errSetEnvFailed = errors.New("failed to update environment variable")
 	// errOpenFileFailed indicates a failure to open a file when reading secrets.
 	errOpenFileFailed = errors.New("failed to open secret file")
 	// errReplaceSliceFailed indicates a failure to replace a slice value in a flag.
@@ -65,7 +59,7 @@ var (
 //     failure it is the last logger set up, for reporting the failure.
 //   - error: Non-nil when a step fails, naming the step.
 func prepareFlags(log *zerolog.Logger, flagSet *pflag.FlagSet) (*zerolog.Logger, error) {
-	err := applyEnvToFlags(flagSet)
+	err := applyEnvToFlags(flagSet, AllSpecs())
 	if err != nil {
 		return log, fmt.Errorf("apply environment configuration: %w", err)
 	}
@@ -91,107 +85,6 @@ func prepareFlags(log *zerolog.Logger, flagSet *pflag.FlagSet) (*zerolog.Logger,
 	}
 
 	return log, nil
-}
-
-// EnvConfig sets the Docker environment variables to the resolved Docker settings.
-//
-// Each variable mirrors its setting, so a variable whose setting is empty or false is unset.
-//
-// Parameters:
-//   - log: Logger for configuration diagnostics.
-//   - cmd: Cobra command with flags.
-//
-// Returns:
-//   - error: Non-nil if the settings cannot be read or a variable cannot be updated.
-func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
-	flagSet := cmd.PersistentFlags()
-
-	// Resolve Docker settings via Viper (flag > env > static default) after BindAll.
-	vCfg := viper.New()
-
-	err := BindAll(vCfg, flagSet, docker.Specs())
-	if err != nil {
-		return fmt.Errorf("bind docker flags: %w", err)
-	}
-
-	host := vCfg.GetString("host")
-
-	// GetBool reads a value it cannot parse as false, which would turn verification off.
-	tls, err := strconv.ParseBool(vCfg.GetString("tlsverify"))
-	if err != nil {
-		return fmt.Errorf("read tlsverify: %w", err)
-	}
-
-	version := strings.Trim(vCfg.GetString("api-version"), "\"")
-	certPath := vCfg.GetString("cert-path")
-
-	// Convert tcp:// to https:// when TLS is enabled.
-	if tls && strings.HasPrefix(host, "tcp://") {
-		host = strings.Replace(host, "tcp://", "https://", 1)
-	}
-
-	// Warn about mismatched TLS settings.
-	if tls {
-		if strings.HasPrefix(host, "http://") {
-			log.Warn().
-				Msg("TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.")
-		} else if strings.HasPrefix(host, "unix://") {
-			log.Warn().
-				Msg("TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification.")
-		}
-	}
-
-	// The Docker client reads these variables and treats any value as set, even "0",
-	// so an empty or false setting unsets its variable rather than leaving the
-	// environment's value in place.
-	tlsValue := ""
-	if tls {
-		tlsValue = "1"
-	}
-
-	for _, setting := range []struct{ env, value string }{
-		{env: "DOCKER_HOST", value: host},
-		{env: "DOCKER_TLS_VERIFY", value: tlsValue},
-		{env: "DOCKER_API_VERSION", value: version},
-		{env: "DOCKER_CERT_PATH", value: certPath},
-	} {
-		err = exportEnv(setting.env, setting.value)
-		if err != nil {
-			return err
-		}
-	}
-
-	log.Debug().
-		Str("host", host).
-		Bool("tls", tls).
-		Str("version", version).
-		Str("certPath", certPath).
-		Msg("Configured Docker environment variables")
-
-	return nil
-}
-
-// exportEnv sets an environment variable, or unsets it when the value is empty.
-//
-// Parameters:
-//   - env: Environment variable name.
-//   - value: Value to set. Empty unsets the variable.
-//
-// Returns:
-//   - error: Non-nil if the variable cannot be set or unset.
-func exportEnv(env, value string) error {
-	var err error
-	if value == "" {
-		err = os.Unsetenv(env)
-	} else {
-		err = os.Setenv(env, value)
-	}
-
-	if err != nil {
-		return fmt.Errorf("%w: %s: %w", errSetEnvFailed, env, err)
-	}
-
-	return nil
 }
 
 // getSecretsFromFiles updates flags with file contents for secrets.

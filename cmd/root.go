@@ -20,6 +20,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/api"
 	"github.com/nicholas-fedor/watchtower/internal/api/routes"
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
@@ -31,6 +32,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -79,8 +81,8 @@ var (
 	// client is the Docker client instance used to interact with container operations in Watchtower.
 	//
 	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
-	// the preRun phase with options derived from appCfg.ClientOptions() (DOCKER_HOST, TLS, API version, and
-	// related client flags/environment variables).
+	// the preRun phase with options derived from appCfg.ClientOptions(), which include the Docker
+	// connection settings.
 	client DockerClient
 
 	// rateLimiter paces every registry request, so image pulls, digest checks,
@@ -371,8 +373,8 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
-	// Map Docker connection flags into the process environment for the client stack.
-	err = settings.EnvConfig(p.log, cmd)
+	// Compose rebuilds read the Docker connection settings from the process environment.
+	err = composeApply.ExportConnection(appCfg.Docker)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to configure Docker environment", code: 1}
 	}
@@ -968,19 +970,21 @@ func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
 			return
 		}
 
+		var docker dockerConfig.Docker
+
 		err := p.clientErr
 		if err == nil {
-			// Startup reports the connection settings when it maps them
-			// itself, so this mapping logs nothing.
-			err = settings.EnvConfig(new(zerolog.Nop()), cmd)
+			// Startup reports the TLS warnings when it loads the settings
+			// itself, so this read logs nothing.
+			docker, err = settings.LoadDocker(new(zerolog.Nop()), cmd)
 		}
 
 		if err == nil {
-			// The client options only change how updates run. The process is
-			// exiting, so it waits only briefly for a daemon that does not
-			// answer.
+			// The other client options only change how updates run. The
+			// process is exiting, so it waits only briefly for a daemon that
+			// does not answer.
 			ctx, cancel := context.WithTimeout(context.Background(), restartPolicyTimeout)
-			client, err = newClient(ctx, p.log, containerClient.ClientOptions{})
+			client, err = newClient(ctx, p.log, containerClient.ClientOptions{Docker: docker})
 
 			cancel()
 		}

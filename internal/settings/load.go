@@ -25,6 +25,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/schedule"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
+	dockerFlags "github.com/nicholas-fedor/watchtower/internal/settings/flags/docker"
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/spec"
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 )
@@ -104,7 +105,7 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 
 	cfg := Config{}
 
-	cfg.Docker = loadDocker(values)
+	cfg.Docker = loadDocker(log, values)
 	cfg.Client = loadClient(values)
 	cfg.Compatibility = loadCompat(values)
 
@@ -146,6 +147,38 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 	return cfg, log, nil
 }
 
+// LoadDocker reads only the Docker connection settings of a parsed root
+// command.
+//
+// It serves a process whose [Load] did not finish or never ran, so the
+// environment may not be applied to the flags yet. LoadDocker applies the
+// environment to the Docker settings' flags itself and reads them as Load does.
+//
+// Parameters:
+//   - log: Logger for the TLS warnings.
+//   - cmd: Root command with its persistent flags registered and parsed.
+//
+// Returns:
+//   - docker.Docker: The Docker connection settings.
+//   - error: Non-nil when an environment value or a flag cannot be read.
+func LoadDocker(log *zerolog.Logger, cmd *cobra.Command) (docker.Docker, error) {
+	flagSet := cmd.PersistentFlags()
+
+	err := applyEnvToFlags(flagSet, dockerFlags.Specs())
+	if err != nil {
+		return docker.Docker{}, fmt.Errorf("apply environment configuration: %w", err)
+	}
+
+	values := &flagValues{flags: flagSet}
+
+	settings := loadDocker(log, values)
+	if values.err != nil {
+		return docker.Docker{}, values.err
+	}
+
+	return settings, nil
+}
+
 // checkRanges returns an error for the first integer or duration setting that
 // cannot be read or whose value is outside the range its spec allows.
 //
@@ -184,13 +217,36 @@ func checkRanges(values *flagValues, specs []spec.FlagSpec) error {
 }
 
 // loadDocker reads Docker connection settings.
-func loadDocker(values *flagValues) docker.Docker {
-	return docker.Docker{
+//
+// With TLS verification on, a tcp:// host becomes https://, and a host that
+// cannot use TLS logs a warning.
+func loadDocker(log *zerolog.Logger, values *flagValues) docker.Docker {
+	settings := docker.Docker{
 		Host:       values.String("host"),
 		TLSVerify:  values.Bool("tlsverify"),
 		APIVersion: strings.Trim(values.String("api-version"), "\""),
 		CertPath:   values.String("cert-path"),
 	}
+
+	if !settings.TLSVerify {
+		return settings
+	}
+
+	if strings.HasPrefix(settings.Host, "tcp://") {
+		settings.Host = strings.Replace(settings.Host, "tcp://", "https://", 1)
+	}
+
+	switch {
+	case strings.HasPrefix(settings.Host, "http://"):
+		log.Warn().
+			Msg("TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.")
+	case strings.HasPrefix(settings.Host, "unix://"):
+		log.Warn().
+			Msg("TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification.")
+	default:
+	}
+
+	return settings
 }
 
 // loadClient reads Docker client construction settings.

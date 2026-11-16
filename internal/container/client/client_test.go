@@ -42,6 +42,7 @@ import (
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	registryConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
@@ -252,8 +253,8 @@ func newTLSStubClient(t *testing.T) (*httpstub.Server, *dockerClient.Client) {
 	return server, api
 }
 
-// writeDockerCerts writes the ca.pem, cert.pem, and key.pem files the Docker
-// SDK reads from DOCKER_CERT_PATH. The CA is the stub server's certificate, so
+// writeDockerCerts writes the ca.pem, cert.pem, and key.pem files the client
+// loads from its certificate path. The CA is the stub server's certificate, so
 // the client trusts the server, and the client certificate is self-signed.
 //
 // Parameters:
@@ -261,7 +262,7 @@ func newTLSStubClient(t *testing.T) (*httpstub.Server, *dockerClient.Client) {
 //   - server: TLS stub server the client connects to.
 //
 // Returns:
-//   - string: Directory to set DOCKER_CERT_PATH to.
+//   - string: Directory to use as the certificate path.
 func writeDockerCerts(t *testing.T, server *httpstub.Server) string {
 	t.Helper()
 
@@ -322,20 +323,24 @@ func respondToPing(t *testing.T, method string, status int, apiVersion string) h
 	)
 }
 
-// useDockerTLS points the Docker environment variables at a TLS connection to
-// server, with certificates the client trusts.
+// dockerTLS returns Docker settings for a TLS connection to server, with
+// certificates the client trusts.
 //
 // Parameters:
-//   - t: Test whose environment is changed.
+//   - t: Test the certificate files belong to.
 //   - server: Server the client connects to.
 //   - certServer: TLS server whose certificate the client trusts.
-func useDockerTLS(t *testing.T, server, certServer *httpstub.Server) {
+//
+// Returns:
+//   - dockerConfig.Docker: Settings with TLS verification on.
+func dockerTLS(t *testing.T, server, certServer *httpstub.Server) dockerConfig.Docker {
 	t.Helper()
 
-	t.Setenv("DOCKER_HOST", "tcp://"+server.Addr())
-	t.Setenv("DOCKER_TLS_VERIFY", "1")
-	t.Setenv("DOCKER_CERT_PATH", writeDockerCerts(t, certServer))
-	t.Setenv("DOCKER_API_VERSION", "")
+	return dockerConfig.Docker{
+		Host:      "tcp://" + server.Addr(),
+		TLSVerify: true,
+		CertPath:  writeDockerCerts(t, certServer),
+	}
 }
 
 // TestClient verifies the Docker client's container lifecycle, listing,
@@ -1408,8 +1413,7 @@ func TestClient(t *testing.T) {
 }
 
 // TestClientEnvironment verifies the client behavior that depends on
-// environment variables: runtime detection by the container variables, and
-// client construction from the DOCKER_* variables.
+// environment variables, which is runtime detection by the container variables.
 //
 // The test sets environment variables, so it does not run in parallel.
 func TestClientEnvironment(t *testing.T) {
@@ -1471,113 +1475,116 @@ func TestClientEnvironment(t *testing.T) {
 			})
 		})
 	})
+}
 
-	t.Run("TLS client methods", func(t *testing.T) {
-		t.Run("Ping handles TLS connection failures gracefully", func(t *testing.T) {
-			// The client requires TLS, but the server speaks plain HTTP, so
-			// no request reaches a handler.
-			server := httpstub.New(t)
-			useDockerTLS(t, server, httpstub.NewTLS(t))
+// TestNewClient verifies that the client connects with its Docker settings:
+// over TLS with the configured certificates, with a fixed or negotiated API
+// version, and with a fallback to negotiation when the fixed version is
+// unsupported.
+func TestNewClient(t *testing.T) {
+	t.Parallel()
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.NoError(t, err)
+	t.Run("should return an error when the host cannot be parsed", func(t *testing.T) {
+		t.Parallel()
 
-			err = client.Ping(t.Context())
-			require.ErrorContains(t, err, "ping failed")
-			assert.Empty(t, server.ReceivedRequests())
-		})
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: dockerConfig.Docker{Host: "tcp://[::1"}})
+		require.ErrorContains(t, err, "create Docker client")
+		assert.Nil(t, client)
 	})
 
-	t.Run("NewClient", func(t *testing.T) {
-		t.Run("should return an error when DOCKER_HOST cannot be parsed", func(t *testing.T) {
-			t.Setenv("DOCKER_HOST", "tcp://[::1")
-			t.Setenv("DOCKER_TLS_VERIFY", "")
-			t.Setenv("DOCKER_API_VERSION", "")
+	t.Run("should successfully connect with TLS when TLS verification is on and the host is a TLS server", func(t *testing.T) {
+		t.Parallel()
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.ErrorContains(t, err, "create Docker client")
-			assert.Nil(t, client)
-		})
+		server := httpstub.NewTLS(t)
+		server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
 
-		t.Run("should successfully connect with TLS when DOCKER_TLS_VERIFY=1 and DOCKER_HOST points to TLS server", func(t *testing.T) {
-			server := httpstub.NewTLS(t)
-			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
-			useDockerTLS(t, server, server)
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: dockerTLS(t, server, server)})
+		require.NoError(t, err)
+		require.NotNil(t, client)
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.NoError(t, err)
-			require.NotNil(t, client)
+		requests := server.ReceivedRequests()
+		require.Len(t, requests, 1)
+		assert.NotNil(t, requests[0].TLS, "the ping is sent over TLS")
+	})
 
-			requests := server.ReceivedRequests()
-			require.Len(t, requests, 1)
-			assert.NotNil(t, requests[0].TLS, "the ping is sent over TLS")
-		})
+	t.Run("should send no plain HTTP request when TLS is required but the server is HTTP-only", func(t *testing.T) {
+		t.Parallel()
 
-		t.Run("should fail when TLS is required but server is HTTP-only", func(t *testing.T) {
-			server := httpstub.New(t)
-			useDockerTLS(t, server, httpstub.NewTLS(t))
+		// The client requires TLS, but the server speaks plain HTTP, so
+		// no request reaches a handler and pings fail.
+		server := httpstub.New(t)
 
-			assert.NotPanics(t, func() { _, _ = NewClient(t.Context(), newTestLogger(t), ClientOptions{}) })
-			assert.Empty(t, server.ReceivedRequests(), "no plain HTTP request is sent")
-		})
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: dockerTLS(t, server, httpstub.NewTLS(t))})
+		require.NoError(t, err)
 
-		t.Run("should negotiate API version with TLS", func(t *testing.T) {
-			server := httpstub.NewTLS(t)
-			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
-			useDockerTLS(t, server, server)
+		err = client.Ping(t.Context())
+		require.ErrorContains(t, err, "ping failed")
+		assert.Empty(t, server.ReceivedRequests())
+	})
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.NoError(t, err)
-			assert.Equal(t, "1.45", client.GetVersion())
-		})
+	t.Run("should negotiate API version with TLS", func(t *testing.T) {
+		t.Parallel()
 
-		t.Run("should use forced API version with TLS", func(t *testing.T) {
-			// A forced version skips negotiation, so the daemon's newer
-			// version is not adopted.
-			server := httpstub.NewTLS(t)
-			server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.47"))
-			useDockerTLS(t, server, server)
-			t.Setenv("DOCKER_API_VERSION", "1.44")
+		server := httpstub.NewTLS(t)
+		server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.45"))
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.NoError(t, err)
-			assert.Equal(t, "1.44", client.GetVersion())
-		})
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: dockerTLS(t, server, server)})
+		require.NoError(t, err)
+		assert.Equal(t, "1.45", client.GetVersion())
+	})
 
-		t.Run("should fall back to negotiation when the forced API version is newer than the daemon's", func(t *testing.T) {
-			// The daemon answers the unversioned ping, so only the API
-			// version it reports shows the forced version is unsupported.
-			server := httpstub.NewTLS(t)
-			server.AppendHandlers(
-				respondToPing(t, http.MethodHead, http.StatusOK, "1.45"),
-				respondToPing(t, http.MethodHead, http.StatusOK, "1.45"),
-			)
-			useDockerTLS(t, server, server)
-			t.Setenv("DOCKER_API_VERSION", "1.47")
+	t.Run("should use forced API version with TLS", func(t *testing.T) {
+		t.Parallel()
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.NoError(t, err)
-			assert.Equal(t, "1.45", client.GetVersion())
-			assert.Len(t, server.ReceivedRequests(), 2)
-		})
+		// A forced version skips negotiation, so the daemon's newer
+		// version is not adopted.
+		server := httpstub.NewTLS(t)
+		server.AppendHandlers(respondToPing(t, http.MethodHead, http.StatusOK, "1.47"))
+		docker := dockerTLS(t, server, server)
+		docker.APIVersion = "1.44"
 
-		t.Run("should handle invalid API version with TLS and fall back to negotiation", func(t *testing.T) {
-			// The pings at the forced version fail with 404, HEAD and then
-			// GET, so the client is recreated and negotiates.
-			server := httpstub.NewTLS(t)
-			server.AppendHandlers(
-				respondToPing(t, http.MethodHead, http.StatusNotFound, ""),
-				respondToPing(t, http.MethodGet, http.StatusNotFound, ""),
-				respondToPing(t, http.MethodHead, http.StatusOK, "1.45"),
-			)
-			useDockerTLS(t, server, server)
-			t.Setenv("DOCKER_API_VERSION", "1.99")
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: docker})
+		require.NoError(t, err)
+		assert.Equal(t, "1.44", client.GetVersion())
+	})
 
-			client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{})
-			require.NoError(t, err)
-			assert.Equal(t, "1.45", client.GetVersion())
-			assert.Len(t, server.ReceivedRequests(), 3)
-		})
+	t.Run("should fall back to negotiation when the forced API version is newer than the daemon's", func(t *testing.T) {
+		t.Parallel()
+
+		// The daemon answers the unversioned ping, so only the API
+		// version it reports shows the forced version is unsupported.
+		server := httpstub.NewTLS(t)
+		server.AppendHandlers(
+			respondToPing(t, http.MethodHead, http.StatusOK, "1.45"),
+			respondToPing(t, http.MethodHead, http.StatusOK, "1.45"),
+		)
+		docker := dockerTLS(t, server, server)
+		docker.APIVersion = "1.47"
+
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: docker})
+		require.NoError(t, err)
+		assert.Equal(t, "1.45", client.GetVersion())
+		assert.Len(t, server.ReceivedRequests(), 2)
+	})
+
+	t.Run("should handle invalid API version with TLS and fall back to negotiation", func(t *testing.T) {
+		t.Parallel()
+
+		// The pings at the forced version fail with 404, HEAD and then
+		// GET, so the client is recreated and negotiates.
+		server := httpstub.NewTLS(t)
+		server.AppendHandlers(
+			respondToPing(t, http.MethodHead, http.StatusNotFound, ""),
+			respondToPing(t, http.MethodGet, http.StatusNotFound, ""),
+			respondToPing(t, http.MethodHead, http.StatusOK, "1.45"),
+		)
+		docker := dockerTLS(t, server, server)
+		docker.APIVersion = "1.99"
+
+		client, err := NewClient(t.Context(), newTestLogger(t), ClientOptions{Docker: docker})
+		require.NoError(t, err)
+		assert.Equal(t, "1.45", client.GetVersion())
+		assert.Len(t, server.ReceivedRequests(), 3)
 	})
 }
 
@@ -2544,7 +2551,7 @@ func TestNegotiateDockerAPI_WaitsForDaemon(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		daemon := &startingDaemon{ready: time.Now().Add(75 * time.Second)}
 
-		cli, result, err := negotiateDockerAPI(t.Context(), newTestLogger(t), newStartingDaemonClient(t, daemon))
+		cli, result, err := negotiateDockerAPI(t.Context(), newTestLogger(t), newStartingDaemonClient(t, daemon), nil)
 		require.NoError(t, err)
 		assert.Equal(t, "1.45", result.APIVersion)
 		assert.Equal(t, "1.45", cli.ClientVersion())

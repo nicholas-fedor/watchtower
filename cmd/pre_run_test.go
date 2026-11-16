@@ -27,6 +27,7 @@ import (
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 )
 
 // preRunExitHelperEnv selects a preRun exit case when the test binary is
@@ -59,8 +60,8 @@ func cgroupWithSelf() string {
 
 // setPreRunState prepares the process state preRun reads and writes, and
 // restores it when the test ends. newClient returns client, self container ID
-// detection reads only detection, and the Docker variables and registry TLS
-// settings preRun sets are restored.
+// detection reads only detection, and the Docker variables preRun reads and
+// sets are cleared and restored.
 func setPreRunState(t *testing.T, client DockerClient, detection selfDetection) {
 	t.Helper()
 
@@ -366,23 +367,40 @@ func containerName(c *container.Container) string {
 }
 
 // TestPreRun_Configuration verifies that preRun loads the configuration from
-// the flags and exports the Docker connection settings to the environment,
-// where the Docker client reads them.
+// the flags, passes the Docker connection settings to the Docker client, and
+// exports them to the environment, where Compose rebuilds read them.
 func TestPreRun_Configuration(t *testing.T) {
-	setPreRunState(t, mockCmd.NewMockDockerClient(t), selfDetection{})
+	mockClient := mockCmd.NewMockDockerClient(t)
+	setPreRunState(t, mockClient, selfDetection{})
+
+	var gotOpts containerClient.ClientOptions
+
+	newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
+		gotOpts = opts
+
+		return mockClient, nil
+	}
 
 	require.NoError(t, newRunProcess().preRun(newTestRootCommand(t,
 		"--scope", "prod",
 		"--host", "tcp://docker.example.com:2376",
 		"--tlsverify",
 		"--api-version", "1.47",
+		"--cert-path", "/certs",
 	), nil))
 
 	assert.Equal(t, "prod", appCfg.Filter.Scope)
-	// With TLS verification enabled, a tcp:// host is exported as https://.
+	// With TLS verification enabled, a tcp:// host becomes https://.
+	assert.Equal(t, dockerConfig.Docker{
+		Host:       "https://docker.example.com:2376",
+		TLSVerify:  true,
+		APIVersion: "1.47",
+		CertPath:   "/certs",
+	}, gotOpts.Docker)
 	assert.Equal(t, "https://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
 	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
+	assert.Equal(t, "/certs", os.Getenv("DOCKER_CERT_PATH"))
 }
 
 // TestPreRun_loadsSettingsOnce verifies that a run of the root command loads
@@ -634,7 +652,7 @@ func TestPreRun_Exit(t *testing.T) {
 			helperCase:   "invalid-log-format-with-host-flag",
 			wantExitCode: 1,
 			wantOutput: []string{
-				"newClient DOCKER_HOST=tcp://socket-proxy:2375 bounded=true",
+				"newClient host=tcp://socket-proxy:2375 bounded=true",
 				"SetRestartPolicy cccccccccccc no",
 				"Failed to load configuration",
 			},
@@ -684,7 +702,7 @@ func TestPreRun_Exit(t *testing.T) {
 			helperCase:   "host-flag-before-unknown-flag",
 			wantExitCode: 1,
 			wantOutput: []string{
-				"newClient DOCKER_HOST=tcp://socket-proxy:2375",
+				"newClient host=tcp://socket-proxy:2375",
 				"SetRestartPolicy cccccccccccc no",
 				"Failed to execute root command",
 			},
@@ -946,9 +964,9 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	// The client factory prints the Docker host it connects to and whether its
 	// wait for the daemon has a deadline. It fails with clientErr when a case
 	// sets it.
-	newClient = func(ctx context.Context, _ *zerolog.Logger, _ containerClient.ClientOptions) (DockerClient, error) {
+	newClient = func(ctx context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
 		_, bounded := ctx.Deadline()
-		fmt.Fprintf(os.Stderr, "newClient DOCKER_HOST=%s bounded=%t\n", os.Getenv("DOCKER_HOST"), bounded)
+		fmt.Fprintf(os.Stderr, "newClient host=%s bounded=%t\n", opts.Docker.Host, bounded)
 
 		if clientErr != nil {
 			return nil, clientErr

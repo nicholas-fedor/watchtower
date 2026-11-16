@@ -10,4 +10,6 @@ var (
 	errNoComposeServices = errors.New("no compose services to apply")
 	// errEmptyProjectName indicates the loaded project has no name, so compose start cannot find its containers.
 	errEmptyProjectName = errors.New("compose project name is empty")
+	// errExportEnvFailed indicates a Docker environment variable could not be set or unset.
+	errExportEnvFailed = errors.New("failed to update environment variable")
 )

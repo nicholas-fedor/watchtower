@@ -965,8 +965,7 @@ func TestCloneImageInspect_IsolatesMutations(t *testing.T) {
 func newImageInspectFailAPI(t *testing.T, err error) *mockContainer.MockAPIClient {
 	t.Helper()
 
-	api := mockContainer.NewMockAPIClient(t)
-	api.EXPECT().ClientVersion().Return("1.44").Maybe()
+	api := newDockerAPI(t)
 	api.EXPECT().ContainerList(mock.Anything, mock.Anything).
 		Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{{ID: testContainerID}}}, nil).Once()
 	api.EXPECT().ContainerInspect(mock.Anything, testContainerID, dockerClient.ContainerInspectOptions{}).
