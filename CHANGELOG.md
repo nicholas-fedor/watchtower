@@ -163,6 +163,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/valyala/fasthttp to v1.79.0 by @renovate[bot] in [#3836](https://github.com/nicholas-fedor/watchtower/pull/3836)
+- Update module github.com/docker/cli to v29.10.0+incompatible by @renovate[bot] in [#3835](https://github.com/nicholas-fedor/watchtower/pull/3835)
 - Update golang:alpine3.24 docker digest to 70bd7dd by @renovate[bot] in [#3832](https://github.com/nicholas-fedor/watchtower/pull/3832)
 - Update golang:1.27.4-alpine docker digest to 70bd7dd by @renovate[bot] in [#3831](https://github.com/nicholas-fedor/watchtower/pull/3831)
 - Update github.com/defanglabs/secret-detector digest to 4d8b46d by @renovate[bot] in [#3821](https://github.com/nicholas-fedor/watchtower/pull/3821)
