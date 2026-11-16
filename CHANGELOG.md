@@ -165,6 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to c24983a by @renovate[bot] in [#3844](https://github.com/nicholas-fedor/watchtower/pull/3844)
 - Update golang.org/x/tools digest to 5bc4490 by @renovate[bot] in [#3840](https://github.com/nicholas-fedor/watchtower/pull/3840)
 - Update module github.com/valyala/fasthttp to v1.79.0 by @renovate[bot] in [#3836](https://github.com/nicholas-fedor/watchtower/pull/3836)
 - Update module github.com/docker/cli to v29.10.0+incompatible by @renovate[bot] in [#3835](https://github.com/nicholas-fedor/watchtower/pull/3835)
