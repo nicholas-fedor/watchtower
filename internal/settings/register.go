@@ -63,7 +63,7 @@ func specNamed(name string) (spec.FlagSpec, bool) {
 // AllSpecs returns aggregated FlagSpec rows from every domain.
 //
 // Returns:
-//   - []spec.FlagSpec: Flag metadata for BindAll.
+//   - []spec.FlagSpec: The specs of every setting.
 func AllSpecs() []spec.FlagSpec {
 	return collectSpecs(
 		docker.Specs(),
