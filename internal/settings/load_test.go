@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -31,27 +29,19 @@ func newNopLogger() *zerolog.Logger {
 	return &log
 }
 
-// bindLoad registers flags, parses args, and binds a local Viper instance.
+// parsedValues returns a reader of a command's flags parsed from args, with
+// every flag registered as in production.
 //
 // Parameters:
 //   - t: Test handle.
 //   - args: CLI arguments after the command name.
 //
 // Returns:
-//   - *viper.Viper: Bound configuration, for the integer settings.
 //   - *flagValues: Reader of the parsed persistent flags.
-func bindLoad(t *testing.T, args ...string) (*viper.Viper, *flagValues) {
+func parsedValues(t *testing.T, args ...string) *flagValues {
 	t.Helper()
 
-	cmd := &cobra.Command{Use: "watchtower"}
-	RegisterAll(cmd)
-	require.NoError(t, cmd.ParseFlags(args))
-
-	flagSet := cmd.PersistentFlags()
-	vCfg := viper.New()
-	require.NoError(t, BindAll(vCfg, flagSet, AllSpecs()))
-
-	return vCfg, &flagValues{flags: flagSet}
+	return &flagValues{flags: newParsedCommand(t, args...).PersistentFlags()}
 }
 
 func TestLoad_DefaultsAndAlignment(t *testing.T) {
@@ -268,7 +258,7 @@ func TestLoad_InvalidAndNegativeCooldown(t *testing.T) {
 }
 
 func TestLoadDocker(t *testing.T) {
-	_, values := bindLoad(t, "-H", "tcp://127.0.0.1:2375", "--tlsverify", "--api-version", `"1.43"`, "--cert-path", "/certs")
+	values := parsedValues(t, "-H", "tcp://127.0.0.1:2375", "--tlsverify", "--api-version", `"1.43"`, "--cert-path", "/certs")
 
 	got := loadDocker(values)
 	assert.Equal(t, "tcp://127.0.0.1:2375", got.Host)
@@ -278,7 +268,7 @@ func TestLoadDocker(t *testing.T) {
 }
 
 func TestLoadClient(t *testing.T) {
-	_, values := bindLoad(t, "--include-stopped", "--include-restarting", "--revive-stopped", "--remove-volumes", "--warn-on-head-failure", "always")
+	values := parsedValues(t, "--include-stopped", "--include-restarting", "--revive-stopped", "--remove-volumes", "--warn-on-head-failure", "always")
 
 	got := loadClient(values)
 	assert.True(t, got.IncludeStopped)
@@ -289,7 +279,7 @@ func TestLoadClient(t *testing.T) {
 }
 
 func TestLoadCompat(t *testing.T) {
-	_, values := bindLoad(t, "--disable-memory-swappiness", "--cpu-copy-mode", "none")
+	values := parsedValues(t, "--disable-memory-swappiness", "--cpu-copy-mode", "none")
 
 	got := loadCompat(values)
 	assert.True(t, got.DisableMemorySwappiness)
@@ -297,16 +287,16 @@ func TestLoadCompat(t *testing.T) {
 }
 
 func TestLoadSchedule(t *testing.T) {
-	vCfg, values := bindLoad(t, "--interval", "120", "--schedule", "0 0 * * *", "--update-on-start")
+	values := parsedValues(t, "--interval", "120", "--schedule", "0 0 * * *", "--update-on-start")
 
-	got := loadSchedule(vCfg, values)
+	got := loadSchedule(values)
 	assert.Equal(t, 120, got.IntervalSeconds)
 	assert.Equal(t, "0 0 * * *", got.Spec)
 	assert.True(t, got.UpdateOnStart)
 }
 
 func TestLoadMode(t *testing.T) {
-	_, values := bindLoad(t, "--run-once", "--health-check", "--porcelain", "v1", "--self-update-orchestrator", "--no-startup-message")
+	values := parsedValues(t, "--run-once", "--health-check", "--porcelain", "v1", "--self-update-orchestrator", "--no-startup-message")
 
 	got := loadMode(values)
 	assert.True(t, got.RunOnce)
@@ -318,7 +308,7 @@ func TestLoadMode(t *testing.T) {
 
 func TestLoadUpdate(t *testing.T) {
 	t.Run("flags", func(t *testing.T) {
-		_, values := bindLoad(t,
+		values := parsedValues(t,
 			"--cleanup", "--no-pull", "--no-restart", "--monitor-only", "--rolling-restart",
 			"--stop-timeout", "45s", "--cooldown-delay", "2h",
 			"--use-compose-depends-on", "--label-take-precedence", "--ephemeral-self-update",
@@ -339,21 +329,21 @@ func TestLoadUpdate(t *testing.T) {
 	})
 
 	t.Run("empty cooldown", func(t *testing.T) {
-		_, values := bindLoad(t)
+		values := parsedValues(t)
 		got, err := loadUpdate(newNopLogger(), values)
 		require.NoError(t, err)
 		assert.Equal(t, time.Duration(0), got.CooldownDelay)
 	})
 
 	t.Run("subsecond timeout", func(t *testing.T) {
-		_, values := bindLoad(t, "--stop-timeout", "500ms")
+		values := parsedValues(t, "--stop-timeout", "500ms")
 		got, err := loadUpdate(newNopLogger(), values)
 		require.NoError(t, err)
 		assert.Equal(t, 500*time.Millisecond, got.StopTimeout)
 	})
 
 	t.Run("invalid cooldown", func(t *testing.T) {
-		_, values := bindLoad(t, "--cooldown-delay", "nope")
+		values := parsedValues(t, "--cooldown-delay", "nope")
 		_, err := loadUpdate(newNopLogger(), values)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "cooldown-delay:")
@@ -361,7 +351,7 @@ func TestLoadUpdate(t *testing.T) {
 
 	t.Run("negative cooldown", func(t *testing.T) {
 		// units.ParseDuration rejects a leading '-'.
-		_, values := bindLoad(t, "--cooldown-delay", "-2d")
+		values := parsedValues(t, "--cooldown-delay", "-2d")
 		_, err := loadUpdate(newNopLogger(), values)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "cooldown-delay:")
@@ -369,9 +359,9 @@ func TestLoadUpdate(t *testing.T) {
 }
 
 func TestLoadLifecycle(t *testing.T) {
-	vCfg, values := bindLoad(t, "--enable-lifecycle-hooks", "--lifecycle-uid", "1000", "--lifecycle-gid", "1001")
+	values := parsedValues(t, "--enable-lifecycle-hooks", "--lifecycle-uid", "1000", "--lifecycle-gid", "1001")
 
-	got := loadLifecycle(vCfg, values)
+	got := loadLifecycle(values)
 	assert.True(t, got.Enabled)
 	assert.Equal(t, 1000, got.UID)
 	assert.Equal(t, 1001, got.GID)
@@ -385,7 +375,7 @@ func TestNormalizedStringSlice(t *testing.T) {
 	t.Run("lowercases values", func(t *testing.T) {
 		t.Parallel()
 
-		values := &flagValues{flags: newParsedCommand(t, "--disable-containers", "/Foo,Bar").PersistentFlags()}
+		values := parsedValues(t, "--disable-containers", "/Foo,Bar")
 
 		got := normalizedStringSlice(values, "disable-containers", strings.ToLower)
 		assert.Equal(t, []string{"/foo", "bar"}, got)
@@ -394,7 +384,7 @@ func TestNormalizedStringSlice(t *testing.T) {
 	t.Run("empty when unset", func(t *testing.T) {
 		t.Parallel()
 
-		values := &flagValues{flags: newParsedCommand(t).PersistentFlags()}
+		values := parsedValues(t)
 
 		got := normalizedStringSlice(values, "disable-containers", strings.ToLower)
 		assert.Empty(t, got)
@@ -403,7 +393,7 @@ func TestNormalizedStringSlice(t *testing.T) {
 
 func TestLoadFilter(t *testing.T) {
 	t.Run("names and lists", func(t *testing.T) {
-		_, values := bindLoad(t,
+		values := parsedValues(t,
 			"--label-enable",
 			"--disable-containers", "/SkipMe",
 			"--monitor-image-names", "nginx*",
@@ -428,7 +418,7 @@ func TestLoadFilter(t *testing.T) {
 	})
 
 	t.Run("invalid label pair", func(t *testing.T) {
-		_, values := bindLoad(t, "--disable-containers-by-label", "broken")
+		values := parsedValues(t, "--disable-containers-by-label", "broken")
 		_, err := loadFilter(newNopLogger(), values, nil)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "build filter:")
@@ -445,7 +435,7 @@ func TestLoadRegistry(t *testing.T) {
 		t.Setenv("WATCHTOWER_COOLDOWN_PLATFORM_ARCH", "arm")
 		t.Setenv("WATCHTOWER_COOLDOWN_PLATFORM_VARIANT", "v7")
 
-		_, values := bindLoad(t, "--registry-tls-skip", "--registry-tls-min-version", "1.3")
+		values := parsedValues(t, "--registry-tls-skip", "--registry-tls-min-version", "1.3")
 
 		assert.Equal(t, registry.Registry{
 			CooldownPlatform: registry.Platform{OS: "windows", Architecture: "arm", Variant: "v7"},
@@ -464,7 +454,7 @@ func TestLoadRegistry(t *testing.T) {
 			require.NoError(t, os.Unsetenv(key))
 		}
 
-		_, values := bindLoad(t)
+		values := parsedValues(t)
 
 		assert.Equal(t, registry.Registry{TLSMinVersion: "TLS1.2"}, loadRegistry(values))
 	})
@@ -472,7 +462,7 @@ func TestLoadRegistry(t *testing.T) {
 
 func TestLoadAPI(t *testing.T) {
 	t.Run("all fields", func(t *testing.T) {
-		vCfg, values := bindLoad(t,
+		values := parsedValues(t,
 			"--http-api-endpoints", "health,update",
 			"--http-api-update", "--http-api-metrics", "--http-api-containers",
 			"--http-api-host", "127.0.0.1", "--http-api-port", "8080",
@@ -485,7 +475,7 @@ func TestLoadAPI(t *testing.T) {
 			"--http-api-check-timeout", "5s", "--http-api-update-timeout", "10s",
 		)
 
-		got := loadAPI(vCfg, values)
+		got := loadAPI(values)
 		assert.Equal(t, []string{"health", "update"}, got.Endpoints)
 		assert.True(t, got.LegacyUpdate)
 		assert.True(t, got.LegacyMetrics)
@@ -511,9 +501,9 @@ func TestLoadAPI(t *testing.T) {
 	})
 
 	t.Run("unchanged flags", func(t *testing.T) {
-		vCfg, values := bindLoad(t)
+		values := parsedValues(t)
 
-		got := loadAPI(vCfg, values)
+		got := loadAPI(values)
 		assert.False(t, got.HostChanged)
 		assert.False(t, got.PortChanged)
 		assert.False(t, got.RateLimitChanged)
@@ -526,7 +516,7 @@ func TestLoadAPI(t *testing.T) {
 }
 
 func TestLoadNotify(t *testing.T) {
-	vCfg, values := bindLoad(t,
+	values := parsedValues(t,
 		"--notification-url", "gotify://example/token",
 		"--notifications", "email,slack",
 		"--notifications-level", "debug",
@@ -559,7 +549,7 @@ func TestLoadNotify(t *testing.T) {
 		"--notification-gotify-tls-skip-verify",
 	)
 
-	got := loadNotify(vCfg, values)
+	got := loadNotify(values)
 	assert.Equal(t, []string{"gotify://example/token"}, got.URLs)
 	assert.Equal(t, []string{"email", "slack"}, got.LegacyTypes)
 	assert.Equal(t, "debug", got.Level)
@@ -594,7 +584,7 @@ func TestLoadNotify(t *testing.T) {
 
 func TestLoadLogging(t *testing.T) {
 	t.Run("explicit format", func(t *testing.T) {
-		_, values := bindLoad(t, "--log-format", "json", "--log-level", "debug", "--debug", "--trace", "--no-color")
+		values := parsedValues(t, "--log-format", "json", "--log-level", "debug", "--debug", "--trace", "--no-color")
 		got := loadLogging(values)
 		assert.Equal(t, "json", got.Format)
 		assert.Equal(t, "debug", got.Level)
@@ -604,7 +594,7 @@ func TestLoadLogging(t *testing.T) {
 	})
 
 	t.Run("empty format becomes auto", func(t *testing.T) {
-		_, values := bindLoad(t, "--log-format=", "--log-level", "warn")
+		values := parsedValues(t, "--log-format=", "--log-level", "warn")
 		got := loadLogging(values)
 		assert.Equal(t, "auto", got.Format)
 		assert.Equal(t, "warn", got.Level)
@@ -645,7 +635,7 @@ func TestLoadGit(t *testing.T) {
 		bundle := filepath.Join(dir, "ca.pem")
 		require.NoError(t, os.WriteFile(bundle, []byte("pem"), 0o600))
 
-		_, values := bindLoad(t,
+		values := parsedValues(t,
 			"--git-enable",
 			"--git-image", "myapp:latest=https://github.com/org/app.git#main@minor",
 			"--git-timeout", "45s",
@@ -683,7 +673,7 @@ func TestLoadGit(t *testing.T) {
 	})
 
 	t.Run("defaults", func(t *testing.T) {
-		_, values := bindLoad(t)
+		values := parsedValues(t)
 		got, err := loadGit(values)
 		require.NoError(t, err)
 		assert.False(t, got.Enable)
@@ -695,21 +685,21 @@ func TestLoadGit(t *testing.T) {
 	})
 
 	t.Run("invalid image", func(t *testing.T) {
-		_, values := bindLoad(t, "--git-image", "nope")
+		values := parsedValues(t, "--git-image", "nope")
 		_, err := loadGit(values)
 		require.ErrorIs(t, err, git.ErrInvalidGitImage)
 		assert.ErrorContains(t, err, "git-image:")
 	})
 
 	t.Run("invalid compose project", func(t *testing.T) {
-		_, values := bindLoad(t, "--compose-project", "nopair")
+		values := parsedValues(t, "--compose-project", "nopair")
 		_, err := loadGit(values)
 		require.ErrorIs(t, err, git.ErrInvalidComposeProject)
 		assert.ErrorContains(t, err, "compose-project:")
 	})
 
 	t.Run("missing ca bundle", func(t *testing.T) {
-		_, values := bindLoad(t, "--git-ca-bundle", filepath.Join(t.TempDir(), "missing.pem"))
+		values := parsedValues(t, "--git-ca-bundle", filepath.Join(t.TempDir(), "missing.pem"))
 		_, err := loadGit(values)
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "git-ca-bundle:")
@@ -771,6 +761,7 @@ func Test_flagValues_reads(t *testing.T) {
 	t.Setenv("WATCHTOWER_SCOPE", "env-scope")
 	t.Setenv("WATCHTOWER_HTTP_API_CHECK_TIMEOUT", "7s")
 	t.Setenv("WATCHTOWER_DISABLE_CONTAINERS", "db")
+	t.Setenv("WATCHTOWER_POLL_INTERVAL", "010")
 
 	cmd := newTestCommand()
 	parseWithEnv(t, cmd, "--scope", "cli-scope", "--disable-containers", "web")
@@ -781,6 +772,7 @@ func Test_flagValues_reads(t *testing.T) {
 	assert.Equal(t, "cli-scope", values.String("scope"), "the command line wins")
 	assert.Equal(t, 7*time.Second, values.Duration("http-api-check-timeout"))
 	assert.Equal(t, []string{"web"}, values.Strings("disable-containers"))
+	assert.Equal(t, 10, values.Int("interval"), "an environment integer is decimal")
 	require.NoError(t, values.err)
 }
 
@@ -789,7 +781,7 @@ func Test_flagValues_reads(t *testing.T) {
 func Test_flagValues_Strings_emptyWhenUnset(t *testing.T) {
 	t.Parallel()
 
-	values := &flagValues{flags: newParsedCommand(t).PersistentFlags()}
+	values := parsedValues(t)
 
 	got := values.Strings("notification-url")
 	require.NotNil(t, got)
@@ -802,7 +794,7 @@ func Test_flagValues_Strings_emptyWhenUnset(t *testing.T) {
 func Test_flagValues_Strings_returnsCopy(t *testing.T) {
 	t.Parallel()
 
-	values := &flagValues{flags: newParsedCommand(t, "--disable-containers", "web").PersistentFlags()}
+	values := parsedValues(t, "--disable-containers", "web")
 
 	list := values.Strings("disable-containers")
 	list[0] = "changed"
@@ -816,11 +808,12 @@ func Test_flagValues_Strings_returnsCopy(t *testing.T) {
 func Test_flagValues_failedRead(t *testing.T) {
 	t.Parallel()
 
-	values := &flagValues{flags: newParsedCommand(t).PersistentFlags()}
+	values := parsedValues(t)
 
 	assert.Empty(t, values.String("not-registered"))
 	assert.False(t, values.Bool("scope"), "scope is a string flag")
 	assert.Zero(t, values.Duration("cleanup"))
+	assert.Zero(t, values.Int("scope"))
 	assert.Equal(t, []string{}, values.Strings("scope"))
 
 	require.Error(t, values.err)

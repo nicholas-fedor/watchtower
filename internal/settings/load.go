@@ -10,7 +10,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/api"
@@ -72,9 +71,8 @@ var (
 // into their flags. Load changes the flags this way, so call it once per parsed
 // command. It does not re-parse CLI arguments.
 //
-// Settings are then read from the prepared flags, except integer settings,
-// which are resolved through a process-local Viper instance (flag > env >
-// static default) using FlagSpec metadata from every domain.
+// Settings are then read from the prepared flags, which hold the command-line
+// value, the environment value or the default of each setting.
 //
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. Load logs its own
@@ -87,7 +85,7 @@ var (
 //   - Config: Immutable configuration snapshot.
 //   - *zerolog.Logger: The logger with the configured format and level, also on
 //     a failure, for reporting it.
-//   - error: Non-nil when a flag cannot be prepared or bound or holds an
+//   - error: Non-nil when a flag cannot be prepared or read or holds an
 //     invalid value. A failed preparation names its step.
 func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zerolog.Logger, error) {
 	flagSet := cmd.PersistentFlags()
@@ -97,18 +95,9 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 		return Config{}, log, err
 	}
 
-	vCfg := viper.New()
-
-	specs := AllSpecs()
-
-	err = BindAll(vCfg, flagSet, specs)
-	if err != nil {
-		return Config{}, log, fmt.Errorf("bind configuration: %w", err)
-	}
-
 	values := &flagValues{flags: flagSet}
 
-	err = checkRanges(vCfg, values, specs)
+	err = checkRanges(values, AllSpecs())
 	if err != nil {
 		return Config{}, log, err
 	}
@@ -119,7 +108,7 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 	cfg.Client = loadClient(values)
 	cfg.Compatibility = loadCompat(values)
 
-	cfg.Schedule = loadSchedule(vCfg, values)
+	cfg.Schedule = loadSchedule(values)
 	cfg.Mode = loadMode(values)
 
 	cfg.Update, err = loadUpdate(log, values)
@@ -127,7 +116,7 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 		return Config{}, log, err
 	}
 
-	cfg.Lifecycle = loadLifecycle(vCfg, values)
+	cfg.Lifecycle = loadLifecycle(values)
 
 	cfg.Filter, err = loadFilter(log, values, args)
 	if err != nil {
@@ -136,8 +125,8 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 
 	cfg.Registry = loadRegistry(values)
 
-	cfg.API = loadAPI(vCfg, values)
-	cfg.Notify = loadNotify(vCfg, values)
+	cfg.API = loadAPI(values)
+	cfg.Notify = loadNotify(values)
 	cfg.Logging = loadLogging(values)
 
 	cfg.Git, err = loadGit(values)
@@ -157,27 +146,33 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 	return cfg, log, nil
 }
 
-// checkRanges returns an error for the first integer or duration setting whose
-// value is outside the range its spec allows.
+// checkRanges returns an error for the first integer or duration setting that
+// cannot be read or whose value is outside the range its spec allows.
 //
 // Parameters:
-//   - vCfg: Bound Viper instance, for the integer settings.
-//   - values: The prepared flags, for the duration settings.
+//   - values: The prepared flags.
 //   - specs: Specs of every setting.
 //
 // Returns:
-//   - error: The spec's range error, naming the setting and its value.
-func checkRanges(vCfg *viper.Viper, values *flagValues, specs []spec.FlagSpec) error {
+//   - error: The failed read of a setting, or the spec's range error naming
+//     the setting and its value.
+func checkRanges(values *flagValues, specs []spec.FlagSpec) error {
 	for _, flagSpec := range specs {
 		var err error
 
 		switch flagSpec.Kind {
 		case spec.KindInt:
-			err = flagSpec.CheckInt(vCfg.GetInt(flagSpec.Name))
+			err = flagSpec.CheckInt(values.Int(flagSpec.Name))
 		case spec.KindDuration:
 			err = flagSpec.CheckDuration(values.Duration(flagSpec.Name))
 		case spec.KindBool, spec.KindString, spec.KindStringSlice, spec.KindStringArray:
 		default:
+		}
+
+		// A setting that cannot be read holds 0, which the range check would
+		// report as an out-of-range value instead of the failed read.
+		if values.err != nil {
+			return values.err
 		}
 
 		if err != nil {
@@ -218,11 +213,9 @@ func loadCompat(values *flagValues) compatibility.Compatibility {
 }
 
 // loadSchedule reads schedule settings.
-//
-// The interval comes from Viper, and the other settings from the flags.
-func loadSchedule(vCfg *viper.Viper, values *flagValues) schedule.Schedule {
+func loadSchedule(values *flagValues) schedule.Schedule {
 	return schedule.Schedule{
-		IntervalSeconds: vCfg.GetInt("interval"),
+		IntervalSeconds: values.Int("interval"),
 		Spec:            values.String("schedule"),
 		UpdateOnStart:   values.Bool("update-on-start"),
 	}
@@ -367,13 +360,11 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 }
 
 // loadLifecycle reads lifecycle hook settings.
-//
-// The UID and GID come from Viper, and the enable setting from the flags.
-func loadLifecycle(vCfg *viper.Viper, values *flagValues) lifecycle.Lifecycle {
+func loadLifecycle(values *flagValues) lifecycle.Lifecycle {
 	return lifecycle.Lifecycle{
 		Enabled: values.Bool("enable-lifecycle-hooks"),
-		UID:     vCfg.GetInt("lifecycle-uid"),
-		GID:     vCfg.GetInt("lifecycle-gid"),
+		UID:     values.Int("lifecycle-uid"),
+		GID:     values.Int("lifecycle-gid"),
 	}
 }
 
@@ -400,6 +391,20 @@ func (v *flagValues) Bool(name string) bool {
 //   - string: The flag's value, or "" after a failed read.
 func (v *flagValues) String(name string) string {
 	value, err := v.flags.GetString(name)
+	v.record(name, err)
+
+	return value
+}
+
+// Int returns an integer setting.
+//
+// Parameters:
+//   - name: Flag name.
+//
+// Returns:
+//   - int: The flag's value, or 0 after a failed read.
+func (v *flagValues) Int(name string) int {
+	value, err := v.flags.GetInt(name)
 	v.record(name, err)
 
 	return value
@@ -533,7 +538,7 @@ func loadRegistry(values *flagValues) registry.Registry {
 }
 
 // loadAPI reads HTTP API settings.
-func loadAPI(vCfg *viper.Viper, values *flagValues) api.API {
+func loadAPI(values *flagValues) api.API {
 	checkTimeout := values.Duration("http-api-check-timeout")
 	updateTimeout := values.Duration("http-api-update-timeout")
 
@@ -549,7 +554,7 @@ func loadAPI(vCfg *viper.Viper, values *flagValues) api.API {
 		Token:                values.String("http-api-token"),
 		EventsToken:          values.String("http-api-events-token"),
 		PeriodicPolls:        values.Bool("http-api-periodic-polls"),
-		RateLimit:            vCfg.GetInt("http-api-rate-limit"),
+		RateLimit:            values.Int("http-api-rate-limit"),
 		RateLimitChanged:     values.flags.Changed("http-api-rate-limit"),
 		TLSCert:              values.String("http-api-tls-cert"),
 		TLSKey:               values.String("http-api-tls-key"),
@@ -564,7 +569,7 @@ func loadAPI(vCfg *viper.Viper, values *flagValues) api.API {
 }
 
 // loadNotify reads notification settings.
-func loadNotify(vCfg *viper.Viper, values *flagValues) notify.Notify {
+func loadNotify(values *flagValues) notify.Notify {
 	return notify.Notify{
 		URLs:             values.Strings("notification-url"),
 		LegacyTypes:      values.Strings("notifications"),
@@ -575,7 +580,7 @@ func loadNotify(vCfg *viper.Viper, values *flagValues) notify.Notify {
 		SplitByContainer: values.Bool("notification-split-by-container"),
 		SkipTitle:        values.Bool("notification-skip-title"),
 		LogStdout:        values.Bool("notification-log-stdout"),
-		DelaySeconds:     vCfg.GetInt("notifications-delay"),
+		DelaySeconds:     values.Int("notifications-delay"),
 		Hostname:         values.String("notifications-hostname"),
 		TitleTag:         values.String("notification-title-tag"),
 		EmailSubjectTag:  values.String("notification-email-subjecttag"),
@@ -585,9 +590,9 @@ func loadNotify(vCfg *viper.Viper, values *flagValues) notify.Notify {
 			EmailServer:         values.String("notification-email-server"),
 			EmailUser:           values.String("notification-email-server-user"),
 			EmailPassword:       values.String("notification-email-server-password"),
-			EmailPort:           vCfg.GetInt("notification-email-server-port"),
+			EmailPort:           values.Int("notification-email-server-port"),
 			EmailTLSSkipVerify:  values.Bool("notification-email-server-tls-skip-verify"),
-			EmailDelay:          vCfg.GetInt("notification-email-delay"),
+			EmailDelay:          values.Int("notification-email-delay"),
 			SlackHookURL:        values.String("notification-slack-hook-url"),
 			SlackIdentifier:     values.String("notification-slack-identifier"),
 			SlackChannel:        values.String("notification-slack-channel"),

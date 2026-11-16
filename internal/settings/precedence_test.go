@@ -97,6 +97,20 @@ func TestLoad_EnvOverridesDefault(t *testing.T) {
 	assert.Equal(t, 120, cfg.Schedule.IntervalSeconds)
 }
 
+// TestLoad_integerFromEnv verifies that an integer setting from the
+// environment loads as the decimal value with surrounding spaces dropped, so a
+// leading zero is not octal and the value reaches the derived schedule.
+func TestLoad_integerFromEnv(t *testing.T) {
+	cfg := newLoadedCommand(t, map[string]string{
+		"WATCHTOWER_POLL_INTERVAL":       " 010 ",
+		"WATCHTOWER_HTTP_API_RATE_LIMIT": " 7 ",
+	})
+
+	assert.Equal(t, 10, cfg.Schedule.IntervalSeconds)
+	assert.Equal(t, "@every 10s", cfg.Schedule.Spec)
+	assert.Equal(t, 7, cfg.API.RateLimit)
+}
+
 func TestLoad_DefaultWhenUnset(t *testing.T) {
 	cfg := newLoadedCommand(t, nil)
 
