@@ -30,6 +30,9 @@ Environment Variable: DOCKER_TLS_VERIFY
     - The use of `tcp://` or `https://` schemes for the Docker host URL is required.
     - `tcp://` is converted to `https://` when TLS verification is enabled.
 
+!!! Note
+    Watchtower reads `DOCKER_TLS_VERIFY` as a boolean, so `0` or `false` turns verification off. The Docker CLI verifies when the variable has any value.
+
 ### TLS Certificate Path
 
 ```text

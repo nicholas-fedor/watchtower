@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog"
@@ -24,8 +25,8 @@ var (
 	errInvalidLogFormat = errors.New("invalid log format specified")
 	// errInvalidLogLevel indicates an invalid log level was specified in configuration.
 	errInvalidLogLevel = errors.New("invalid log level specified")
-	// errSetEnvFailed indicates a failure to set an environment variable during configuration.
-	errSetEnvFailed = errors.New("failed to set environment variable")
+	// errSetEnvFailed indicates a failure to set or unset an environment variable during configuration.
+	errSetEnvFailed = errors.New("failed to update environment variable")
 	// errOpenFileFailed indicates a failure to open a file when reading secrets.
 	errOpenFileFailed = errors.New("failed to open secret file")
 	// errReplaceSliceFailed indicates a failure to replace a slice value in a flag.
@@ -92,14 +93,16 @@ func prepareFlags(log *zerolog.Logger, flagSet *pflag.FlagSet) (*zerolog.Logger,
 	return log, nil
 }
 
-// EnvConfig sets Docker environment variables from flags.
+// EnvConfig sets the Docker environment variables to the resolved Docker settings.
+//
+// Each variable mirrors its setting, so a variable whose setting is empty or false is unset.
 //
 // Parameters:
 //   - log: Logger for configuration diagnostics.
 //   - cmd: Cobra command with flags.
 //
 // Returns:
-//   - error: Non-nil if flag retrieval fails, nil on success.
+//   - error: Non-nil if the settings cannot be read or a variable cannot be updated.
 func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
 	flagSet := cmd.PersistentFlags()
 
@@ -112,7 +115,13 @@ func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
 	}
 
 	host := vCfg.GetString("host")
-	tls := vCfg.GetBool("tlsverify")
+
+	// GetBool reads a value it cannot parse as false, which would turn verification off.
+	tls, err := strconv.ParseBool(vCfg.GetString("tlsverify"))
+	if err != nil {
+		return fmt.Errorf("read tlsverify: %w", err)
+	}
+
 	version := strings.Trim(vCfg.GetString("api-version"), "\"")
 	certPath := vCfg.GetString("cert-path")
 
@@ -132,25 +141,24 @@ func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
 		}
 	}
 
-	// Set environment variables.
-	err = setEnvOptStr(log, "DOCKER_HOST", host)
-	if err != nil {
-		return err
+	// The Docker client reads these variables and treats any value as set, even "0",
+	// so an empty or false setting unsets its variable rather than leaving the
+	// environment's value in place.
+	tlsValue := ""
+	if tls {
+		tlsValue = "1"
 	}
 
-	err = setEnvOptBool(log, "DOCKER_TLS_VERIFY", tls)
-	if err != nil {
-		return err
-	}
-
-	err = setEnvOptStr(log, "DOCKER_API_VERSION", version)
-	if err != nil {
-		return err
-	}
-
-	err = setEnvOptStr(log, "DOCKER_CERT_PATH", certPath)
-	if err != nil {
-		return err
+	for _, setting := range []struct{ env, value string }{
+		{env: "DOCKER_HOST", value: host},
+		{env: "DOCKER_TLS_VERIFY", value: tlsValue},
+		{env: "DOCKER_API_VERSION", value: version},
+		{env: "DOCKER_CERT_PATH", value: certPath},
+	} {
+		err = exportEnv(setting.env, setting.value)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Debug().
@@ -163,51 +171,24 @@ func EnvConfig(log *zerolog.Logger, cmd *cobra.Command) error {
 	return nil
 }
 
-// setEnvOptStr sets an environment variable if needed.
+// exportEnv sets an environment variable, or unsets it when the value is empty.
 //
 // Parameters:
-//   - log: Logger for configuration diagnostics.
 //   - env: Environment variable name.
-//   - opt: Value to set.
+//   - value: Value to set. Empty unsets the variable.
 //
 // Returns:
-//   - error: Non-nil if set fails, nil if skipped or successful.
-func setEnvOptStr(log *zerolog.Logger, env, opt string) error {
-	if opt == "" || opt == os.Getenv(env) {
-		return nil
+//   - error: Non-nil if the variable cannot be set or unset.
+func exportEnv(env, value string) error {
+	var err error
+	if value == "" {
+		err = os.Unsetenv(env)
+	} else {
+		err = os.Setenv(env, value)
 	}
 
-	err := os.Setenv(env, opt)
 	if err != nil {
-		log.Debug().
-			Err(err).
-			Str("env", env).
-			Str("value", opt).
-			Msg("Failed to set environment variable")
-
 		return fmt.Errorf("%w: %s: %w", errSetEnvFailed, env, err)
-	}
-
-	log.Debug().
-		Str("env", env).
-		Str("value", opt).
-		Msg("Set environment variable")
-
-	return nil
-}
-
-// setEnvOptBool sets an environment variable to "1" if true.
-//
-// Parameters:
-//   - log: Logger for configuration diagnostics.
-//   - env: Environment variable name.
-//   - opt: Boolean value.
-//
-// Returns:
-//   - error: Non-nil if set fails, nil otherwise.
-func setEnvOptBool(log *zerolog.Logger, env string, opt bool) error {
-	if opt {
-		return setEnvOptStr(log, env, "1")
 	}
 
 	return nil
