@@ -30,6 +30,17 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/settings/units"
 )
 
+// flagValues reads settings from the root command's prepared flags.
+//
+// Load applies the environment to unset flags first, so each flag holds the
+// command-line value, the environment value or its default. A read of a flag
+// that is not registered with the expected type returns the zero value and
+// records the first such error, which Load returns.
+type flagValues struct {
+	flags *pflag.FlagSet // Prepared persistent flags of the root command.
+	err   error          // First failed read, or nil.
+}
+
 // diskSpacePercentBase is the divisor used to convert a 0-100 percentage into a fraction of max.
 const diskSpacePercentBase = 100
 
@@ -61,8 +72,8 @@ var (
 // into their flags. Load changes the flags this way, so call it once per parsed
 // command. It does not re-parse CLI arguments.
 //
-// List and duration settings are then read from the prepared flags. The other
-// settings are resolved through a process-local Viper instance (flag > env >
+// Settings are then read from the prepared flags, except integer settings,
+// which are resolved through a process-local Viper instance (flag > env >
 // static default) using FlagSpec metadata from every domain.
 //
 // Parameters:
@@ -95,41 +106,47 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 		return Config{}, log, fmt.Errorf("bind configuration: %w", err)
 	}
 
-	err = checkRanges(vCfg, flagSet, specs)
+	values := &flagValues{flags: flagSet}
+
+	err = checkRanges(vCfg, values, specs)
 	if err != nil {
 		return Config{}, log, err
 	}
 
 	cfg := Config{}
 
-	cfg.Docker = loadDocker(vCfg)
-	cfg.Client = loadClient(vCfg)
-	cfg.Compatibility = loadCompat(vCfg)
+	cfg.Docker = loadDocker(values)
+	cfg.Client = loadClient(values)
+	cfg.Compatibility = loadCompat(values)
 
-	cfg.Schedule = loadSchedule(vCfg)
-	cfg.Mode = loadMode(vCfg)
+	cfg.Schedule = loadSchedule(vCfg, values)
+	cfg.Mode = loadMode(values)
 
-	cfg.Update, err = loadUpdate(log, vCfg, flagSet)
+	cfg.Update, err = loadUpdate(log, values)
 	if err != nil {
 		return Config{}, log, err
 	}
 
-	cfg.Lifecycle = loadLifecycle(vCfg)
+	cfg.Lifecycle = loadLifecycle(vCfg, values)
 
-	cfg.Filter, err = loadFilter(log, vCfg, flagSet, args)
+	cfg.Filter, err = loadFilter(log, values, args)
 	if err != nil {
 		return Config{}, log, err
 	}
 
-	cfg.Registry = loadRegistry(vCfg)
+	cfg.Registry = loadRegistry(values)
 
-	cfg.API = loadAPI(vCfg, flagSet)
-	cfg.Notify = loadNotify(vCfg, flagSet)
-	cfg.Logging = loadLogging(vCfg, flagSet)
+	cfg.API = loadAPI(vCfg, values)
+	cfg.Notify = loadNotify(vCfg, values)
+	cfg.Logging = loadLogging(values)
 
-	cfg.Git, err = loadGit(vCfg, flagSet)
+	cfg.Git, err = loadGit(values)
 	if err != nil {
 		return Config{}, log, err
+	}
+
+	if values.err != nil {
+		return Config{}, log, values.err
 	}
 
 	err = validate(log, cfg)
@@ -144,13 +161,13 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 // value is outside the range its spec allows.
 //
 // Parameters:
-//   - vCfg: Bound Viper instance.
-//   - flagSet: Parsed flag set.
+//   - vCfg: Bound Viper instance, for the integer settings.
+//   - values: The prepared flags, for the duration settings.
 //   - specs: Specs of every setting.
 //
 // Returns:
 //   - error: The spec's range error, naming the setting and its value.
-func checkRanges(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpec) error {
+func checkRanges(vCfg *viper.Viper, values *flagValues, specs []spec.FlagSpec) error {
 	for _, flagSpec := range specs {
 		var err error
 
@@ -158,8 +175,7 @@ func checkRanges(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpe
 		case spec.KindInt:
 			err = flagSpec.CheckInt(vCfg.GetInt(flagSpec.Name))
 		case spec.KindDuration:
-			duration, _ := flagSet.GetDuration(flagSpec.Name)
-			err = flagSpec.CheckDuration(duration)
+			err = flagSpec.CheckDuration(values.Duration(flagSpec.Name))
 		case spec.KindBool, spec.KindString, spec.KindStringSlice, spec.KindStringArray:
 		default:
 		}
@@ -172,58 +188,60 @@ func checkRanges(vCfg *viper.Viper, flagSet *pflag.FlagSet, specs []spec.FlagSpe
 	return nil
 }
 
-// loadDocker reads Docker connection settings from Viper after BindAll.
-func loadDocker(vCfg *viper.Viper) docker.Docker {
+// loadDocker reads Docker connection settings.
+func loadDocker(values *flagValues) docker.Docker {
 	return docker.Docker{
-		Host:       vCfg.GetString("host"),
-		TLSVerify:  vCfg.GetBool("tlsverify"),
-		APIVersion: strings.Trim(vCfg.GetString("api-version"), "\""),
-		CertPath:   vCfg.GetString("cert-path"),
+		Host:       values.String("host"),
+		TLSVerify:  values.Bool("tlsverify"),
+		APIVersion: strings.Trim(values.String("api-version"), "\""),
+		CertPath:   values.String("cert-path"),
 	}
 }
 
-// loadClient reads Docker client construction settings from Viper.
-func loadClient(vCfg *viper.Viper) client.Client {
+// loadClient reads Docker client construction settings.
+func loadClient(values *flagValues) client.Client {
 	return client.Client{
-		IncludeStopped:    vCfg.GetBool("include-stopped"),
-		IncludeRestarting: vCfg.GetBool("include-restarting"),
-		ReviveStopped:     vCfg.GetBool("revive-stopped"),
-		RemoveVolumes:     vCfg.GetBool("remove-volumes"),
-		WarnOnHeadFailure: vCfg.GetString("warn-on-head-failure"),
+		IncludeStopped:    values.Bool("include-stopped"),
+		IncludeRestarting: values.Bool("include-restarting"),
+		ReviveStopped:     values.Bool("revive-stopped"),
+		RemoveVolumes:     values.Bool("remove-volumes"),
+		WarnOnHeadFailure: values.String("warn-on-head-failure"),
 	}
 }
 
-// loadCompat reads runtime compatibility settings from Viper.
-func loadCompat(vCfg *viper.Viper) compatibility.Compatibility {
+// loadCompat reads runtime compatibility settings.
+func loadCompat(values *flagValues) compatibility.Compatibility {
 	return compatibility.Compatibility{
-		DisableMemorySwappiness: vCfg.GetBool("disable-memory-swappiness"),
-		CPUCopyMode:             vCfg.GetString("cpu-copy-mode"),
+		DisableMemorySwappiness: values.Bool("disable-memory-swappiness"),
+		CPUCopyMode:             values.String("cpu-copy-mode"),
 	}
 }
 
-// loadSchedule reads schedule settings from Viper.
-func loadSchedule(vCfg *viper.Viper) schedule.Schedule {
+// loadSchedule reads schedule settings.
+//
+// The interval comes from Viper, and the other settings from the flags.
+func loadSchedule(vCfg *viper.Viper, values *flagValues) schedule.Schedule {
 	return schedule.Schedule{
 		IntervalSeconds: vCfg.GetInt("interval"),
-		Spec:            vCfg.GetString("schedule"),
-		UpdateOnStart:   vCfg.GetBool("update-on-start"),
+		Spec:            values.String("schedule"),
+		UpdateOnStart:   values.Bool("update-on-start"),
 	}
 }
 
-// loadMode reads process mode settings from Viper.
-func loadMode(vCfg *viper.Viper) mode.Mode {
+// loadMode reads process mode settings.
+func loadMode(values *flagValues) mode.Mode {
 	return mode.Mode{
-		RunOnce:                vCfg.GetBool("run-once"),
-		HealthCheck:            vCfg.GetBool("health-check"),
-		Porcelain:              vCfg.GetString("porcelain"),
-		SelfUpdateOrchestrator: vCfg.GetBool("self-update-orchestrator"),
-		NoStartupMessage:       vCfg.GetBool("no-startup-message"),
+		RunOnce:                values.Bool("run-once"),
+		HealthCheck:            values.Bool("health-check"),
+		Porcelain:              values.String("porcelain"),
+		SelfUpdateOrchestrator: values.Bool("self-update-orchestrator"),
+		NoStartupMessage:       values.Bool("no-startup-message"),
 	}
 }
 
 // loadUpdate reads update policy settings.
-func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) (update.Update, error) {
-	stopTimeout, _ := flagSet.GetDuration("stop-timeout")
+func loadUpdate(log *zerolog.Logger, values *flagValues) (update.Update, error) {
+	stopTimeout := values.Duration("stop-timeout")
 
 	if stopTimeout > 0 && stopTimeout < time.Second {
 		log.Warn().
@@ -231,7 +249,7 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 			Msg("WATCHTOWER_TIMEOUT is less than 1 second")
 	}
 
-	cooldownStr := vCfg.GetString("cooldown-delay")
+	cooldownStr := values.String("cooldown-delay")
 
 	var cooldown time.Duration
 
@@ -244,8 +262,8 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 		cooldown = parsed
 	}
 
-	maxRaw := vCfg.GetString("disk-space-max")
-	warnRaw := vCfg.GetString("disk-space-warn")
+	maxRaw := values.String("disk-space-max")
+	warnRaw := values.String("disk-space-warn")
 
 	maxBytes, warnBytes, err := resolveDiskSpaceThresholds(maxRaw, warnRaw)
 	if err != nil {
@@ -253,17 +271,17 @@ func loadUpdate(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet) 
 	}
 
 	return update.Update{
-		Cleanup:             vCfg.GetBool("cleanup"),
-		NoPull:              vCfg.GetBool("no-pull"),
-		EnableChangelog:     vCfg.GetBool("enable-changelog"),
-		NoRestart:           vCfg.GetBool("no-restart"),
-		MonitorOnly:         vCfg.GetBool("monitor-only"),
-		RollingRestart:      vCfg.GetBool("rolling-restart"),
+		Cleanup:             values.Bool("cleanup"),
+		NoPull:              values.Bool("no-pull"),
+		EnableChangelog:     values.Bool("enable-changelog"),
+		NoRestart:           values.Bool("no-restart"),
+		MonitorOnly:         values.Bool("monitor-only"),
+		RollingRestart:      values.Bool("rolling-restart"),
 		StopTimeout:         stopTimeout,
 		CooldownDelay:       cooldown,
-		UseComposeDependsOn: vCfg.GetBool("use-compose-depends-on"),
-		LabelPrecedence:     vCfg.GetBool("label-take-precedence"),
-		EphemeralSelfUpdate: vCfg.GetBool("ephemeral-self-update"),
+		UseComposeDependsOn: values.Bool("use-compose-depends-on"),
+		LabelPrecedence:     values.Bool("label-take-precedence"),
+		EphemeralSelfUpdate: values.Bool("ephemeral-self-update"),
 		DiskSpaceMax:        maxRaw,
 		DiskSpaceWarn:       warnRaw,
 		DiskSpaceMaxBytes:   maxBytes,
@@ -348,35 +366,78 @@ func parseDiskSpaceWarn(raw string, maxBytes int64) (int64, error) {
 	return warnBytes, nil
 }
 
-// loadLifecycle reads lifecycle hook settings from Viper.
-func loadLifecycle(vCfg *viper.Viper) lifecycle.Lifecycle {
+// loadLifecycle reads lifecycle hook settings.
+//
+// The UID and GID come from Viper, and the enable setting from the flags.
+func loadLifecycle(vCfg *viper.Viper, values *flagValues) lifecycle.Lifecycle {
 	return lifecycle.Lifecycle{
-		Enabled: vCfg.GetBool("enable-lifecycle-hooks"),
+		Enabled: values.Bool("enable-lifecycle-hooks"),
 		UID:     vCfg.GetInt("lifecycle-uid"),
 		GID:     vCfg.GetInt("lifecycle-gid"),
 	}
 }
 
-// stringSliceValue returns a copy of a list flag's value.
-//
-// Load applies the environment to unset flags first, so the flag holds the
-// command-line value, the environment value or its default.
+// Bool returns a boolean setting.
 //
 // Parameters:
-//   - flagSet: Parsed and prepared flag set.
 //   - name: Flag name.
 //
 // Returns:
-//   - []string: The values, never nil. Empty when the flag is not a
-//     registered list.
-func stringSliceValue(flagSet *pflag.FlagSet, name string) []string {
-	flag := flagSet.Lookup(name)
+//   - bool: The flag's value, or false after a failed read.
+func (v *flagValues) Bool(name string) bool {
+	value, err := v.flags.GetBool(name)
+	v.record(name, err)
+
+	return value
+}
+
+// String returns a string setting.
+//
+// Parameters:
+//   - name: Flag name.
+//
+// Returns:
+//   - string: The flag's value, or "" after a failed read.
+func (v *flagValues) String(name string) string {
+	value, err := v.flags.GetString(name)
+	v.record(name, err)
+
+	return value
+}
+
+// Duration returns a duration setting.
+//
+// Parameters:
+//   - name: Flag name.
+//
+// Returns:
+//   - time.Duration: The flag's value, or 0 after a failed read.
+func (v *flagValues) Duration(name string) time.Duration {
+	value, err := v.flags.GetDuration(name)
+	v.record(name, err)
+
+	return value
+}
+
+// Strings returns a copy of a list setting.
+//
+// Parameters:
+//   - name: Flag name.
+//
+// Returns:
+//   - []string: The values, never nil. Empty after a failed read.
+func (v *flagValues) Strings(name string) []string {
+	flag := v.flags.Lookup(name)
 	if flag == nil {
+		v.record(name, errFlagNotRegistered)
+
 		return []string{}
 	}
 
 	sliceValue, ok := flag.Value.(pflag.SliceValue)
 	if !ok {
+		v.record(name, errUnsupportedFlagKind)
+
 		return []string{}
 	}
 
@@ -385,39 +446,50 @@ func stringSliceValue(flagSet *pflag.FlagSet, name string) []string {
 	return append([]string{}, sliceValue.GetSlice()...)
 }
 
+// record keeps the first failed read.
+//
+// Parameters:
+//   - name: Flag name that was read.
+//   - err: The read's error, or nil.
+func (v *flagValues) record(name string, err error) {
+	if err != nil && v.err == nil {
+		v.err = fmt.Errorf("read %s: %w", name, err)
+	}
+}
+
 // normalizedStringSlice reads a list flag and applies normalize to each element.
 //
 // Parameters:
-//   - flagSet: Parsed and prepared flag set.
+//   - values: The prepared flags.
 //   - name: Flag name.
 //   - normalize: Per-element transform (for example TrimSpace or NormalizeContainerName).
 //
 // Returns:
 //   - []string: Normalized list (empty when unset).
-func normalizedStringSlice(flagSet *pflag.FlagSet, name string, normalize func(string) string) []string {
-	values := stringSliceValue(flagSet, name)
-	for i := range values {
-		values[i] = normalize(values[i])
+func normalizedStringSlice(values *flagValues, name string, normalize func(string) string) []string {
+	list := values.Strings(name)
+	for i := range list {
+		list[i] = normalize(list[i])
 	}
 
-	return values
+	return list
 }
 
 // loadFilter reads filter settings, normalizes names, and builds the predicate.
-func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, args []string) (filter.Filter, error) {
-	labelEnable := vCfg.GetBool("label-enable")
+func loadFilter(log *zerolog.Logger, values *flagValues, args []string) (filter.Filter, error) {
+	labelEnable := values.Bool("label-enable")
 
-	disableContainers := normalizedStringSlice(flagSet, "disable-containers", container.NormalizeContainerName)
+	disableContainers := normalizedStringSlice(values, "disable-containers", container.NormalizeContainerName)
 
-	monitorImages := normalizedStringSlice(flagSet, "monitor-image-names", strings.TrimSpace)
+	monitorImages := normalizedStringSlice(values, "monitor-image-names", strings.TrimSpace)
 
-	skipImages := normalizedStringSlice(flagSet, "skip-image-names", strings.TrimSpace)
+	skipImages := normalizedStringSlice(values, "skip-image-names", strings.TrimSpace)
 
-	enableByLabel := stringSliceValue(flagSet, "enable-containers-by-label")
+	enableByLabel := values.Strings("enable-containers-by-label")
 
-	disableByLabel := stringSliceValue(flagSet, "disable-containers-by-label")
+	disableByLabel := values.Strings("disable-containers-by-label")
 
-	scope := vCfg.GetString("scope")
+	scope := values.String("scope")
 
 	names := make([]string, len(args))
 	for i, name := range args {
@@ -440,170 +512,164 @@ func loadFilter(log *zerolog.Logger, vCfg *viper.Viper, flagSet *pflag.FlagSet, 
 
 // loadRegistry reads the registry request settings.
 //
-// The TLS settings come from Viper. The cooldown platform has no flags and
+// The TLS settings come from the flags. The cooldown platform has no flags and
 // comes from the environment only.
 //
 // Parameters:
-//   - vCfg: Bound Viper instance.
+//   - values: The prepared flags.
 //
 // Returns:
 //   - registry.Registry: Registry request settings.
-func loadRegistry(vCfg *viper.Viper) registry.Registry {
+func loadRegistry(values *flagValues) registry.Registry {
 	return registry.Registry{
 		CooldownPlatform: registry.Platform{
 			OS:           os.Getenv("WATCHTOWER_COOLDOWN_PLATFORM_OS"),
 			Architecture: os.Getenv("WATCHTOWER_COOLDOWN_PLATFORM_ARCH"),
 			Variant:      os.Getenv("WATCHTOWER_COOLDOWN_PLATFORM_VARIANT"),
 		},
-		TLSMinVersion: vCfg.GetString("registry-tls-min-version"),
-		TLSSkip:       vCfg.GetBool("registry-tls-skip"),
+		TLSMinVersion: values.String("registry-tls-min-version"),
+		TLSSkip:       values.Bool("registry-tls-skip"),
 	}
 }
 
 // loadAPI reads HTTP API settings.
-func loadAPI(vCfg *viper.Viper, flagSet *pflag.FlagSet) api.API {
-	checkTimeout, _ := flagSet.GetDuration("http-api-check-timeout")
-	updateTimeout, _ := flagSet.GetDuration("http-api-update-timeout")
+func loadAPI(vCfg *viper.Viper, values *flagValues) api.API {
+	checkTimeout := values.Duration("http-api-check-timeout")
+	updateTimeout := values.Duration("http-api-update-timeout")
 
 	return api.API{
-		Endpoints:            stringSliceValue(flagSet, "http-api-endpoints"),
-		LegacyUpdate:         vCfg.GetBool("http-api-update"),
-		LegacyMetrics:        vCfg.GetBool("http-api-metrics"),
-		LegacyContainers:     vCfg.GetBool("http-api-containers"),
-		Host:                 vCfg.GetString("http-api-host"),
-		HostChanged:          flagSet.Changed("http-api-host"),
-		Port:                 vCfg.GetString("http-api-port"),
-		PortChanged:          flagSet.Changed("http-api-port"),
-		Token:                vCfg.GetString("http-api-token"),
-		EventsToken:          vCfg.GetString("http-api-events-token"),
-		PeriodicPolls:        vCfg.GetBool("http-api-periodic-polls"),
+		Endpoints:            values.Strings("http-api-endpoints"),
+		LegacyUpdate:         values.Bool("http-api-update"),
+		LegacyMetrics:        values.Bool("http-api-metrics"),
+		LegacyContainers:     values.Bool("http-api-containers"),
+		Host:                 values.String("http-api-host"),
+		HostChanged:          values.flags.Changed("http-api-host"),
+		Port:                 values.String("http-api-port"),
+		PortChanged:          values.flags.Changed("http-api-port"),
+		Token:                values.String("http-api-token"),
+		EventsToken:          values.String("http-api-events-token"),
+		PeriodicPolls:        values.Bool("http-api-periodic-polls"),
 		RateLimit:            vCfg.GetInt("http-api-rate-limit"),
-		RateLimitChanged:     flagSet.Changed("http-api-rate-limit"),
-		TLSCert:              vCfg.GetString("http-api-tls-cert"),
-		TLSKey:               vCfg.GetString("http-api-tls-key"),
-		TrustedProxies:       stringSliceValue(flagSet, "http-api-trusted-proxies"),
-		ProxyHeader:          vCfg.GetString("http-api-proxy-header"),
-		CORSOrigins:          stringSliceValue(flagSet, "http-api-cors-origins"),
+		RateLimitChanged:     values.flags.Changed("http-api-rate-limit"),
+		TLSCert:              values.String("http-api-tls-cert"),
+		TLSKey:               values.String("http-api-tls-key"),
+		TrustedProxies:       values.Strings("http-api-trusted-proxies"),
+		ProxyHeader:          values.String("http-api-proxy-header"),
+		CORSOrigins:          values.Strings("http-api-cors-origins"),
 		CheckTimeout:         checkTimeout,
-		CheckTimeoutChanged:  flagSet.Changed("http-api-check-timeout"),
+		CheckTimeoutChanged:  values.flags.Changed("http-api-check-timeout"),
 		UpdateTimeout:        updateTimeout,
-		UpdateTimeoutChanged: flagSet.Changed("http-api-update-timeout"),
+		UpdateTimeoutChanged: values.flags.Changed("http-api-update-timeout"),
 	}
 }
 
 // loadNotify reads notification settings.
-func loadNotify(vCfg *viper.Viper, flagSet *pflag.FlagSet) notify.Notify {
+func loadNotify(vCfg *viper.Viper, values *flagValues) notify.Notify {
 	return notify.Notify{
-		URLs:             stringSliceValue(flagSet, "notification-url"),
-		LegacyTypes:      stringSliceValue(flagSet, "notifications"),
-		Level:            vCfg.GetString("notifications-level"),
-		Template:         vCfg.GetString("notification-template"),
-		TemplateFile:     vCfg.GetString("notification-template-file"),
-		Report:           vCfg.GetBool("notification-report"),
-		SplitByContainer: vCfg.GetBool("notification-split-by-container"),
-		SkipTitle:        vCfg.GetBool("notification-skip-title"),
-		LogStdout:        vCfg.GetBool("notification-log-stdout"),
+		URLs:             values.Strings("notification-url"),
+		LegacyTypes:      values.Strings("notifications"),
+		Level:            values.String("notifications-level"),
+		Template:         values.String("notification-template"),
+		TemplateFile:     values.String("notification-template-file"),
+		Report:           values.Bool("notification-report"),
+		SplitByContainer: values.Bool("notification-split-by-container"),
+		SkipTitle:        values.Bool("notification-skip-title"),
+		LogStdout:        values.Bool("notification-log-stdout"),
 		DelaySeconds:     vCfg.GetInt("notifications-delay"),
-		Hostname:         vCfg.GetString("notifications-hostname"),
-		TitleTag:         vCfg.GetString("notification-title-tag"),
-		EmailSubjectTag:  vCfg.GetString("notification-email-subjecttag"),
+		Hostname:         values.String("notifications-hostname"),
+		TitleTag:         values.String("notification-title-tag"),
+		EmailSubjectTag:  values.String("notification-email-subjecttag"),
 		Legacy: notify.Legacy{
-			EmailFrom:           vCfg.GetString("notification-email-from"),
-			EmailTo:             vCfg.GetString("notification-email-to"),
-			EmailServer:         vCfg.GetString("notification-email-server"),
-			EmailUser:           vCfg.GetString("notification-email-server-user"),
-			EmailPassword:       vCfg.GetString("notification-email-server-password"),
+			EmailFrom:           values.String("notification-email-from"),
+			EmailTo:             values.String("notification-email-to"),
+			EmailServer:         values.String("notification-email-server"),
+			EmailUser:           values.String("notification-email-server-user"),
+			EmailPassword:       values.String("notification-email-server-password"),
 			EmailPort:           vCfg.GetInt("notification-email-server-port"),
-			EmailTLSSkipVerify:  vCfg.GetBool("notification-email-server-tls-skip-verify"),
+			EmailTLSSkipVerify:  values.Bool("notification-email-server-tls-skip-verify"),
 			EmailDelay:          vCfg.GetInt("notification-email-delay"),
-			SlackHookURL:        vCfg.GetString("notification-slack-hook-url"),
-			SlackIdentifier:     vCfg.GetString("notification-slack-identifier"),
-			SlackChannel:        vCfg.GetString("notification-slack-channel"),
-			SlackIconEmoji:      vCfg.GetString("notification-slack-icon-emoji"),
-			SlackIconURL:        vCfg.GetString("notification-slack-icon-url"),
-			MSTeamsHook:         vCfg.GetString("notification-msteams-hook"),
-			GotifyURL:           vCfg.GetString("notification-gotify-url"),
-			GotifyToken:         vCfg.GetString("notification-gotify-token"),
-			GotifyTLSSkipVerify: vCfg.GetBool("notification-gotify-tls-skip-verify"),
+			SlackHookURL:        values.String("notification-slack-hook-url"),
+			SlackIdentifier:     values.String("notification-slack-identifier"),
+			SlackChannel:        values.String("notification-slack-channel"),
+			SlackIconEmoji:      values.String("notification-slack-icon-emoji"),
+			SlackIconURL:        values.String("notification-slack-icon-url"),
+			MSTeamsHook:         values.String("notification-msteams-hook"),
+			GotifyURL:           values.String("notification-gotify-url"),
+			GotifyToken:         values.String("notification-gotify-token"),
+			GotifyTLSSkipVerify: values.Bool("notification-gotify-tls-skip-verify"),
 		},
 	}
 }
 
-// loadLogging reads logging settings from Viper.
-//
-// NO_COLOR is presence-based and has no Viper environment binding, so NoColor
-// comes from the no-color flag, which applyEnvToFlags sets from NO_COLOR.
+// loadLogging reads logging settings.
 //
 // Parameters:
-//   - vCfg: Bound configuration.
-//   - flagSet: Command flag set holding the resolved no-color value.
+//   - values: The prepared flags. The no-color flag holds NO_COLOR's
+//     presence-based value when the command line left it unset.
 //
 // Returns:
 //   - logging.Logging: Logging settings.
-func loadLogging(vCfg *viper.Viper, flagSet *pflag.FlagSet) logging.Logging {
-	format := vCfg.GetString("log-format")
+func loadLogging(values *flagValues) logging.Logging {
+	format := values.String("log-format")
 	if format == "" {
 		format = "auto"
 	}
 
-	noColor, err := flagSet.GetBool("no-color")
-
 	return logging.Logging{
-		Level:   vCfg.GetString("log-level"),
+		Level:   values.String("log-level"),
 		Format:  format,
-		Debug:   vCfg.GetBool("debug"),
-		Trace:   vCfg.GetBool("trace"),
-		NoColor: err == nil && noColor,
+		Debug:   values.Bool("debug"),
+		Trace:   values.Bool("trace"),
+		NoColor: values.Bool("no-color"),
 	}
 }
 
 // loadGit reads Git association and watcher settings.
 //
 // Parameters:
-//   - vCfg: Bound configuration.
-//   - flagSet: Prepared flag set, for the list and duration settings.
+//   - values: The prepared flags.
 //
 // Returns:
 //   - cfggit.Git: Parsed Git settings.
 //   - error: Non-nil when a mapping, host, or CA bundle is invalid.
-func loadGit(vCfg *viper.Viper, flagSet *pflag.FlagSet) (gitConfig.Git, error) {
-	rawImages := stringSliceValue(flagSet, "git-image")
+func loadGit(values *flagValues) (gitConfig.Git, error) {
+	rawImages := values.Strings("git-image")
 
 	images, err := gitConfig.ParseImageMappings(rawImages)
 	if err != nil {
 		return gitConfig.Git{}, fmt.Errorf("git-image: %w", err)
 	}
 
-	caBundle, err := readOptionalFile(vCfg.GetString("git-ca-bundle"))
+	caBundle, err := readOptionalFile(values.String("git-ca-bundle"))
 	if err != nil {
 		return gitConfig.Git{}, fmt.Errorf("git-ca-bundle: %w", err)
 	}
 
-	rawProjects := stringSliceValue(flagSet, "compose-project")
+	rawProjects := values.Strings("compose-project")
 
 	projects, err := gitConfig.ParseComposeProjects(rawProjects)
 	if err != nil {
 		return gitConfig.Git{}, fmt.Errorf("compose-project: %w", err)
 	}
 
-	timeout, _ := flagSet.GetDuration("git-timeout")
+	timeout := values.Duration("git-timeout")
 
 	return gitConfig.Git{
-		Enable:          vCfg.GetBool("git-enable"),
+		Enable:          values.Bool("git-enable"),
 		DefaultRef:      gitConfig.DefaultRef,
 		SemverPolicy:    gitConfig.DefaultPolicy,
 		Images:          images,
-		Dockerfile:      strings.TrimSpace(vCfg.GetString("git-dockerfile")),
-		Context:         strings.TrimSpace(vCfg.GetString("git-context")),
+		Dockerfile:      strings.TrimSpace(values.String("git-dockerfile")),
+		Context:         strings.TrimSpace(values.String("git-context")),
 		Timeout:         timeout,
-		Token:           vCfg.GetString("git-auth-token"),
-		Username:        vCfg.GetString("git-username"),
-		Password:        vCfg.GetString("git-password"),
-		SSHKeyPath:      vCfg.GetString("git-ssh-key-path"),
-		SSHKnownHosts:   vCfg.GetString("git-ssh-known-hosts"),
+		Token:           values.String("git-auth-token"),
+		Username:        values.String("git-username"),
+		Password:        values.String("git-password"),
+		SSHKeyPath:      values.String("git-ssh-key-path"),
+		SSHKnownHosts:   values.String("git-ssh-known-hosts"),
 		CABundle:        caBundle,
-		InsecureSkipTLS: vCfg.GetBool("git-insecure-skip-tls"),
-		ComposeStash:    vCfg.GetBool("git-compose-stash"),
+		InsecureSkipTLS: values.Bool("git-insecure-skip-tls"),
+		ComposeStash:    values.Bool("git-compose-stash"),
 		ComposeProjects: projects,
 	}, nil
 }
