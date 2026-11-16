@@ -73,6 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Pass docker connection settings to the client by @nicholas-fedor in [#3842](https://github.com/nicholas-fedor/watchtower/pull/3842)
 - Read boolean and string settings from the flags by @nicholas-fedor in [#3829](https://github.com/nicholas-fedor/watchtower/pull/3829)
 - Read list and duration settings from the flags by @nicholas-fedor in [#3827](https://github.com/nicholas-fedor/watchtower/pull/3827)
 - Prepare the startup flags in one place by @nicholas-fedor in [#3823](https://github.com/nicholas-fedor/watchtower/pull/3823)
