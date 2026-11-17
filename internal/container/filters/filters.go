@@ -135,6 +135,30 @@ func excludeOldWatchtowerFilterChain(baseFilter Filter) Filter {
 	}
 }
 
+// excludeJobRunsFilterChain wraps a base filter so that it rejects the
+// containers Docker Engine runs for a job.
+//
+// The engine creates each run and removes it after a success. It keeps a
+// failed run for the job's history. A run that Watchtower recreated or
+// restarted would run outside the job's schedule. A recreated failed run would
+// lose its exit status and logs.
+//
+// Parameters:
+//   - baseFilter: Base filter to chain.
+//
+// Returns:
+//   - Filter: Filter function that excludes job runs and applies the base
+//     filter.
+func excludeJobRunsFilterChain(baseFilter Filter) Filter {
+	return func(c FilterableContainer) bool {
+		if _, ok := c.GetLabel(labels.JobID); ok {
+			return false
+		}
+
+		return baseFilter(c)
+	}
+}
+
 // NoFilter allows all containers through.
 //
 // Returns:
@@ -961,9 +985,15 @@ func BuildFilter(log *zerolog.Logger,
 		stringBuilder.WriteString(scope)
 	}
 
+	// The two exclusions below wrap the whole chain, so they reject a
+	// container before any configured filter runs.
+	//
 	// Exclude old Watchtower containers (predecessors from self-update).
-	// Applied last so it wraps the entire chain and short-circuits first.
 	filter = excludeOldWatchtowerFilterChain(filter)
+
+	// Exclude the containers Docker Engine runs for jobs. The engine owns
+	// their lifecycle, so no configuration option selects them.
+	filter = excludeJobRunsFilterChain(filter)
 
 	// Build filter description.
 	filterDesc := "Checking all containers (except explicitly disabled with label)"

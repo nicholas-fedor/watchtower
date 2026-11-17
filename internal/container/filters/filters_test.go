@@ -117,6 +117,82 @@ func TestIsOldWatchtower(t *testing.T) {
 	similarPrefix.AssertExpectations(t)
 }
 
+// TestExcludeJobRunsFilterChain verifies that a container carrying Docker
+// Engine's job label is rejected before the base filter runs, and that any
+// other container gets the base filter's answer.
+func TestExcludeJobRunsFilterChain(t *testing.T) {
+	t.Parallel()
+
+	jobRun := modelfixture.Container(containerfixture.WithLabels(map[string]string{
+		labels.JobID: "e8076a55d2a8",
+	}))
+	service := modelfixture.Container(containerfixture.WithLabels(map[string]string{}))
+
+	baseCalls := 0
+	base := func(FilterableContainer) bool {
+		baseCalls++
+
+		return true
+	}
+
+	filter := excludeJobRunsFilterChain(base)
+	assert.False(t, filter(jobRun))
+	assert.Zero(t, baseCalls, "a job run must not reach the base filter")
+
+	assert.True(t, filter(service))
+	assert.Equal(t, 1, baseCalls)
+
+	assert.False(t, excludeJobRunsFilterChain(func(FilterableContainer) bool { return false })(service))
+}
+
+// TestBuildFilter_excludesJobRuns verifies that BuildFilter never selects a
+// container Docker Engine runs for a job, even when the configured names,
+// enabled labels or enable label would select it, and that it still selects
+// the service beside it.
+func TestBuildFilter_excludesJobRuns(t *testing.T) {
+	t.Parallel()
+
+	const jobRunName = "job-jp.work-1-b6fcceb1f393"
+
+	jobRun := modelfixture.Container(
+		containerfixture.WithName(jobRunName),
+		containerfixture.WithLabels(map[string]string{
+			labels.JobID:  "e8076a55d2a8",
+			labels.Enable: "true",
+			"tier":        "jobs",
+		}),
+	)
+	service := modelfixture.Container(
+		containerfixture.WithName("jp-app-1"),
+		containerfixture.WithLabels(map[string]string{labels.Enable: "true", "tier": "jobs"}),
+	)
+
+	tests := []struct {
+		name         string
+		names        []string
+		enabled      []string
+		enableLabel  bool
+		wantSelected bool
+	}{
+		{name: "no options", wantSelected: true},
+		{name: "name selects the run", names: []string{jobRunName}},
+		{name: "enabled label selects both", enabled: []string{"tier=jobs"}, wantSelected: true},
+		{name: "label-enable selects both", enableLabel: true, wantSelected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			filter, _, err := BuildFilter(newTestLogger(t), tt.names, nil, nil, nil, tt.enabled, nil, tt.enableLabel, "")
+			require.NoError(t, err)
+
+			assert.False(t, filter(jobRun))
+			assert.Equal(t, tt.wantSelected, filter(service))
+		})
+	}
+}
+
 func TestWatchtowerContainersFilter(t *testing.T) {
 	t.Parallel()
 
@@ -479,6 +555,8 @@ func TestBuildFilterNoneScope(t *testing.T) {
 	assert.Contains(t, desc, "without a scope")
 
 	scoped := new(mockFilters.MockFilterableContainer)
+
+	scoped.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	scoped.On("IsWatchtower").Return(false).Maybe()
 	scoped.On("Enabled").Return(false, false).Maybe()
 	scoped.On("NormalizedScope").Return("anyscope")
@@ -486,6 +564,8 @@ func TestBuildFilterNoneScope(t *testing.T) {
 	scoped.On("Name").Return("/scoped")
 
 	unscoped := new(mockFilters.MockFilterableContainer)
+
+	unscoped.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	unscoped.On("IsWatchtower").Return(false).Maybe()
 	unscoped.On("Enabled").Return(false, false).Maybe()
 	unscoped.On("NormalizedScope").Return("none")
@@ -499,6 +579,8 @@ func TestBuildFilterNoneScope(t *testing.T) {
 	unscoped.AssertExpectations(t)
 
 	oldNamed := new(mockFilters.MockFilterableContainer)
+
+	oldNamed.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	oldNamed.On("IsWatchtower").Return(true)
 	oldNamed.On("Name").Return("/watchtower-old-abc123")
 
@@ -753,6 +835,8 @@ func TestBuildFilter(t *testing.T) {
 	assert.Contains(t, desc, "valid")
 
 	container := new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("Invalid").Maybe()
 	container.On("Enabled").Return(false, false).Maybe()
@@ -763,6 +847,8 @@ func TestBuildFilter(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("test").Maybe()
 	container.On("Enabled").Return(false, false).Maybe()
@@ -773,6 +859,8 @@ func TestBuildFilter(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("Invalid").Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
@@ -783,6 +871,8 @@ func TestBuildFilter(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("test").Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
@@ -793,6 +883,8 @@ func TestBuildFilter(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
 	container.On("NormalizedScope").Return("none").Maybe() // No scope set
@@ -815,6 +907,7 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 
 	// Container without enable label: excluded because enableLabel requires it.
 	container := new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(false, false).Maybe()
 	container.On("NormalizedScope").Return("none").Maybe()
@@ -824,6 +917,7 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 
 	// Container with enable=false: excluded by boolean parsing.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(false, true).Maybe()
 	container.On("NormalizedScope").Return("none").Maybe()
@@ -833,6 +927,7 @@ func TestBuildFilterEnableLabel(t *testing.T) {
 
 	// Container with enable=true: included.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Once()
 	container.On("Enabled").Return(true, true).Maybe()
 	container.On("NormalizedScope").Return("none").Once()
@@ -864,6 +959,8 @@ func TestBuildFilterEnableLabelPreservesUserCriteria(t *testing.T) {
 	require.NoError(t, err)
 
 	container := new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
 	container.On("GetLabel", labels.Enable).Return("true", true).Once()
@@ -884,6 +981,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	assert.Contains(t, desc, "notfound")
 
 	container := new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("Another").Maybe()
 	container.On("Enabled").Return(false, false).Maybe()
@@ -894,6 +993,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("AnotherOne").Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
@@ -904,6 +1005,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("test").Maybe()
 	container.On("Enabled").Return(false, false).Maybe()
@@ -914,6 +1017,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("excluded").Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
@@ -924,6 +1029,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("excludedAsSubstring").Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
@@ -934,6 +1041,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("notfound").Maybe()
 	container.On("Enabled").Return(true, true).Maybe()
@@ -944,6 +1053,8 @@ func TestBuildFilterDisableContainer(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Enabled").Return(false, true).Maybe()
 	container.On("NormalizedScope").Return("none").Maybe()
@@ -1066,6 +1177,7 @@ func TestBuildFilterImageNames(t *testing.T) {
 
 	// Image matches a pattern and is not skipped -> kept.
 	container := new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/web").Maybe()
 	container.On("ImageName").Return("nginx:1.25").Maybe()
@@ -1077,6 +1189,7 @@ func TestBuildFilterImageNames(t *testing.T) {
 
 	// Image matches no pattern -> excluded.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/api").Maybe()
 	container.On("ImageName").Return("api:latest").Maybe()
@@ -1088,6 +1201,7 @@ func TestBuildFilterImageNames(t *testing.T) {
 
 	// Image matches a pattern but is explicitly skipped -> excluded.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/cache").Maybe()
 	container.On("ImageName").Return("redis:latest").Maybe()
@@ -1099,6 +1213,7 @@ func TestBuildFilterImageNames(t *testing.T) {
 
 	// Image matches pattern and skip pattern does not match -> kept.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/cache2").Maybe()
 	container.On("ImageName").Return("redis:7").Maybe()
@@ -1128,6 +1243,7 @@ func TestBuildFilterImageNamesWithContainerNames(t *testing.T) {
 
 	// Matches both container name and image name -> kept.
 	container := new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("nginx:1.25").Maybe()
@@ -1139,6 +1255,7 @@ func TestBuildFilterImageNamesWithContainerNames(t *testing.T) {
 
 	// Matches container name but not image name -> excluded.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("web").Maybe()
 	container.On("ImageName").Return("redis:latest").Maybe()
@@ -1150,6 +1267,7 @@ func TestBuildFilterImageNamesWithContainerNames(t *testing.T) {
 
 	// Matches image name but not container name -> excluded.
 	container = new(mockFilters.MockFilterableContainer)
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("api").Maybe()
 	container.On("ImageName").Return("nginx:1.25").Maybe()
@@ -1255,6 +1373,8 @@ func TestBuildFilterEnabledLabels(t *testing.T) {
 	assert.Contains(t, desc, `Service="Pelican"`)
 
 	container := new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/pelican-1").Maybe()
 	container.On("GetLabel", "Service").Return("Pelican", true)
@@ -1265,6 +1385,8 @@ func TestBuildFilterEnabledLabels(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/other").Maybe()
 	container.On("GetLabel", "Service").Return("Other", true)
@@ -1284,6 +1406,8 @@ func TestBuildFilterDisabledLabels(t *testing.T) {
 	assert.Contains(t, desc, `Service="Pelican"`)
 
 	container := new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/pelican-1").Maybe()
 	container.On("GetLabel", "Service").Return("Pelican", true)
@@ -1294,6 +1418,8 @@ func TestBuildFilterDisabledLabels(t *testing.T) {
 	container.AssertExpectations(t)
 
 	container = new(mockFilters.MockFilterableContainer)
+
+	container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 	container.On("IsWatchtower").Return(false).Maybe()
 	container.On("Name").Return("/other").Maybe()
 	container.On("GetLabel", "Service").Return("Other", true)
@@ -1609,18 +1735,24 @@ func TestFilters_QuietLoggers(t *testing.T) {
 			t.Parallel()
 
 			labeled := new(mockFilters.MockFilterableContainer)
+
+			labeled.On("GetLabel", labels.JobID).Return("", false).Maybe()
 			labeled.On("GetLabel", "env").Return("prod", true)
 			assert.True(t, filterByEnabledLabels(log, []labelPair{{key: "env", value: "prod"}}, NoFilter)(labeled))
 			assert.False(t, filterByDisabledLabels(log, []labelPair{{key: "env"}}, NoFilter)(labeled))
 			labeled.AssertExpectations(t)
 
 			scoped := new(mockFilters.MockFilterableContainer)
+
+			scoped.On("GetLabel", labels.JobID).Return("", false).Maybe()
 			scoped.On("NormalizedScope").Return("prod")
 			assert.True(t, FilterByScope(log, "prod", NoFilter)(scoped))
 			assert.False(t, FilterByScope(log, "dev", NoFilter)(scoped))
 			scoped.AssertExpectations(t)
 
 			imaged := new(mockFilters.MockFilterableContainer)
+
+			imaged.On("GetLabel", labels.JobID).Return("", false).Maybe()
 			imaged.On("ImageName").Return("nginx:latest")
 			assert.True(t, FilterByImage(log, []string{"nginx"}, NoFilter)(imaged))
 			assert.False(t, FilterByImage(log, []string{"redis"}, NoFilter)(imaged))
@@ -1631,6 +1763,8 @@ func TestFilters_QuietLoggers(t *testing.T) {
 			assert.Contains(t, desc, `with label env="prod"`)
 
 			built := new(mockFilters.MockFilterableContainer)
+
+			built.On("GetLabel", labels.JobID).Return("", false).Maybe()
 			built.On("IsWatchtower").Return(false)
 			built.On("GetLabel", "env").Return("prod", true)
 			built.On("Enabled").Return(false, false)
@@ -1652,6 +1786,7 @@ func TestBuildFilterRepeatedLabelKey(t *testing.T) {
 
 	for _, value := range []string{"prod", "staging"} {
 		container := new(mockFilters.MockFilterableContainer)
+		container.On("GetLabel", labels.JobID).Return("", false).Maybe()
 		container.On("IsWatchtower").Return(false).Maybe()
 		container.On("Name").Return("/app").Maybe()
 		container.On("GetLabel", "env").Return(value, true)
