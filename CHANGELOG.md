@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Clean old instances in the configured scope by @nicholas-fedor in [#3872](https://github.com/nicholas-fedor/watchtower/pull/3872)
 - Report a failed orchestrator listing once by @nicholas-fedor in [#3862](https://github.com/nicholas-fedor/watchtower/pull/3862)
 - Stop repeating the container listing error prefix by @nicholas-fedor in [#3857](https://github.com/nicholas-fedor/watchtower/pull/3857)
 - Connect compose rebuilds with the docker settings by @nicholas-fedor in [#3852](https://github.com/nicholas-fedor/watchtower/pull/3852)
