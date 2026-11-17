@@ -2,6 +2,7 @@ package apply
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,11 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
+	dockerClient "github.com/moby/moby/client"
 
 	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 )
 
 // TestInjectLabels verifies that labels are merged onto the named service only,
@@ -102,12 +105,92 @@ func TestAppliedImageID(t *testing.T) {
 	)
 }
 
+// TestClient_newDockerCLI checks that the Docker CLI Compose uses connects over
+// TLS to the host the Docker settings name, through an API client built from
+// those settings, so that with TLS verification off it needs no CA file. It sets
+// environment variables, so it does not run in parallel.
+func TestClient_newDockerCLI(t *testing.T) {
+	// Keep docker/cli away from the real Docker configuration and context. It
+	// reads DOCKER_CONFIG once per process, so the directory spans every case.
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+
+	tests := []struct {
+		name string
+		// keepCA reports whether ca.pem stays in the certificate path.
+		keepCA    bool
+		tlsVerify bool
+	}{
+		{name: "verified TLS", keepCA: true, tlsVerify: true},
+		{name: "unverified TLS without a CA file", keepCA: false, tlsVerify: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, name := range []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_API_VERSION", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"} {
+				t.Setenv(name, "")
+				require.NoError(t, os.Unsetenv(name))
+			}
+
+			server := httpstub.NewTLS(t)
+			server.AllowUnhandledRequests()
+
+			for _, method := range []string{http.MethodHead, http.MethodGet} {
+				server.RouteToHandler(method, httpstub.Path("/_ping"),
+					httpstub.RespondWith(http.StatusOK, "", http.Header{"Api-Version": []string{"1.45"}}))
+			}
+
+			certPath := server.WriteDockerCerts(t)
+			if !tt.keepCA {
+				require.NoError(t, os.Remove(filepath.Join(certPath, "ca.pem")))
+			}
+
+			client := NewClient(dockerConfig.Docker{
+				Host:       "tcp://" + server.Addr(),
+				APIVersion: "",
+				CertPath:   certPath,
+				TLSVerify:  tt.tlsVerify,
+			})
+
+			dockerCLI, err := client.newDockerCLI()
+			require.NoError(t, err)
+
+			_, err = dockerCLI.Client().Ping(t.Context(), dockerClient.PingOptions{})
+			require.NoError(t, err)
+
+			requests := server.ReceivedRequests()
+			require.NotEmpty(t, requests)
+
+			for _, request := range requests {
+				assert.NotNil(t, request.TLS, "the ping is sent over TLS")
+			}
+		})
+	}
+}
+
+// TestClient_newDockerCLI_missingCertificates checks that a certificate path
+// without its files returns an error instead of a Docker CLI.
+func TestClient_newDockerCLI_missingCertificates(t *testing.T) {
+	t.Parallel()
+
+	client := NewClient(dockerConfig.Docker{
+		Host:       "tcp://docker.example.com:2376",
+		APIVersion: "",
+		CertPath:   t.TempDir(),
+		TLSVerify:  true,
+	})
+
+	dockerCLI, err := client.newDockerCLI()
+	require.ErrorContains(t, err, "configure TLS")
+	assert.Nil(t, dockerCLI)
+}
+
 // TestExportConnection checks that the DOCKER_* connection variables follow
 // the Docker settings, and that an empty or false setting unsets its variable
 // rather than leaving the environment's value in place. It sets environment
 // variables, so it does not run in parallel.
 func TestExportConnection(t *testing.T) {
 	t.Setenv("DOCKER_HOST", "tcp://old.example.com:2375")
+	t.Setenv("DOCKER_TLS", "1")
 	t.Setenv("DOCKER_TLS_VERIFY", "0")
 	t.Setenv("DOCKER_API_VERSION", "1.41")
 	t.Setenv("DOCKER_CERT_PATH", "/old/certs")
@@ -119,13 +202,14 @@ func TestExportConnection(t *testing.T) {
 		CertPath:   "/certs",
 	}))
 	assert.Equal(t, "tcp://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
+	assert.Equal(t, "1", os.Getenv("DOCKER_TLS"))
 	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
 	assert.Equal(t, "/certs", os.Getenv("DOCKER_CERT_PATH"))
 
 	require.NoError(t, ExportConnection(dockerConfig.Docker{}))
 
-	for _, name := range []string{"DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
+	for _, name := range []string{"DOCKER_HOST", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
 		value, ok := os.LookupEnv(name)
 		assert.False(t, ok, "%s is set to %q", name, value)
 	}

@@ -161,7 +161,7 @@ func update(
 		watcher = gitClient[0]
 	}
 
-	gitSession := rebuild.NewSession(watcher)
+	gitSession := rebuild.NewSession(watcher, config.Docker)
 
 	// Initialize logging for the update process start.
 	log.Debug().Msg("Starting container update check")

@@ -1,14 +1,24 @@
 package httpstub
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"errors"
 	"io"
+	"math/big"
 	"net/http"
 	"net/http/httptest"
 	"net/http/httputil"
+	"os"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
+	"time"
 )
 
 // Server is an HTTP test server that answers each request with a handler the
@@ -47,6 +57,10 @@ type route struct {
 	// method is the request method the route matches.
 	method string
 }
+
+// certFileMode is the permission of the certificate files WriteDockerCerts
+// writes, readable only by the test's user because one holds a private key.
+const certFileMode = 0o600
 
 // New starts a server that serves HTTP and closes it when the test ends.
 //
@@ -211,6 +225,61 @@ func (s *Server) Reset() {
 	// Closing can wait for each connection, so it runs without the lock that
 	// incoming requests need.
 	s.testServer.CloseClientConnections()
+}
+
+// WriteDockerCerts writes the ca.pem, cert.pem and key.pem files a Docker client
+// loads from its certificate path, into a directory removed after the test.
+//
+// The CA is the server's own certificate, so a client that verifies the server
+// trusts it. The client certificate is self-signed.
+//
+// Parameters:
+//   - tb: Test the files belong to.
+//
+// Returns:
+//   - string: Directory to use as the certificate path.
+func (s *Server) WriteDockerCerts(tb testing.TB) string {
+	tb.Helper()
+
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		tb.Fatalf("httpstub: generate client key: %v", err)
+	}
+
+	template := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "watchtower-test-client"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+	}
+
+	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		tb.Fatalf("httpstub: create client certificate: %v", err)
+	}
+
+	keyDER, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		tb.Fatalf("httpstub: encode client key: %v", err)
+	}
+
+	dir := tb.TempDir()
+	files := map[string]*pem.Block{
+		"ca.pem":   {Type: "CERTIFICATE", Bytes: s.testServer.Certificate().Raw},
+		"cert.pem": {Type: "CERTIFICATE", Bytes: certDER},
+		"key.pem":  {Type: "EC PRIVATE KEY", Bytes: keyDER},
+	}
+
+	for name, block := range files {
+		err := os.WriteFile(filepath.Join(dir, name), pem.EncodeToMemory(block), certFileMode)
+		if err != nil {
+			tb.Fatalf("httpstub: write %s: %v", name, err)
+		}
+	}
+
+	return dir
 }
 
 // serveHTTP records a request and answers it with its route's handler, the next

@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 
@@ -17,6 +18,7 @@ import (
 
 	composeTypes "github.com/compose-spec/compose-go/v2/types"
 	dockerFlags "github.com/docker/cli/cli/flags"
+	dockerClient "github.com/moby/moby/client"
 
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
@@ -26,7 +28,9 @@ import (
 // Client applies a Compose project through docker/compose v5.
 type Client struct {
 	service api.Compose
-	mu      sync.Mutex
+	// docker holds the settings the Compose service connects with.
+	docker dockerConfig.Docker
+	mu     sync.Mutex
 }
 
 // Request is one Compose apply for a checked-out project directory.
@@ -57,18 +61,21 @@ type Container struct {
 
 // NewClient returns an applier that talks to the Docker daemon on first Apply.
 //
+// Parameters:
+//   - docker: Docker connection settings for the Compose service.
+//
 // Returns:
 //   - *Client: Lazy Compose service.
-func NewClient() *Client {
-	return &Client{}
+func NewClient(docker dockerConfig.Docker) *Client {
+	return &Client{docker: docker}
 }
 
 // ExportConnection sets the DOCKER_* connection variables to the Docker connection settings.
 //
-// The Compose service connects through the Docker CLI, which reads its host and API version
-// from these variables. The build tools Compose starts inherit the process environment and
-// read all four. A variable whose setting is empty or false is unset, because those tools
-// treat any value as set, even "0".
+// The build tools Compose starts read the connection from these variables, because Compose
+// passes them only the daemon host. A certificate path also sets DOCKER_TLS, so they use TLS
+// when verification is off. A variable whose setting is empty or false is unset rather than
+// left stale, because those tools treat any value as set, even "0".
 //
 // Parameters:
 //   - settings: Docker connection settings.
@@ -81,8 +88,14 @@ func ExportConnection(settings dockerConfig.Docker) error {
 		tlsVerify = "1"
 	}
 
+	useTLS := ""
+	if settings.CertPath != "" {
+		useTLS = "1"
+	}
+
 	for _, variable := range []struct{ name, value string }{
 		{name: "DOCKER_HOST", value: settings.Host},
+		{name: "DOCKER_TLS", value: useTLS},
 		{name: "DOCKER_TLS_VERIFY", value: tlsVerify},
 		{name: "DOCKER_API_VERSION", value: settings.APIVersion},
 		{name: "DOCKER_CERT_PATH", value: settings.CertPath},
@@ -313,14 +326,9 @@ func (c *Client) composeService() (api.Compose, error) {
 		return c.service, nil
 	}
 
-	dockerCLI, err := command.NewDockerCli()
+	dockerCLI, err := c.newDockerCLI()
 	if err != nil {
-		return nil, fmt.Errorf("docker cli: %w", err)
-	}
-
-	err = dockerCLI.Initialize(dockerFlags.NewClientOptions())
-	if err != nil {
-		return nil, fmt.Errorf("docker cli init: %w", err)
+		return nil, err
 	}
 
 	svc, err := compose.NewComposeService(
@@ -335,6 +343,54 @@ func (c *Client) composeService() (api.Compose, error) {
 	c.service = svc
 
 	return svc, nil
+}
+
+// newDockerCLI returns a Docker CLI that connects with the client's Docker settings.
+//
+// The Docker CLI uses an API client built from the settings, as the container client's is,
+// so both connect and trust the daemon's certificate the same way. The host takes the place
+// of DOCKER_HOST and any Docker context, and an empty host is the Docker SDK's default
+// socket.
+//
+// Returns:
+//   - *command.DockerCli: Initialized Docker CLI. It connects on first use.
+//   - error: Non-nil when the certificate files cannot be loaded, or when the Docker CLI
+//     cannot be created or initialized.
+func (c *Client) newDockerCLI() (*command.DockerCli, error) {
+	connection, err := c.docker.ConnectionOptions()
+	if err != nil {
+		return nil, fmt.Errorf("docker cli: %w", err)
+	}
+
+	apiClient, err := dockerClient.New(
+		slices.Concat(connection, []dockerClient.Opt{dockerClient.WithAPIVersion(c.docker.APIVersion)})...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("docker cli: %w", err)
+	}
+
+	// With its own API client, the Docker CLI never loads TLS files itself. Its endpoint then
+	// carries the host alone, which Compose passes to the build tools it starts, and those
+	// read the TLS settings from the environment that ExportConnection writes.
+	dockerCLI, err := command.NewDockerCli(command.WithAPIClient(apiClient))
+	if err != nil {
+		return nil, fmt.Errorf("docker cli: %w", err)
+	}
+
+	host := c.docker.Host
+	if host == "" {
+		host = dockerClient.DefaultDockerHost
+	}
+
+	options := dockerFlags.NewClientOptions()
+	options.Hosts = []string{host}
+
+	err = dockerCLI.Initialize(options)
+	if err != nil {
+		return nil, fmt.Errorf("docker cli init: %w", err)
+	}
+
+	return dockerCLI, nil
 }
 
 // listApplied returns running service containers after compose up or build.

@@ -14,6 +14,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -51,13 +52,14 @@ type Session struct {
 //
 // Parameters:
 //   - client: Git monitor client. May be unused when no container is monitored.
+//   - docker: Docker connection settings for the session's Compose applies.
 //
 // Returns:
 //   - *Session: Session with empty result and built maps.
-func NewSession(client *git.Client) *Session {
+func NewSession(client *git.Client, docker dockerConfig.Docker) *Session {
 	return &Session{
 		client:   client,
-		apply:    composeApply.NewClient(),
+		apply:    composeApply.NewClient(docker),
 		checkout: project.Checkout,
 		results:  make(map[container.ContainerID]git.CheckResult),
 		built:    make(map[container.ContainerID]container.ImageID),

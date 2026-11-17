@@ -2,16 +2,9 @@ package client
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"crypto/x509/pkix"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -253,51 +246,6 @@ func newTLSStubClient(t *testing.T) (*httpstub.Server, *dockerClient.Client) {
 	return server, api
 }
 
-// writeDockerCerts writes the ca.pem, cert.pem, and key.pem files the client
-// loads from its certificate path. The CA is the stub server's certificate, so
-// the client trusts the server, and the client certificate is self-signed.
-//
-// Parameters:
-//   - t: Test the files belong to.
-//   - server: TLS stub server the client connects to.
-//
-// Returns:
-//   - string: Directory to use as the certificate path.
-func writeDockerCerts(t *testing.T, server *httpstub.Server) string {
-	t.Helper()
-
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(t, err)
-
-	template := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: "watchtower-test-client"},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
-	}
-
-	certDER, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
-	require.NoError(t, err)
-
-	keyDER, err := x509.MarshalECPrivateKey(key)
-	require.NoError(t, err)
-
-	dir := t.TempDir()
-	files := map[string]*pem.Block{
-		"ca.pem":   {Type: "CERTIFICATE", Bytes: server.TestServer().Certificate().Raw},
-		"cert.pem": {Type: "CERTIFICATE", Bytes: certDER},
-		"key.pem":  {Type: "EC PRIVATE KEY", Bytes: keyDER},
-	}
-
-	for name, block := range files {
-		require.NoError(t, os.WriteFile(filepath.Join(dir, name), pem.EncodeToMemory(block), 0o600))
-	}
-
-	return dir
-}
-
 // respondToPing answers a ping with status, reporting apiVersion as the
 // daemon's API version.
 //
@@ -339,7 +287,7 @@ func dockerTLS(t *testing.T, server, certServer *httpstub.Server) dockerConfig.D
 	return dockerConfig.Docker{
 		Host:      "tcp://" + server.Addr(),
 		TLSVerify: true,
-		CertPath:  writeDockerCerts(t, certServer),
+		CertPath:  certServer.WriteDockerCerts(t),
 	}
 }
 

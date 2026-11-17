@@ -13,6 +13,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/client"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/compatibility"
+	"github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/filter"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/lifecycle"
@@ -85,6 +86,11 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 			TLSMinVersion:    "TLS1.3",
 			TLSSkip:          true,
 		},
+		Docker: docker.Docker{
+			Host:      "tcp://docker.example.com:2376",
+			TLSVerify: true,
+			CertPath:  "/certs",
+		},
 	}
 
 	ov := RunOverrides{
@@ -129,6 +135,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, "build/docker/Dockerfile", params.Git.Dockerfile)
 	assert.Equal(t, ".", params.Git.Context)
 	assert.Equal(t, cfg.Registry, params.Registry)
+	assert.Equal(t, cfg.Docker, params.Docker)
 	assert.True(t, params.GitComposeStash)
 	assert.Equal(t, "/compose/demo", params.ComposeProjects["demo"])
 
