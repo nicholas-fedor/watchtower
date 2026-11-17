@@ -171,6 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Regenerate compose mock for compose v5.8.0 by @nicholas-fedor in [#3878](https://github.com/nicholas-fedor/watchtower/pull/3878)
 - Update github.com/moby/extensions digest to 2b6b3bd by @renovate[bot] in [#3876](https://github.com/nicholas-fedor/watchtower/pull/3876)
 - Update module github.com/docker/compose/v5 to v5.8.0 by @renovate[bot] in [#3874](https://github.com/nicholas-fedor/watchtower/pull/3874)
 - Update module github.com/docker/compose/v5 to v5.7.2 by @renovate[bot] in [#3870](https://github.com/nicholas-fedor/watchtower/pull/3870)
