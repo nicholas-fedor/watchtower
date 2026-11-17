@@ -146,6 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Pin the compose api version fallback by @nicholas-fedor in [#3866](https://github.com/nicholas-fedor/watchtower/pull/3866)
 - Rename the hand-written client fake by @nicholas-fedor in [#3627](https://github.com/nicholas-fedor/watchtower/pull/3627)
 - Build git and update tests from model containers by @nicholas-fedor in [#3596](https://github.com/nicholas-fedor/watchtower/pull/3596)
 - Build container-layer tests from model containers by @nicholas-fedor in [#3594](https://github.com/nicholas-fedor/watchtower/pull/3594)
