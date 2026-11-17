@@ -171,6 +171,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/schema to v1.9.5 by @renovate[bot] in [#3881](https://github.com/nicholas-fedor/watchtower/pull/3881)
+- Update golang.org/x/tools digest to 611c7a4 by @renovate[bot] in [#3880](https://github.com/nicholas-fedor/watchtower/pull/3880)
 - Regenerate compose mock for compose v5.8.0 by @nicholas-fedor in [#3878](https://github.com/nicholas-fedor/watchtower/pull/3878)
 - Update github.com/moby/extensions digest to 2b6b3bd by @renovate[bot] in [#3876](https://github.com/nicholas-fedor/watchtower/pull/3876)
 - Update module github.com/docker/compose/v5 to v5.8.0 by @renovate[bot] in [#3874](https://github.com/nicholas-fedor/watchtower/pull/3874)
