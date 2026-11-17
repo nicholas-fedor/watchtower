@@ -168,6 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update actions/setup-go action to v7.1.0 by @renovate[bot] in [#3860](https://github.com/nicholas-fedor/watchtower/pull/3860)
+- Update golang.org/x/tools digest to 6bc5e25 by @renovate[bot] in [#3859](https://github.com/nicholas-fedor/watchtower/pull/3859)
 - Update module github.com/sergi/go-diff to v1.4.4 by @renovate[bot] in [#3855](https://github.com/nicholas-fedor/watchtower/pull/3855)
 - Update google.golang.org/genproto/googleapis/rpc digest to fd2c768 by @renovate[bot] in [#3854](https://github.com/nicholas-fedor/watchtower/pull/3854)
 - Update golang.org/x/tools digest to 147c2de by @renovate[bot] in [#3848](https://github.com/nicholas-fedor/watchtower/pull/3848)
