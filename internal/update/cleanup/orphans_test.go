@@ -20,6 +20,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockCleanup "github.com/nicholas-fedor/watchtower/internal/update/cleanup/mocks"
 )
@@ -142,7 +143,7 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 	t.Run("listing the orchestrators fails", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should return an error", func(t *testing.T) {
+		t.Run("should return the error and log it only at debug", func(t *testing.T) {
 			t.Parallel()
 
 			mockAPIClient := mockCleanup.NewMockClient(t)
@@ -150,10 +151,14 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 				ListLabeledContainers(ctx, labels.EphemeralOrchestrator).
 				Return(nil, errors.New("failed to list containers: docker daemon unavailable"))
 
-			count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
+			log, out := logcapture.NewJSON(zerolog.DebugLevel)
+
+			count, err := RemoveOrphanedOrchestrators(log, ctx, mockAPIClient)
 
 			require.EqualError(t, err, "failed to list containers: docker daemon unavailable")
 			assert.Equal(t, 0, count)
+			// The caller's warning is the one report that can reach notifications.
+			assert.Equal(t, []string{"debug"}, logcapture.Levels(t, out.String(), "Failed to list ephemeral orchestrators"))
 		})
 	})
 

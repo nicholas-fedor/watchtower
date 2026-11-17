@@ -51,7 +51,8 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 
 	orchestrators, err := client.ListLabeledContainers(ctx, labels.EphemeralOrchestrator)
 	if err != nil {
-		clog.Error().
+		// The caller reports the returned error, so it is logged here only at debug.
+		clog.Debug().
 			Err(err).
 			Msg("Failed to list ephemeral orchestrators")
 
