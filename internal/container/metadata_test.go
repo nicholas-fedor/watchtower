@@ -1717,9 +1717,10 @@ func TestNormalizedScope(t *testing.T) {
 
 // TestIsOrphanedReplacement verifies which containers count as replacements
 // that an interrupted self-update left in the created state. Only a created
-// Watchtower container in the current container's scope counts, unless it is
-// the current container or a renamed predecessor. An unset scope label and an
-// empty one are the same scope.
+// Watchtower container in the given scope or with the current container in its
+// chain label counts, unless it is the current container or a renamed
+// predecessor. An unset scope label, an empty one and an empty scope are the
+// same scope.
 func TestIsOrphanedReplacement(t *testing.T) {
 	t.Parallel()
 
@@ -1734,50 +1735,82 @@ func TestIsOrphanedReplacement(t *testing.T) {
 		return containerfixture.WithLabels(containerLabels)
 	}
 
-	current := MockContainer(containerfixture.WithID("current"), containerfixture.WithName("/watchtower"), running,
-		watchtower(""))
+	const currentID = ContainerID("current")
 
 	tests := []struct {
 		name      string
 		candidate *Container
+		scope     string
 		want      bool
 	}{
 		{
 			name:      "created Watchtower container in the same scope",
 			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("")),
+			scope:     "",
 			want:      true,
 		},
 		{
 			name: "empty scope label matches an unset one",
 			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created,
 				containerfixture.WithLabels(map[string]string{labels.Watchtower: "true", labels.Scope: ""})),
-			want: true,
+			scope: "",
+			want:  true,
 		},
 		{
-			name:      "different scope",
+			name:      "an unscoped container is in the scope none",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("")),
+			scope:     labels.NoScope,
+			want:      true,
+		},
+		{
+			name:      "created Watchtower container in a named scope",
 			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("prod")),
+			scope:     "prod",
+			want:      true,
+		},
+		{
+			name:      "scoped candidate outside an empty scope",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("prod")),
+			scope:     "",
 			want:      false,
+		},
+		{
+			name:      "unscoped candidate outside a named scope",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created, watchtower("")),
+			scope:     "prod",
+			want:      false,
+		},
+		{
+			name: "replacement of the current container outside the scope",
+			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), created,
+				containerfixture.WithLabels(map[string]string{labels.Watchtower: "true", labels.ContainerChain: "older," + string(currentID)})),
+			scope: "prod",
+			want:  true,
 		},
 		{
 			name:      "not created",
 			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/watchtower-new"), running, watchtower("")),
+			scope:     "",
 			want:      false,
 		},
 		{
 			name: "not a Watchtower container",
 			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/app"), created,
 				containerfixture.WithLabels(map[string]string{})),
-			want: false,
+			scope: "",
+			want:  false,
 		},
 		{
 			name: "renamed predecessor",
 			candidate: MockContainer(containerfixture.WithID("old"), containerfixture.WithName("/watchtower-old-abc123"), created,
 				watchtower("")),
-			want: false,
+			scope: "",
+			want:  false,
 		},
 		{
 			name:      "the current container",
-			candidate: MockContainer(containerfixture.WithID("current"), containerfixture.WithName("/watchtower"), created, watchtower("")),
+			candidate: MockContainer(containerfixture.WithID(string(currentID)), containerfixture.WithName("/watchtower"), created, watchtower("")),
+			scope:     "",
 			want:      false,
 		},
 	}
@@ -1786,7 +1819,7 @@ func TestIsOrphanedReplacement(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, IsOrphanedReplacement(tt.candidate, current))
+			assert.Equal(t, tt.want, IsOrphanedReplacement(tt.candidate, currentID, tt.scope))
 		})
 	}
 }

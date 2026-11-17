@@ -63,12 +63,30 @@ func (f Filter) Build(log *zerolog.Logger) (Filter, error) {
 	return f, nil
 }
 
-// WithLabelScope returns f for the scope that Watchtower's own scope label
-// gives, rebuilt when that scope applies.
+// ScopeWithLabel returns the scope Watchtower runs in when its own container's
+// scope label has the given value.
 //
 // A scope set in the configuration wins. Without one, a non-empty label value
-// becomes the scope, "none" included. A replacement from a self-update keeps
-// the scope of the instance it replaced this way.
+// is the scope, "none" included. A replacement from a self-update keeps the
+// scope of the instance it replaced this way.
+//
+// Parameters:
+//   - label: Value of the scope label on Watchtower's own container. It is
+//     empty when the container has no scope label.
+//
+// Returns:
+//   - string: The scope, empty when neither the configuration nor the label
+//     sets one.
+func (f Filter) ScopeWithLabel(label string) string {
+	if f.Scope != "" {
+		return f.Scope
+	}
+
+	return label
+}
+
+// WithLabelScope returns f for the scope that [Filter.ScopeWithLabel] gives,
+// rebuilt when the label sets that scope.
 //
 // Parameters:
 //   - log: Logger for the filter's debug output. May be nil.
@@ -80,11 +98,12 @@ func (f Filter) Build(log *zerolog.Logger) (Filter, error) {
 //     the label's scope and a rebuilt predicate and description.
 //   - error: Non-nil when an enable or disable label pair is malformed.
 func (f Filter) WithLabelScope(log *zerolog.Logger, label string) (Filter, error) {
-	if f.Scope != "" || label == "" {
+	scope := f.ScopeWithLabel(label)
+	if scope == f.Scope {
 		return f, nil
 	}
 
-	f.Scope = label
+	f.Scope = scope
 
 	return f.Build(log)
 }

@@ -183,7 +183,7 @@ func update(
 	// An old instance's container stops itself rather than run a session.
 	// This catches one restarted despite the startup check.
 	if old := currentOldInstance(allContainers, config.CurrentContainerID); old != nil {
-		selfupdate.RetireOldInstance(log, ctx, client, old, config.DetachedTimeout())
+		selfupdate.RetireOldInstance(log, ctx, client, old, config.Scope, config.DetachedTimeout())
 
 		return nil, nil, errOldSelfDetected
 	}
@@ -194,11 +194,12 @@ func update(
 	// Clean up any old Watchtower containers that linger from a previous
 	// self-update. This runs each update cycle to catch containers that the
 	// startup cleanup may have missed (e.g., they were still stopping at startup).
-	// It stays within the current container's scope.
+	// It stays within the scope this instance runs in.
 	_, cleanupErr := cleanup.RemoveOldWatchtowerContainers(log,
 		ctx,
 		client,
 		config.Cleanup,
+		config.Scope,
 		config.CurrentContainerID,
 		&cleanupImageInfos,
 	)

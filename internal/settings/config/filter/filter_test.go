@@ -72,7 +72,8 @@ func TestFilter_Build_malformedLabelPair(t *testing.T) {
 
 // TestFilter_WithLabelScope verifies that a configured scope wins over the
 // scope label and that a non-empty label, "none" included, sets the scope of
-// a filter without one and rebuilds it for that scope.
+// a filter without one and rebuilds it for that scope. ScopeWithLabel gives
+// the same scope.
 func TestFilter_WithLabelScope(t *testing.T) {
 	t.Parallel()
 
@@ -121,6 +122,8 @@ func TestFilter_WithLabelScope(t *testing.T) {
 
 			configured, err := Filter{Scope: tt.configured}.Build(nil)
 			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantScope, configured.ScopeWithLabel(tt.label))
 
 			got, err := configured.WithLabelScope(nil, tt.label)
 			require.NoError(t, err)

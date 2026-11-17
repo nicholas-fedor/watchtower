@@ -499,7 +499,12 @@ func (p *process) retire() error {
 		p.log.Debug().Err(err).Msg("Could not set up notifications for the retirement of an old Watchtower container")
 	}
 
-	selfupdate.RetireOldInstance(p.log, context.Background(), client, currentWatchtowerContainer, restartPolicyTimeout)
+	// Startup retires before it settles the scope, so the scope is worked out
+	// here from the configuration and the old container's scope label.
+	label, _ := currentWatchtowerContainer.Scope()
+	scope := appCfg.Filter.ScopeWithLabel(label)
+
+	selfupdate.RetireOldInstance(p.log, context.Background(), client, currentWatchtowerContainer, scope, restartPolicyTimeout)
 
 	return &exitError{err: errSupersededInstance, msg: "", code: 0}
 }
