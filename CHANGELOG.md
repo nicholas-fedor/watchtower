@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep compose jobs out of git-monitored applies by @nicholas-fedor in [#3888](https://github.com/nicholas-fedor/watchtower/pull/3888)
 - Recognize engine-reported pull rate limits by @nicholas-fedor in [#3883](https://github.com/nicholas-fedor/watchtower/pull/3883)
 - Clean old instances in the configured scope by @nicholas-fedor in [#3872](https://github.com/nicholas-fedor/watchtower/pull/3872)
 - Report a failed orchestrator listing once by @nicholas-fedor in [#3862](https://github.com/nicholas-fedor/watchtower/pull/3862)
