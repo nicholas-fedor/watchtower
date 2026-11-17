@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -138,6 +139,6 @@ func TestDocker_ConnectionOptions_missingCertificates(t *testing.T) {
 	certPath := t.TempDir()
 
 	options, err := Docker{Host: "tcp://docker.example.com:2376", APIVersion: "", CertPath: certPath, TLSVerify: true}.ConnectionOptions()
-	require.ErrorContains(t, err, "configure TLS from \""+certPath+"\"")
+	require.ErrorContains(t, err, fmt.Sprintf("configure TLS from %q", certPath))
 	assert.Nil(t, options)
 }

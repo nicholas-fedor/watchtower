@@ -163,25 +163,67 @@ func TestClient_newDockerCLI(t *testing.T) {
 			for _, request := range requests {
 				assert.NotNil(t, request.TLS, "the ping is sent over TLS")
 			}
+
+			// The Compose service is created once and reused.
+			service, err := client.composeService()
+			require.NoError(t, err)
+
+			again, err := client.composeService()
+			require.NoError(t, err)
+			assert.Same(t, service, again)
 		})
 	}
 }
 
-// TestClient_newDockerCLI_missingCertificates checks that a certificate path
-// without its files returns an error instead of a Docker CLI.
-func TestClient_newDockerCLI_missingCertificates(t *testing.T) {
+// TestClient_newDockerCLI_errors checks that settings the Docker CLI cannot
+// connect with return an error instead of a Docker CLI, and that the Compose
+// service passes the error on.
+func TestClient_newDockerCLI_errors(t *testing.T) {
 	t.Parallel()
 
-	client := NewClient(dockerConfig.Docker{
-		Host:       "tcp://docker.example.com:2376",
-		APIVersion: "",
-		CertPath:   t.TempDir(),
-		TLSVerify:  true,
-	})
+	tests := []struct {
+		name     string
+		settings func(t *testing.T) dockerConfig.Docker
+		wantErr  string
+	}{
+		{
+			name: "missing certificate files",
+			settings: func(t *testing.T) dockerConfig.Docker {
+				t.Helper()
 
-	dockerCLI, err := client.newDockerCLI()
-	require.ErrorContains(t, err, "configure TLS")
-	assert.Nil(t, dockerCLI)
+				return dockerConfig.Docker{
+					Host:       "tcp://docker.example.com:2376",
+					APIVersion: "",
+					CertPath:   t.TempDir(),
+					TLSVerify:  true,
+				}
+			},
+			wantErr: "configure TLS",
+		},
+		{
+			name: "unparsable host",
+			settings: func(*testing.T) dockerConfig.Docker {
+				return dockerConfig.Docker{Host: "docker.example.com", APIVersion: "", CertPath: "", TLSVerify: false}
+			},
+			wantErr: "unable to parse docker host",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			client := NewClient(tt.settings(t))
+
+			dockerCLI, err := client.newDockerCLI()
+			require.ErrorContains(t, err, tt.wantErr)
+			assert.Nil(t, dockerCLI)
+
+			service, err := client.composeService()
+			require.ErrorContains(t, err, tt.wantErr)
+			assert.Nil(t, service)
+		})
+	}
 }
 
 // TestExportConnection checks that the DOCKER_* connection variables follow
