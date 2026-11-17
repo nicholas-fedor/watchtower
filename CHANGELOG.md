@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop repeating the container listing error prefix by @nicholas-fedor in [#3857](https://github.com/nicholas-fedor/watchtower/pull/3857)
 - Connect compose rebuilds with the docker settings by @nicholas-fedor in [#3852](https://github.com/nicholas-fedor/watchtower/pull/3852)
 - Keep tcp docker hosts for tls connections by @nicholas-fedor in [#3846](https://github.com/nicholas-fedor/watchtower/pull/3846)
 - Unset docker variables the settings leave empty by @nicholas-fedor in [#3838](https://github.com/nicholas-fedor/watchtower/pull/3838)
