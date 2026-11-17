@@ -313,7 +313,9 @@ Environment Variable: WATCHTOWER_NOTIFICATION_GOTIFY_URL
 
 #### Gotify Token
 
-Sets the Gotify token for notifications.
+Sets the Gotify application token for notifications.
+A client token is rejected at startup.
+Watchtower sends the token in the `X-Gotify-Key` header, which keeps it out of the server's access logs.
 
 ```text
             Argument: --notification-gotify-token

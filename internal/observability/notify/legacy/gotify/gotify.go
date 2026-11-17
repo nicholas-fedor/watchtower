@@ -82,6 +82,7 @@ func URL(log *zerolog.Logger, cfg notifyConfig.Legacy) (string, error) {
 		DisableTLS:    apiURL.Scheme == "http",
 		SkipTLSVerify: cfg.GotifyTLSSkipVerify,
 		Token:         cfg.GotifyToken,
+		UseHeader:     true,
 	}
 
 	urlStr := config.GetURL().String()
