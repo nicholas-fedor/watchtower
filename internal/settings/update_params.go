@@ -34,6 +34,7 @@ func (c Config) UpdateParams(overrides RunOverrides) updateParams.Params {
 		LifecycleGID:        c.Lifecycle.GID,
 		RunOnce:             overrides.RunOnce || c.Mode.RunOnce,
 		CurrentContainerID:  overrides.CurrentContainerID,
+		Scope:               c.Filter.Scope,
 		UseComposeDependsOn: c.Update.UseComposeDependsOn,
 		SkipSelfUpdate:      overrides.SkipSelfUpdate,
 		EphemeralSelfUpdate: c.Update.EphemeralSelfUpdate,

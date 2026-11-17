@@ -51,18 +51,20 @@ type RetireClient interface {
 //   - ctx: The caller's context.
 //   - client: Container client for the recovery and the restart policy.
 //   - oldContainer: The old Watchtower container.
+//   - scope: Scope the old instance runs in, empty for no scope.
 //   - timeout: The bound of each step.
 func RetireOldInstance(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client RetireClient,
 	oldContainer *container.Container,
+	scope string,
 	timeout time.Duration,
 ) {
 	log.Debug().Str("container", oldContainer.Name()).Msg("Retiring old Watchtower container")
 
 	recoverCtx, recoverCancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
-	tryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer)
+	tryRecoverOrphanedContainer(log, recoverCtx, client, oldContainer, scope)
 
 	recoverCancel()
 
@@ -80,8 +82,8 @@ func RetireOldInstance(
 // It lists the Watchtower containers whatever the include-stopped
 // configuration option says, since the replacement it looks for was created but
 // never started. It starts the first container that
-// [container.IsOrphanedReplacement] reports as an orphaned replacement of the
-// current container and that starts without error. A recovery is logged once,
+// [container.IsOrphanedReplacement] reports as an orphaned replacement in the
+// scope or of the current container, and that starts without error. A recovery is logged once,
 // at info. A start that fails is logged at error, since no Watchtower may run
 // once the old instance exits.
 //
@@ -90,11 +92,13 @@ func RetireOldInstance(
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker API operations.
 //   - currentContainer: The current running container to exclude from recovery.
+//   - scope: Scope the current instance runs in, empty for no scope.
 func tryRecoverOrphanedContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client RecoveryClient,
 	currentContainer *container.Container,
+	scope string,
 ) {
 	candidates, err := client.ListLabeledContainers(ctx, labels.Watchtower)
 	if err != nil {
@@ -106,7 +110,7 @@ func tryRecoverOrphanedContainer(
 	}
 
 	for _, c := range candidates {
-		if !container.IsOrphanedReplacement(c, currentContainer) {
+		if !container.IsOrphanedReplacement(c, currentContainer.ID(), scope) {
 			continue
 		}
 

@@ -114,7 +114,7 @@ func TestRetireOldInstance(t *testing.T) {
 			// The other recovery lines are at debug, so an info capture holds
 			// only the line reporting the recovery.
 			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-			RetireOldInstance(log, ctx, client, old, time.Minute)
+			RetireOldInstance(log, ctx, client, old, "", time.Minute)
 
 			type recoveryEntry struct {
 				Message   string `json:"message"`
@@ -133,8 +133,8 @@ func TestRetireOldInstance(t *testing.T) {
 
 // Test_tryRecoverOrphanedContainer verifies that a Watchtower replacement left
 // in the created state is started. Recovery gives up quietly when listing
-// fails or when no orphan in the current container's scope exists, and reports
-// a start that fails. The client mocks expect exactly the starts each case makes.
+// fails or when no orphan in the given scope or of the current container
+// exists, and reports a start that fails. The client mocks expect exactly the starts each case makes.
 func Test_tryRecoverOrphanedContainer(t *testing.T) {
 	t.Parallel()
 
@@ -149,7 +149,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 
 			current := mockUpdate.CreateMockContainer("current-id", "watchtower", "watchtower:latest", time.Now())
 
-			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current, "")
 		})
 	})
 
@@ -167,7 +167,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, oldContainer, current)
 
-			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current, "")
 		})
 	})
 
@@ -184,7 +184,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 			expectListed(client, orphaned, current)
 			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("orphaned-id")).Return(nil).Once()
 
-			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current, "")
 		})
 	})
 
@@ -203,7 +203,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 				Return(context.DeadlineExceeded).Once()
 
 			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-			tryRecoverOrphanedContainer(log, t.Context(), client, current)
+			tryRecoverOrphanedContainer(log, t.Context(), client, current, "")
 
 			// No Watchtower may run once the old instance exits, so the failure
 			// is reported at error with its cause.
@@ -238,7 +238,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 			// The attempts log at debug, so an info capture holds the failed
 			// start of the first orphan and the recovery of the second.
 			log, buf := logcapture.NewJSON(zerolog.InfoLevel)
-			tryRecoverOrphanedContainer(log, t.Context(), client, current)
+			tryRecoverOrphanedContainer(log, t.Context(), client, current, "")
 
 			type recoveryEntry struct {
 				Level     string `json:"level"`
@@ -277,7 +277,7 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
-			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current, "scope-a")
 		})
 	})
 
@@ -293,7 +293,41 @@ func Test_tryRecoverOrphanedContainer(t *testing.T) {
 			client := mockSelfupdate.NewMockRecoveryClient(t)
 			expectListed(client, orphaned, current)
 
-			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current)
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current, "")
+		})
+	})
+
+	t.Run("the scope differs from the old container's scope label", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should start only its own replacement", func(t *testing.T) {
+			t.Parallel()
+
+			// The old instance runs in the scope "prod" although its container
+			// has no scope label. Another, unscoped instance left a replacement
+			// in the created state, which is not in that scope. The old
+			// instance's own replacement names it in its chain label.
+			other := recoveryContainer("other-id", "watchtower-other", false, "")
+			current := recoveryContainer("current-id", "watchtower-old-abc123", true, "")
+			own := mockUpdate.CreateMockContainerWithConfig(
+				"own-id",
+				"watchtower",
+				"watchtower:latest",
+				false,
+				false,
+				time.Now(),
+				&dockerContainer.Config{Image: "watchtower:latest", Labels: map[string]string{
+					labels.Watchtower:     "true",
+					labels.ContainerChain: "current-id",
+				}},
+			)
+			own.ContainerInfo().State.Status = dockerContainer.StateCreated
+
+			client := mockSelfupdate.NewMockRecoveryClient(t)
+			expectListed(client, other, own, current)
+			client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("own-id")).Return(nil).Once()
+
+			tryRecoverOrphanedContainer(newTestLogger(t), t.Context(), client, current, "prod")
 		})
 	})
 }

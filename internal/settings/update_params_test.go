@@ -62,6 +62,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 		Filter: filter.Filter{
 			Predicate:   filters.NoFilter,
 			Desc:        "all",
+			Scope:       "prod",
 			LabelEnable: true,
 		},
 		Git: git.Git{
@@ -117,6 +118,7 @@ func TestUpdateParamsAssignsEveryField(t *testing.T) {
 	assert.Equal(t, 1000, params.LifecycleGID)
 	assert.True(t, params.RunOnce)
 	assert.Equal(t, container.ContainerID("abc123"), params.CurrentContainerID)
+	assert.Equal(t, "prod", params.Scope)
 	assert.True(t, params.UseComposeDependsOn)
 	assert.True(t, params.SkipSelfUpdate)
 	assert.True(t, params.EphemeralSelfUpdate)

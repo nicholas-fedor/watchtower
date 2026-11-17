@@ -18,6 +18,7 @@ type Params struct {
 	Filter              filters.Filter          // Container filter.
 	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
 	CurrentContainerID  container.ContainerID   // ID of the current container being updated.
+	Scope               string                  // Scope this instance runs in, empty for no scope.
 	Git                 gitConfig.Defaults      // Credential-free Git association settings.
 	Registry            registryConfig.Registry // Settings for registry requests.
 	Docker              dockerConfig.Docker     // Docker connection settings for Compose rebuilds.

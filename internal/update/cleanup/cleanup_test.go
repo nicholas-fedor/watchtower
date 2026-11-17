@@ -2405,17 +2405,29 @@ func createMockCreatedContainer(
 // currentWatchtowerContainer returns the running Watchtower container with the
 // ID "current-id". An empty scope leaves it unscoped.
 func currentWatchtowerContainer(scope string) *container.Container {
+	return createMockContainer("current-id", "watchtower", "watchtower:current", true, false, time.Now(), watchtowerLabels(scope))
+}
+
+// watchtowerLabels returns the labels of a Watchtower container in scope.
+//
+// Parameters:
+//   - scope: Scope label value, empty for no scope label.
+//
+// Returns:
+//   - map[string]string: The Watchtower label, and the scope label when scope is set.
+func watchtowerLabels(scope string) map[string]string {
 	containerLabels := map[string]string{"com.centurylinklabs.watchtower": "true"}
 	if scope != "" {
 		containerLabels["com.centurylinklabs.watchtower.scope"] = scope
 	}
 
-	return createMockContainer("current-id", "watchtower", "watchtower:current", true, false, time.Now(), containerLabels)
+	return containerLabels
 }
 
 // TestRemoveOldWatchtowerContainers covers the cleanup of old Watchtower
-// containers in the current container's scope. It checks the following:
-//   - Old and orphaned created-state containers in that scope are removed.
+// containers in the scope the instance runs in. It checks the following:
+//   - Old and orphaned created-state containers in that scope are removed,
+//     also when the current container's own scope label differs.
 //   - Their images are collected when image cleanup is enabled.
 //   - Listing failures are reported.
 //   - Nothing is removed without a listed current container.
@@ -2438,6 +2450,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2471,6 +2484,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2511,6 +2525,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2549,6 +2564,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"my-scope",
 				"current-id",
 				nil,
 			)
@@ -2583,6 +2599,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2617,12 +2634,102 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"my-scope",
 				"current-id",
 				nil,
 			)
 
 			require.NoError(t, err)
 			assert.Equal(t, 0, removed)
+		})
+	})
+
+	t.Run("the scope differs from the current container's label", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should clean only the given scope", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := mockCleanup.NewMockClient(t)
+
+			// Another, unscoped instance's predecessor and its replacement in
+			// the middle of a self-update.
+			otherOld := createMockContainer("other-old-id", "watchtower-old-other", "watchtower:old", true, false,
+				time.Now(), watchtowerLabels(""))
+			otherReplacement := createMockCreatedContainer("other-new-id", "watchtower-other", time.Now(), watchtowerLabels(""))
+
+			// Leftovers in this instance's scope.
+			prodOld := createMockContainer("prod-old-id", "watchtower-old-prod", "watchtower:old", true, false,
+				time.Now(), watchtowerLabels("prod"))
+			prodReplacement := createMockCreatedContainer("prod-new-id", "watchtower-prod", time.Now(), watchtowerLabels("prod"))
+
+			mockClient.EXPECT().
+				ListLabeledContainers(mock.Anything, labels.Watchtower).
+				Return([]*container.Container{currentWatchtowerContainer(""), otherOld, otherReplacement, prodOld, prodReplacement}, nil)
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, prodOld, 10*time.Minute).
+				Return(nil).Once()
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, prodReplacement, 10*time.Minute).
+				Return(nil).Once()
+
+			// The instance runs in the scope "prod" although its own container
+			// has no scope label.
+			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
+				t.Context(),
+				mockClient,
+				false,
+				"prod",
+				"current-id",
+				nil,
+			)
+
+			require.NoError(t, err)
+			assert.Equal(t, 2, removed)
+		})
+
+		t.Run("should clean the current container's own predecessor and replacement", func(t *testing.T) {
+			t.Parallel()
+
+			mockClient := mockCleanup.NewMockClient(t)
+
+			// The current container's chain names its predecessor, and the
+			// replacement's chain names the current container. Both carry the
+			// current container's missing scope label.
+			current := currentWatchtowerContainer("")
+			current.SetLabel(labels.ContainerChain, "own-old-id")
+
+			ownOld := createMockContainer("own-old-id", "watchtower-old-own", "watchtower:old", false, false,
+				time.Now(), watchtowerLabels(""))
+			ownReplacementLabels := watchtowerLabels("")
+			ownReplacementLabels[labels.ContainerChain] = "own-old-id,current-id"
+			ownReplacement := createMockCreatedContainer("own-new-id", "watchtower-own", time.Now(), ownReplacementLabels)
+
+			// Another, unscoped instance's predecessor stays.
+			otherOld := createMockContainer("other-old-id", "watchtower-old-other", "watchtower:old", true, false,
+				time.Now(), watchtowerLabels(""))
+
+			mockClient.EXPECT().
+				ListLabeledContainers(mock.Anything, labels.Watchtower).
+				Return([]*container.Container{current, ownOld, ownReplacement, otherOld}, nil)
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, ownOld, 10*time.Minute).
+				Return(nil).Once()
+			mockClient.EXPECT().
+				StopAndRemoveContainer(mock.Anything, ownReplacement, 10*time.Minute).
+				Return(nil).Once()
+
+			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
+				t.Context(),
+				mockClient,
+				false,
+				"prod",
+				"current-id",
+				nil,
+			)
+
+			require.NoError(t, err)
+			assert.Equal(t, 2, removed)
 		})
 	})
 
@@ -2657,6 +2764,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2695,6 +2803,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2732,6 +2841,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"prod",
 				"current-id",
 				nil,
 			)
@@ -2765,6 +2875,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2817,6 +2928,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"prod",
 				"current-id",
 				nil,
 			)
@@ -2870,6 +2982,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				true,
+				"",
 				"current-id",
 				&imageInfos,
 			)
@@ -2910,6 +3023,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 					t.Context(),
 					mockClient,
 					false,
+					"",
 					"current-id",
 					nil,
 				)
@@ -2936,6 +3050,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -2948,7 +3063,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 	t.Run("current container not found in list", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should remove nothing, since the scope to clean up is unknown", func(t *testing.T) {
+		t.Run("should remove nothing", func(t *testing.T) {
 			t.Parallel()
 
 			// The mock fails the test on any removal.
@@ -2974,6 +3089,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"nonexistent-current-id",
 				nil,
 			)
@@ -2997,6 +3113,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"",
 				nil,
 			)
@@ -3034,6 +3151,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -3064,6 +3182,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -3111,6 +3230,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)
@@ -3142,6 +3262,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				t.Context(),
 				mockClient,
 				false,
+				"",
 				"current-id",
 				nil,
 			)

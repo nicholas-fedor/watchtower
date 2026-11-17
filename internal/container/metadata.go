@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -914,21 +915,26 @@ func IsSuperseded(container *Container) bool {
 // IsOrphanedReplacement reports whether a container counts as a replacement
 // that an interrupted self-update left in the created state.
 //
-// Any Watchtower container in the created state and in the current container's
-// scope counts, unless it is the current container or a renamed predecessor.
-// One scope runs one Watchtower instance, so such a container is never a separate
-// instance to keep.
+// Any Watchtower container in the created state counts when it is in the given
+// scope or its chain label names the current container, unless it is the
+// current container or a renamed predecessor. One scope runs one Watchtower
+// instance, so such a container is never a separate instance to keep. A
+// replacement of the current container counts whatever its scope label, since
+// the configured scope can differ from that label. An empty scope is the scope
+// "none".
 //
 // Parameters:
 //   - candidate: The container to check.
-//   - current: The running Watchtower container.
+//   - currentID: ID of the running Watchtower container.
+//   - scope: Scope the replacement must be in.
 //
 // Returns:
 //   - bool: True when the candidate is an orphaned replacement.
-func IsOrphanedReplacement(candidate, current *Container) bool {
+func IsOrphanedReplacement(candidate *Container, currentID ContainerID, scope string) bool {
 	return candidate.IsWatchtower() &&
-		candidate.ID() != current.ID() &&
+		candidate.ID() != currentID &&
 		!IsOldContainer(candidate.Name()) &&
 		candidate.IsCreated() &&
-		candidate.NormalizedScope() == current.NormalizedScope()
+		(candidate.NormalizedScope() == labels.NormalizeScope(scope) ||
+			slices.Contains(candidate.ChainIDs(), currentID))
 }

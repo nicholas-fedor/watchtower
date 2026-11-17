@@ -152,20 +152,25 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 // It lists the Watchtower containers whatever the include-stopped
 // configuration option says, leaving out only those being removed or left
 // dead. It removes the predecessors named with the watchtower-old- prefix in
-// the current container's scope, running or stopped. It also removes a
-// replacement that a self-update left in the created state in that scope. With cleanupImages, their images are cleaned up too, as
-// removeImageInfos describes.
+// the given scope, running or stopped. It also removes a replacement that a
+// self-update left in the created state in that scope. With cleanupImages,
+// their images are cleaned up too, as removeImageInfos describes.
 //
-// The scope is read from the current container in the same listing. An unset
-// or empty scope is the scope "none". Nothing is removed when the current
-// container ID is empty or that container is not listed. This keeps the
-// cleanup out of other instances' scopes.
+// The scope is the one this instance runs in, so the cleanup stays out of
+// other instances' scopes regardless of the current container's scope label.
+// An empty scope is the scope "none". The current container's own predecessors
+// and replacements, which chain labels link to it, are removed in any scope.
+// They carry the current container's scope label, which can differ from the
+// configured scope. Nothing is removed when the current
+// container ID is empty or that container is not among the listed Watchtower
+// containers, so a wrongly detected ID removes nothing.
 //
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
 //   - cleanupImages: Remove images if true.
+//   - scope: Scope this instance runs in, empty for no scope.
 //   - currentContainerID: ID of the currently running Watchtower container, or empty.
 //   - removeImageInfos: List that receives the images of removed instances for the caller to remove.
 //     Nil removes them right away.
@@ -176,6 +181,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	client Client,
 	cleanupImages bool,
+	scope string,
 	currentContainerID container.ContainerID,
 	removeImageInfos *[]RemovedImageInfo,
 ) (int, error) {
@@ -188,7 +194,8 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		return 0, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
-	// The current container sets the scope to clean up.
+	// The current container's chain names its predecessors, and the removal
+	// keeps its image.
 	var current *container.Container
 
 	for _, c := range watchtowers {
@@ -207,33 +214,20 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 		return 0, nil
 	}
 
-	scope := current.NormalizedScope()
-
 	log.Debug().
-		Str("scope", scope).
+		Str("scope", labels.NormalizeScope(scope)).
 		Str("current_id", string(currentContainerID)).
 		Bool("cleanup_images", cleanupImages).
 		Msg("Checking for old Watchtower containers")
 
-	// Find old Watchtower containers within the same scope
+	// Find old Watchtower containers in the scope or in the current container's chain.
+	inScope := filters.FilterByScope(log, scope, filters.NoFilter)
+	predecessors := current.ChainIDs()
+
 	var oldContainers []*container.Container
 
 	for _, c := range watchtowers {
-		// Skip containers that are not old predecessors
-		if !container.IsOldContainer(c.Name()) {
-			continue
-		}
-
-		// Scope check: only clean up old containers in the same scope
-		containerScope := c.NormalizedScope()
-
-		if containerScope != scope {
-			log.Debug().
-				Str("container", c.Name()).
-				Str("container_scope", containerScope).
-				Str("current_scope", scope).
-				Msg("Skipping old Watchtower container in different scope")
-
+		if !container.IsOldContainer(c.Name()) || (!slices.Contains(predecessors, c.ID()) && !inScope(c)) {
 			continue
 		}
 
@@ -249,7 +243,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 	var orphanedCreatedContainers []*container.Container
 
 	for _, c := range watchtowers {
-		if container.IsOrphanedReplacement(c, current) {
+		if container.IsOrphanedReplacement(c, currentContainerID, scope) {
 			orphanedCreatedContainers = append(orphanedCreatedContainers, c)
 		}
 	}
