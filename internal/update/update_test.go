@@ -1,10 +1,12 @@
 package update
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
@@ -87,6 +89,25 @@ func staleGitTestContainer(
 	require.True(t, app.IsStale())
 
 	return app, session, gitClient, commit
+}
+
+// TestUpdate_ListingFailure checks that a session ends with the client's own
+// error when its container listing fails, so the "Update execution failed"
+// line does not repeat the listing prefix.
+func TestUpdate_ListingFailure(t *testing.T) {
+	t.Parallel()
+
+	listErr := errors.New("failed to list containers: connection refused")
+
+	client := newMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, listErr).Once()
+
+	report, cleanupImages, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
+
+	require.ErrorIs(t, err, listErr)
+	require.EqualError(t, err, listErr.Error())
+	assert.Nil(t, report)
+	assert.Nil(t, cleanupImages)
 }
 
 // TestCurrentOldInstance verifies that the current container is returned

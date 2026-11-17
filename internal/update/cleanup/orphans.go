@@ -2,7 +2,6 @@ package cleanup
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -56,7 +55,7 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 			Err(err).
 			Msg("Failed to list ephemeral orchestrators")
 
-		return 0, fmt.Errorf("failed to list ephemeral orchestrators: %w", err)
+		return 0, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	removed := 0

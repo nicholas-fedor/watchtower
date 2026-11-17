@@ -1590,6 +1590,34 @@ func TestRemoveExcessWatchtowerInstances_ScopeAndCurrentContainer(t *testing.T) 
 	})
 }
 
+// TestRemoveExcessWatchtowerInstances_ListingFailure checks that a failed
+// container listing removes nothing and returns the client's error unchanged,
+// since that error already names the failed listing.
+func TestRemoveExcessWatchtowerInstances_ListingFailure(t *testing.T) {
+	t.Parallel()
+
+	listErr := errors.New("failed to list containers: connection refused")
+
+	mockClient := mockCleanup.NewMockClient(t)
+	mockClient.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, listErr).Once()
+
+	var cleanupImageInfo []RemovedImageInfo
+
+	cleanupOccurred, err := RemoveExcessWatchtowerInstances(newTestLogger(t),
+		t.Context(),
+		mockClient,
+		true,
+		"",
+		&cleanupImageInfo,
+		nil,
+	)
+
+	require.ErrorIs(t, err, listErr)
+	require.EqualError(t, err, listErr.Error())
+	assert.Equal(t, 0, cleanupOccurred)
+	assert.Empty(t, cleanupImageInfo)
+}
+
 // TestRemoveImages verifies that each collected image is removed, and that a
 // missing image, a conflict, or a canceled context does not count as a
 // failure.
@@ -2902,7 +2930,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 
 			mockClient.EXPECT().
 				ListLabeledContainers(mock.Anything, labels.Watchtower).
-				Return(nil, errors.New("docker daemon unreachable"))
+				Return(nil, errors.New("failed to list containers: docker daemon unreachable"))
 
 			removed, err := RemoveOldWatchtowerContainers(newTestLogger(t),
 				t.Context(),
@@ -2912,8 +2940,7 @@ func TestRemoveOldWatchtowerContainers(t *testing.T) {
 				nil,
 			)
 
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to list Watchtower containers")
+			require.EqualError(t, err, "failed to list containers: docker daemon unreachable")
 			assert.Equal(t, 0, removed)
 		})
 	})

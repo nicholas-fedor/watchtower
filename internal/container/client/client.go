@@ -514,7 +514,7 @@ func (c *Client) ListContainers(ctx context.Context, filter ...filters.Filter) (
 		select {
 		case <-time.After(delay):
 		case <-ctx.Done():
-			return nil, fmt.Errorf("context canceled during container list retry: %w", ctx.Err())
+			return nil, fmt.Errorf("%w: %w", errListContainersFailed, ctx.Err())
 		}
 	}
 

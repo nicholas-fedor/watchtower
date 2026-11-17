@@ -148,11 +148,11 @@ func TestRemoveOrphanedOrchestrators(t *testing.T) {
 			mockAPIClient := mockCleanup.NewMockClient(t)
 			mockAPIClient.EXPECT().
 				ListLabeledContainers(ctx, labels.EphemeralOrchestrator).
-				Return(nil, errors.New("docker daemon unavailable"))
+				Return(nil, errors.New("failed to list containers: docker daemon unavailable"))
 
 			count, err := RemoveOrphanedOrchestrators(newTestLogger(t), ctx, mockAPIClient)
 
-			require.ErrorContains(t, err, "failed to list ephemeral orchestrators")
+			require.EqualError(t, err, "failed to list containers: docker daemon unavailable")
 			assert.Equal(t, 0, count)
 		})
 	})

@@ -180,7 +180,8 @@ func inspectListedContainers(log *zerolog.Logger,
 				continue
 			}
 
-			return nil, err // Logged above and in getSourceContainer
+			// The inspect is part of the listing, so the listing names the failure.
+			return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 		}
 
 		if filter == nil || filter(c) {

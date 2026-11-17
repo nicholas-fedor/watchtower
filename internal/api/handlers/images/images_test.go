@@ -60,7 +60,7 @@ func TestListImageStatuses(t *testing.T) {
 			},
 		},
 		{
-			name:    "client error returns wrapped error",
+			name:    "client error is returned unchanged",
 			listErr: errors.New("connection refused"),
 		},
 	}
@@ -76,7 +76,7 @@ func TestListImageStatuses(t *testing.T) {
 
 			if tt.listErr != nil {
 				require.ErrorIs(t, err, tt.listErr)
-				assert.ErrorContains(t, err, "failed to list containers")
+				require.EqualError(t, err, tt.listErr.Error())
 			} else {
 				require.NoError(t, err)
 				assert.Len(t, statuses, len(tt.want))

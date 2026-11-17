@@ -1226,6 +1226,26 @@ func TestClient(t *testing.T) {
 		})
 	})
 
+	t.Run("listing containers canceled before a retry", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("should return a listing error", func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			api := newDockerAPI(t)
+			api.EXPECT().ContainerList(mock.Anything, mock.Anything).
+				Return(dockerClient.ContainerListResult{}, errors.New("connection refused")).Once()
+
+			containers, err := (&Client{log: newTestLogger(t), api: api}).ListContainers(ctx, filters.NoFilter)
+			require.EqualError(t, err, "failed to list containers: context canceled")
+			require.ErrorIs(t, err, context.Canceled)
+			assert.Nil(t, containers)
+		})
+	})
+
 	t.Run("listing containers with container inspect 500 error", func(t *testing.T) {
 		t.Parallel()
 

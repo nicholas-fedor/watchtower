@@ -177,7 +177,7 @@ func update(
 		filters.NoFilter,
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list containers: %w", err)
+		return nil, nil, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	// An old instance's container stops itself rather than run a session.
