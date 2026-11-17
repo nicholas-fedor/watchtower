@@ -236,6 +236,9 @@ func injectLabels(project *composeTypes.Project, labels map[string]map[string]st
 
 // scopeComposeProject scopes a project to the requested services and their dependencies.
 //
+// The scoped project declares no jobs, so an apply neither registers nor checks
+// the project's jobs. Registering them stays with the user's own compose up.
+//
 // Parameters:
 //   - project: Loaded Compose project.
 //   - services: Service names to select.
@@ -257,6 +260,14 @@ func scopeComposeProject(project *composeTypes.Project, services []string) (*com
 	if err != nil {
 		return nil, fmt.Errorf("select selected compose services: %w", err)
 	}
+
+	// Compose up refuses a project with scheduled jobs when the engine's jobs
+	// extension is off, and otherwise registers them after starting services.
+	// A registered job records the directory it was declared in, so an apply
+	// from Watchtower's checkout would fail as a changed job after the services
+	// were already recreated.
+	project.Jobs = nil
+	project.DisabledJobs = nil
 
 	return project, nil
 }

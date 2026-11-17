@@ -2,9 +2,11 @@ package apply
 
 import (
 	"context"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -369,6 +371,66 @@ services:
 	assert.Equal(t, []string{"app"}, upOptions.Create.Services)
 	assert.Equal(t, api.RecreateNever, upOptions.Create.RecreateDependencies)
 	assert.Empty(t, upOptions.Start.Services)
+}
+
+// TestClientApplyLeavesOutJobs verifies that Apply passes Compose a project
+// without the file's jobs, scheduled, manual and profile-disabled alike, so
+// compose up neither requires the engine's jobs extension nor registers jobs.
+func TestClientApplyLeavesOutJobs(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`
+services:
+  app:
+    image: app
+jobs:
+  backup:
+    image: backup
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"
+  migrate:
+    image: migrate
+    triggers:
+      manual: true
+  report:
+    image: report
+    profiles: [reports]
+    triggers:
+      schedule:
+        - cron: "0 4 * * *"
+`), 0o600))
+
+	ref := composeProject.ProjectRef{Dir: dir, Name: "project"}
+
+	loaded, err := composeProject.Load(t.Context(), ref)
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{"backup", "migrate"}, slices.Collect(maps.Keys(loaded.Jobs)))
+	require.Contains(t, loaded.DisabledJobs, "report")
+
+	var upProject *composeTypes.Project
+
+	service := mockCompose.NewMockCompose(t)
+	service.EXPECT().Up(mock.Anything, mock.Anything, mock.Anything).
+		RunAndReturn(func(_ context.Context, project *composeTypes.Project, _ api.UpOptions) error {
+			upProject = project
+
+			return nil
+		}).Once()
+	service.EXPECT().Ps(mock.Anything, "project", mock.Anything).
+		Return([]api.ContainerSummary{{Service: "app", Name: "project-app-1", ID: "app-id"}}, nil).Once()
+	service.EXPECT().Images(mock.Anything, "project", mock.Anything).
+		Return(map[string]api.ImageSummary{}, nil).Once()
+
+	client := &Client{service: service}
+	_, err = client.Apply(t.Context(), Request{Ref: ref, Services: []string{"app"}})
+	require.NoError(t, err)
+
+	require.NotNil(t, upProject)
+	assert.Equal(t, []string{"app"}, upProject.ServiceNames())
+	assert.Empty(t, upProject.Jobs)
+	assert.Empty(t, upProject.DisabledJobs)
 }
 
 // TestClientApplyRejectsInvalidRequests verifies that Client.Apply rejects invalid requests before invoking Compose.

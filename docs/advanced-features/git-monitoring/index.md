@@ -621,6 +621,11 @@ When the commits differ, Watchtower leaves the project untouched and retries on 
 Compose uses each service's `build.context` relative to the project directory.
 Image-only services in the same file are not rebuilt from Git.
 
+[Jobs](https://docs.docker.com/compose/how-tos/jobs/){target="_blank" rel="noopener noreferrer"} in the Compose file are left out of the apply.
+Watchtower does not register or compare them, so a scheduled job keeps the definition your own `docker compose up` registered.
+An apply also works when the engine's jobs extension is off.
+To register a changed job, follow Compose's steps for [changing a registered job](https://docs.docker.com/compose/how-tos/jobs/#change-a-registered-job){target="_blank" rel="noopener noreferrer"}.
+
 Fetch uses the same [Git Auth Token](../../configuration/git-monitoring/index.md#git_auth_token), [Git Password](../../configuration/git-monitoring/index.md#git_password), [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_key_path), [Git CA Bundle](../../configuration/git-monitoring/index.md#git_ca_bundle), and [Git Insecure Skip TLS](../../configuration/git-monitoring/index.md#git_insecure_skip_tls) configuration options as monitoring.
 If fetch fails but the monitored commit is already in the local object store, checkout continues.
 
