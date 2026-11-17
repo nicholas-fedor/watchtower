@@ -172,6 +172,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/go-openapi/jsonpointer to v1.0.3 by @renovate[bot] in [#3886](https://github.com/nicholas-fedor/watchtower/pull/3886)
+- Update golang.org/x/exp digest to 7a49493 by @renovate[bot] in [#3885](https://github.com/nicholas-fedor/watchtower/pull/3885)
 - Update module github.com/gofiber/schema to v1.9.5 by @renovate[bot] in [#3881](https://github.com/nicholas-fedor/watchtower/pull/3881)
 - Update golang.org/x/tools digest to 611c7a4 by @renovate[bot] in [#3880](https://github.com/nicholas-fedor/watchtower/pull/3880)
 - Regenerate compose mock for compose v5.8.0 by @nicholas-fedor in [#3878](https://github.com/nicholas-fedor/watchtower/pull/3878)
