@@ -160,7 +160,7 @@ func GetContainerDetails(
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
+		return nil, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	details := make([]ContainerDetails, 0, len(list))

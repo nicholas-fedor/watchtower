@@ -984,9 +984,9 @@ func newImageInspectFailAPI(t *testing.T, err error) *mockContainer.MockAPIClien
 }
 
 // TestListSourceContainers_ImageInspectFailure verifies that a canceled or
-// timed-out image inspect ends the listing, while other failures leave the
-// container without image info. Ending the listing keeps an interrupted scan
-// from warning about every remaining container.
+// timed-out image inspect ends the listing with a listing error, while other
+// failures leave the container without image info. Ending the listing keeps an
+// interrupted scan from warning about every remaining container.
 func TestListSourceContainers_ImageInspectFailure(t *testing.T) {
 	t.Parallel()
 
@@ -1031,6 +1031,7 @@ func TestListSourceContainers_ImageInspectFailure(t *testing.T) {
 
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
+				require.ErrorIs(t, err, errListContainersFailed)
 				assert.Empty(t, containers)
 				assert.NotContains(t, out.String(), "Failed to retrieve image info")
 
@@ -1041,6 +1042,57 @@ func TestListSourceContainers_ImageInspectFailure(t *testing.T) {
 			require.Len(t, containers, 1)
 			assert.False(t, containers[0].HasImageInfo())
 			assert.Contains(t, out.String(), "Failed to retrieve image info")
+		})
+	}
+}
+
+// TestListSourceContainers_ContainerInspectFailure verifies that a failed
+// container inspect ends the listing with an error that names both the listing
+// and the inspect, while a container removed after the list call is skipped.
+func TestListSourceContainers_ContainerInspectFailure(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// inspectErr is the error the container inspect fails with.
+		inspectErr error
+		// wantErr is the listing's error text. Empty expects an empty listing.
+		wantErr string
+	}{
+		{
+			name:       "daemon error",
+			inspectErr: errors.New("daemon error"),
+			wantErr:    "failed to list containers: failed to inspect container: daemon error",
+		},
+		{
+			name:       "container removed",
+			inspectErr: notFoundError("No such container"),
+			wantErr:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := newDockerAPI(t)
+			api.EXPECT().ContainerList(mock.Anything, mock.Anything).
+				Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{{ID: testContainerID}}}, nil).Once()
+			expectInspect(api, testContainerID, dockerContainer.InspectResponse{}, tt.inspectErr)
+
+			containers, err := listSourceContainers(newTestLogger(t), t.Context(), api, ClientOptions{}, nil)
+
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				require.ErrorIs(t, err, errListContainersFailed)
+				require.ErrorIs(t, err, errInspectContainerFailed)
+				assert.Empty(t, containers)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Empty(t, containers)
 		})
 	}
 }

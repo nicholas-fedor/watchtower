@@ -109,7 +109,7 @@ func RemoveExcessWatchtowerInstances(log *zerolog.Logger, ctx context.Context,
 	// List all containers to find excess instances
 	allContainers, err := client.ListContainers(ctx, filters.NoFilter)
 	if err != nil {
-		return 0, fmt.Errorf("failed to list containers: %w", err)
+		return 0, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	// Retrieve containers that are excess Watchtower containers within the same scope
@@ -185,7 +185,7 @@ func RemoveOldWatchtowerContainers(log *zerolog.Logger, ctx context.Context,
 
 	watchtowers, err := client.ListLabeledContainers(ctx, labels.Watchtower)
 	if err != nil {
-		return 0, fmt.Errorf("failed to list Watchtower containers: %w", err)
+		return 0, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	// The current container sets the scope to clean up.

@@ -2,7 +2,6 @@ package containers
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
@@ -76,7 +75,7 @@ func ListContainerStatuses(ctx context.Context, client ContainerLister, filter f
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
+		return nil, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	statuses := make([]Status, 0, len(list))

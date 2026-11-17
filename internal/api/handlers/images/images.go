@@ -3,7 +3,6 @@ package images
 import (
 	"cmp"
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 
@@ -76,7 +75,7 @@ func ListImageStatuses(ctx context.Context, client ContainerLister, filter filte
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
+		return nil, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	imageMap := make(map[string]*ImageStatus)

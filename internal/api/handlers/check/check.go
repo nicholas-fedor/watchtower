@@ -2,7 +2,6 @@ package check
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 
@@ -122,7 +121,7 @@ func CheckForUpdates(log *zerolog.Logger,
 ) ([]ContainerCheck, error) {
 	containers, err := client.ListContainers(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list containers: %w", err)
+		return nil, err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	results := make([]ContainerCheck, 0, len(containers))

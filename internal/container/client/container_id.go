@@ -360,7 +360,7 @@ func parseContainerIDFromCgroupString(log *zerolog.Logger, cgroupString string) 
 // Returns:
 //   - container.ContainerID: The detected container ID if a match is found.
 //   - error: Non-nil if the HOSTNAME env var is missing, the Docker client's
-//     ListContainers call fails (wrapped and propagated), or no matching container is found.
+//     ListContainers call fails, or no matching container is found.
 func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client ContainerLister) (container.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
@@ -369,7 +369,7 @@ func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client
 
 	containers, err := client.ListContainers(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to list all containers: %w", err)
+		return "", err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
 	// Collect all containers matching the hostname.

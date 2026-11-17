@@ -64,6 +64,22 @@ func TestCheckForUpdates_DigestExtraction(t *testing.T) {
 	assert.Equal(t, "sha256:digest123", results[0].Digest)
 }
 
+// TestCheckForUpdates_ListingFailure checks that a failed container listing
+// returns the client's error unchanged, which already names the failed listing.
+func TestCheckForUpdates_ListingFailure(t *testing.T) {
+	t.Parallel()
+
+	listErr := errors.New("failed to list containers: connection refused")
+
+	client := mockCheck.NewMockUpdateChecker(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return(nil, listErr)
+
+	results, err := CheckForUpdates(newTestLogger(t), t.Context(), client, nil, updateParams.Params{}, nil)
+	require.ErrorIs(t, err, listErr)
+	require.EqualError(t, err, listErr.Error())
+	assert.Nil(t, results)
+}
+
 func TestCheckForUpdates_CheckContainerUpdateError(t *testing.T) {
 	client := mockCheck.NewMockUpdateChecker(t)
 	running := imageContainer("my-app", "nginx:latest", "sha256:abc")
