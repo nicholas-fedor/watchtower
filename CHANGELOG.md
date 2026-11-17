@@ -166,6 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/tools digest to 147c2de by @renovate[bot] in [#3848](https://github.com/nicholas-fedor/watchtower/pull/3848)
 - Update google.golang.org/genproto/googleapis/api digest to fd2c768 by @renovate[bot] in [#3849](https://github.com/nicholas-fedor/watchtower/pull/3849)
 - Update golang.org/x/tools digest to c24983a by @renovate[bot] in [#3844](https://github.com/nicholas-fedor/watchtower/pull/3844)
 - Update golang.org/x/tools digest to 5bc4490 by @renovate[bot] in [#3840](https://github.com/nicholas-fedor/watchtower/pull/3840)
