@@ -1,6 +1,8 @@
 package ratelimit
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -10,6 +12,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	cerrdefs "github.com/containerd/errdefs"
+)
+
+// Registry error text as engines report it.
+const (
+	// hubPullLimit is the unauthenticated limit as moby/moby#54133 shows an
+	// engine using the containerd image store report it.
+	hubPullLimit = "error from registry: You have reached your unauthenticated pull rate limit. " +
+		"https://www.docker.com/increase-rate-limit"
+	// hubAuthenticatedPullLimit is the authenticated limit with Docker Hub's
+	// documented body.
+	hubAuthenticatedPullLimit = "error from registry: You have reached your pull rate limit. " +
+		"You may increase the limit by authenticating and upgrading: https://www.docker.com/increase-rate-limits"
+	// unmarkedRefusal is registry text that names no rate limit.
+	unmarkedRefusal = "error from registry: request refused"
 )
 
 func TestParseRetryAfterHeader(t *testing.T) {
@@ -286,12 +304,13 @@ func TestFromResponseHugeRetryAfterExceedsHonorWindow(t *testing.T) {
 	}
 }
 
-func TestFromErrorMessage(t *testing.T) {
+// TestFromError checks that a pull-stream throttle yields its wait and quota.
+func TestFromError(t *testing.T) {
 	t.Parallel()
 
-	got := FromErrorMessage(
+	got := FromError(errors.New(
 		"error pulling image configuration: toomanyrequests: retry-after: 160.574µs, allowed: 44000/minute",
-	)
+	))
 	require.NotNil(t, got)
 	require.ErrorIs(t, got, ErrRateLimited)
 	assert.Equal(t, 44000, got.Allowed)
@@ -443,59 +462,111 @@ func TestReadBody(t *testing.T) {
 	assert.Empty(t, ReadBody(failing, 16))
 }
 
-func TestFromErrorMessageRecognizesPhrases(t *testing.T) {
+// TestFromError_recognizesPhrases checks the 429 phrases that mark a pull error
+// as rate limited.
+func TestFromError_recognizesPhrases(t *testing.T) {
 	t.Parallel()
 
-	require.NotNil(t, FromErrorMessage("Too Many Requests from registry"))
-	require.NotNil(t, FromErrorMessage("registry returned 429"))
-	require.NotNil(t, FromErrorMessage("HTTP 429 from registry"))
-	require.NotNil(t, FromErrorMessage("status: 429"))
+	for _, msg := range []string{
+		"Too Many Requests from registry",
+		"registry returned 429",
+		"HTTP 429 from registry",
+		"status: 429",
+	} {
+		assert.NotNil(t, FromError(errors.New(msg)), msg)
+	}
 }
 
-// TestFromErrorMessageRecognizesQuotaOnlyThrottle covers registries that
+// TestFromError_recognizesDockerHubPullLimits covers Docker Hub's pull rate
+// limit. Docker Engine 29.10 and later classify it as resource exhausted from
+// the registry's 429, also when a caller wraps it around text that names no
+// limit. Older engines using the containerd image store send the text alone,
+// which has no 429 or "too many requests" token.
+func TestFromError_recognizesDockerHubPullLimits(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "unauthenticated limit classified as resource exhausted", err: cerrdefs.ErrResourceExhausted.WithMessage(hubPullLimit)},
+		{
+			name: "classified limit wrapped by a caller",
+			err:  fmt.Errorf("pull failed: %w", cerrdefs.ErrResourceExhausted.WithMessage(unmarkedRefusal)),
+		},
+		{name: "unauthenticated limit text from an older engine", err: errors.New(hubPullLimit)},
+		{name: "authenticated limit text from an older engine", err: errors.New(hubAuthenticatedPullLimit)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := FromError(tt.err)
+			require.NotNil(t, got)
+			require.ErrorIs(t, got, ErrRateLimited)
+			assert.Equal(t, http.StatusTooManyRequests, got.StatusCode)
+			assert.Equal(t, tt.err.Error(), got.Message)
+			assert.Zero(t, got.RetryAfter)
+		})
+	}
+}
+
+// TestFromError_recognizesQuotaOnlyThrottle covers registries that
 // throttle without a 429 or "too many requests" token, advertising the wait
 // only via retry-after text. The first message is a verbatim Docker daemon
 // pull error from lscr.io.
-func TestFromErrorMessageRecognizesQuotaOnlyThrottle(t *testing.T) {
+func TestFromError_recognizesQuotaOnlyThrottle(t *testing.T) {
 	t.Parallel()
 
 	msg := "Error response from daemon: error from registry: " +
 		"retry-after: 92.923\u00b5s, allowed: 44000/minute"
 
-	info := FromErrorMessage(msg)
+	info := FromError(errors.New(msg))
 	require.NotNil(t, info)
 	assert.Equal(t, 92923*time.Nanosecond, info.RetryAfter)
 	assert.Equal(t, 44000, info.Allowed)
 	assert.Equal(t, time.Minute, info.AllowedWindow)
 
-	require.NotNil(t, FromErrorMessage("error from registry: retry-after: 1.08ms"))
-	require.NotNil(t, FromErrorMessage(
+	require.NotNil(t, FromError(errors.New("error from registry: retry-after: 1.08ms")))
+	require.NotNil(t, FromError(errors.New(
 		"error from registry: retry-after: 802.695\u00b5s, allowed: 44000/minute",
-	))
+	)))
 
-	compound := FromErrorMessage("error from registry: retry-after: 1m30s")
+	compound := FromError(errors.New("error from registry: retry-after: 1m30s"))
 	require.NotNil(t, compound)
 	assert.Equal(t, 90*time.Second, compound.RetryAfter)
 }
 
-func TestFromErrorMessageIgnoresUnrelatedErrors(t *testing.T) {
+// TestFromError_ignoresUnrelatedErrors checks that pull errors without a
+// rate-limit marker, including a bare 429 in byte counts, ports and digests,
+// are not rate limits.
+func TestFromError_ignoresUnrelatedErrors(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, FromErrorMessage("failed to pull image: connection refused"))
-	assert.Nil(t, FromErrorMessage(""))
-	assert.Nil(t, FromErrorMessage("sha256:abcdef429abcdef"))
-	assert.Nil(t, FromErrorMessage("dial tcp 127.0.0.1:4290: connect: connection refused"))
-	assert.Nil(t, FromErrorMessage("wrote 1429 bytes"))
-	assert.Nil(t, FromErrorMessage("wrote 429 bytes"))
-	assert.Nil(t, FromErrorMessage("dial tcp 10.0.0.1:429: connect: connection refused"))
-	assert.Nil(t, FromErrorMessage("error from registry: allowed: 44000/minute"))
-	assert.Nil(t, FromErrorMessage("retry-after: 5"))
-	assert.Nil(t, FromErrorMessage("retry-after: 5seconds"))
-	assert.Nil(t, FromErrorMessage("retry-after: 5S"))
-	assert.Nil(t, FromErrorMessage("Retry-After: Wed, 21 Oct 2015 07:28:00 GMT"))
-	assert.Nil(t, FromErrorMessage("not allowed: 5/minute"))
-	assert.Nil(t, FromErrorMessage("disallowed: 10/hour"))
-	assert.Nil(t, FromErrorMessage("max allowed: 100/minute"))
+	assert.Nil(t, FromError(nil))
+	// Another classification does not count without a rate-limit marker.
+	assert.Nil(t, FromError(cerrdefs.ErrNotFound.WithMessage(unmarkedRefusal)))
+
+	for _, msg := range []string{
+		"failed to pull image: connection refused",
+		"",
+		"sha256:abcdef429abcdef",
+		"dial tcp 127.0.0.1:4290: connect: connection refused",
+		"wrote 1429 bytes",
+		"wrote 429 bytes",
+		"dial tcp 10.0.0.1:429: connect: connection refused",
+		"error from registry: allowed: 44000/minute",
+		"retry-after: 5",
+		"retry-after: 5seconds",
+		"retry-after: 5S",
+		"Retry-After: Wed, 21 Oct 2015 07:28:00 GMT",
+		"not allowed: 5/minute",
+		"disallowed: 10/hour",
+		"max allowed: 100/minute",
+	} {
+		assert.Nil(t, FromError(errors.New(msg)), msg)
+	}
 }
 
 func TestDecisionCapsTinyAndHugeRetryAfter(t *testing.T) {
@@ -516,6 +587,21 @@ func TestDecisionCapsTinyAndHugeRetryAfter(t *testing.T) {
 	wait, giveUp = decision(nil)
 	assert.False(t, giveUp)
 	assert.Equal(t, minHonorWait, wait)
+}
+
+// TestDecision_stopsAtDockerHubPullLimit checks that Docker Hub's pull rate
+// limit, which gives no wait, stops retries because its window lasts six hours.
+// A registry that names a pull rate limit and sends a usable wait is honored.
+func TestDecision_stopsAtDockerHubPullLimit(t *testing.T) {
+	t.Parallel()
+
+	wait, giveUp := decision(&Error{Message: "You have reached your unauthenticated Pull Rate Limit."})
+	assert.True(t, giveUp)
+	assert.Equal(t, time.Duration(0), wait)
+
+	wait, giveUp = decision(&Error{Message: "pull rate limit exceeded", RetryAfter: 2 * time.Second})
+	assert.False(t, giveUp)
+	assert.Equal(t, 2*time.Second, wait)
 }
 
 // failingReadCloser fails on the first Read so ReadBody can exercise its error path.

@@ -908,7 +908,7 @@ func (c Client) performImagePull(
 
 		response, err := c.api.ImagePull(ctx, imageName, opts)
 		if err != nil {
-			info := ratelimit.FromErrorMessage(err.Error())
+			info := ratelimit.FromError(err)
 			if info != nil {
 				c.rateLimiter.Observe(pullHost, info)
 
@@ -926,7 +926,7 @@ func (c Client) performImagePull(
 
 		waitErr := response.Wait(ctx)
 		if waitErr != nil {
-			info := ratelimit.FromErrorMessage(waitErr.Error())
+			info := ratelimit.FromError(waitErr)
 			if info != nil {
 				c.rateLimiter.Observe(pullHost, info)
 				clog.Debug().

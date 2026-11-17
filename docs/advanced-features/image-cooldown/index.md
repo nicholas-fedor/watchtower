@@ -311,6 +311,17 @@ The subsequent config blob fetch does not count.
 Users running Watchtower against Docker Hub with many monitored containers or short polling intervals should be aware that each stale image detected during a cooldown window consumes one or two pulls.
 Authenticating with a Docker Hub account raises the limit from 100 to 200 pulls, and paid tiers have unlimited pulls.
 
+##### Reaching the Pull Limit
+
+Over the limit, Docker Hub responds with a `429` whose message reads "You have reached your pull rate limit" and gives no time to wait.
+The limit holds for the rest of its six-hour window, so Watchtower does not retry within the cycle:
+
+- The container is marked **Failed** for the cycle.
+- One warning naming the container is logged and included in log-based notifications.
+- The next scheduled run checks the container again.
+
+Docker Hub's abuse rate limit returns a plain `429 Too Many Requests` instead, which Watchtower handles as described in [Handling a 429 Response](#handling_a_429_response).
+
 #### GitHub Container Registry (ghcr.io)
 
 GHCR does not publish Docker Hub-style pull quotas. Requests for a public org's packages draw from one undocumented token bucket per org, observed as `allowed: 44000/minute` with a sub-millisecond `retry-after`. The same bucket serves `lscr.io/linuxserver/*` images, which Watchtower remaps to `ghcr.io` for digest checks and authentication.

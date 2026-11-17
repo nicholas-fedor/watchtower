@@ -9,10 +9,18 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	cerrdefs "github.com/containerd/errdefs"
 )
 
-// maxRetryAfterSeconds is the longest Retry-After delta, in seconds, that fits in a [time.Duration].
-const maxRetryAfterSeconds = int64(math.MaxInt64 / time.Second)
+const (
+	// maxRetryAfterSeconds is the longest Retry-After delta, in seconds, that fits in a [time.Duration].
+	maxRetryAfterSeconds = int64(math.MaxInt64 / time.Second)
+	// dockerHubPullLimit is the lowercase text that names Docker Hub's pull
+	// rate limit, a quota over a six-hour window. Docker Hub's abuse rate limit
+	// is a plain "429 Too Many Requests" instead.
+	dockerHubPullLimit = "pull rate limit"
+)
 
 var (
 	retryAfterBody = regexp.MustCompile(`(?i)retry-after:\s*((?:[0-9]+(?:\.[0-9]+)?(?:ns|us|µs|μs|ms|s|m|h))+)\b`)
@@ -171,20 +179,29 @@ func FromResponse(resp *http.Response, body []byte) *Error {
 	return info
 }
 
-// FromErrorMessage builds a rate-limit error from Docker pull-stream text.
+// FromError builds a rate-limit error from a failed Docker image pull.
 //
-// Some registries advertise a throttle only through retry-after text, with no
-// 429 or "too many requests" token. That path requires a duration that
-// [time.ParseDuration] accepts.
+// A pull is rate limited when the daemon classifies its error as resource
+// exhausted, which Docker Engine 29.10 and later do for a registry 429, or when
+// its text names a rate limit. Some registries advertise a throttle only through
+// retry-after text, with no 429 or "too many requests" token. That path requires
+// a duration that [time.ParseDuration] accepts. The text also supplies the wait
+// and quota for a classified error.
 //
 // Parameters:
-//   - message: Stream error or registry body. Empty or unrelated text returns nil.
+//   - err: Error from starting the pull or from its progress stream. May be nil.
 //
 // Returns:
-//   - *Error: Parsed rate-limit error, or nil when the message is not a 429.
-func FromErrorMessage(message string) *Error {
+//   - *Error: Parsed rate-limit error, or nil when err is not a rate limit.
+func FromError(err error) *Error {
+	if err == nil {
+		return nil
+	}
+
+	message := err.Error()
+
 	retryAfter, allowed, window := parseQuotaMessage(message)
-	if retryAfter == 0 && !looksRateLimited(message) {
+	if retryAfter == 0 && !cerrdefs.IsResourceExhausted(err) && !looksRateLimited(message) {
 		return nil
 	}
 
@@ -225,7 +242,9 @@ func ReadBody(resp *http.Response, limit int64) []byte {
 // looksRateLimited reports whether message looks like a registry 429.
 //
 // A bare 429 is recognized only with HTTP or status context so byte counts,
-// ports, and digest hashes are ignored.
+// ports, and digest hashes are ignored. Docker Hub's "pull rate limit" text
+// counts on its own, since daemons using the containerd image store report it
+// without a 429 or "too many requests" token.
 //
 // Parameters:
 //   - message: Registry body or Docker pull-stream error text.
@@ -237,6 +256,7 @@ func looksRateLimited(message string) bool {
 
 	return strings.Contains(lower, "toomanyrequests") ||
 		strings.Contains(lower, "too many requests") ||
+		strings.Contains(lower, dockerHubPullLimit) ||
 		status429.MatchString(lower)
 }
 

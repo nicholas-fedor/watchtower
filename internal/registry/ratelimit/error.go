@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -101,7 +102,9 @@ func Is(err error) bool {
 //
 // Tiny Retry-After values are raised to minHonorWait so a 331µs GHCR token
 // does not cause an immediate retry. Waits longer than maxHonorWait are not
-// slept in-process. The next scheduled Watchtower run can try again.
+// slept in-process. Neither is Docker Hub's pull rate limit when it gives no
+// wait, because its quota window lasts six hours. The next scheduled Watchtower
+// run can try again.
 //
 // Parameters:
 //   - info: Parsed rate-limit details. Nil uses the minimum wait.
@@ -110,6 +113,10 @@ func Is(err error) bool {
 //   - time.Duration: How long to wait before the next attempt.
 //   - bool: True when the caller should stop retrying this cycle.
 func decision(info *Error) (time.Duration, bool) {
+	if info != nil && info.RetryAfter == 0 && strings.Contains(strings.ToLower(info.Message), dockerHubPullLimit) {
+		return 0, true
+	}
+
 	wait := minHonorWait
 	if info != nil && info.RetryAfter > 0 {
 		wait = info.RetryAfter

@@ -39,6 +39,12 @@ const (
 	// pull and the image once, before the limit.
 	wantRateLimitedPull = "failed to pull image: ghcr.io/linuxserver/nginx:latest: " +
 		"registry rate limited: retry-after 2h0m0s allowed 44000 per 1m0s"
+	// hubPullLimit is Docker Hub's pull rate limit as an engine using the
+	// containerd image store reports it.
+	hubPullLimit = "error from registry: You have reached your unauthenticated pull rate limit. " +
+		"https://www.docker.com/increase-rate-limit"
+	// wantHubPullLimit is the pull's error for that report.
+	wantHubPullLimit = "failed to pull image: docker.io/library/nginx:latest: registry rate limited: " + hubPullLimit
 )
 
 // newTestImageClient returns an image client on api with a daemon info cache of
@@ -422,6 +428,19 @@ func TestImageClient_performImagePull(t *testing.T) {
 			err := i.performImagePull(ctx, "ghcr.io/linuxserver/nginx:latest", dockerClient.ImagePullOptions{})
 			assert.True(t, ratelimit.Is(err), "unexpected error %v", err)
 			assert.EqualError(t, err, wantRateLimitedPull)
+		})
+
+		t.Run("returns a rate-limit error after one attempt when the engine reports Docker Hub's pull rate limit", func(t *testing.T) {
+			// Docker Engine 29.10 and later classify the limit from the registry's 429.
+			api := newImageAPI(t)
+			api.EXPECT().ImagePull(mock.Anything, "docker.io/library/nginx:latest", dockerClient.ImagePullOptions{}).
+				Return(pullResponse(t, cerrdefs.ErrResourceExhausted.WithMessage(hubPullLimit)), nil).Once()
+
+			i := newTestImageClient(api, newTestLogger(t), registryConfig.Registry{}, ratelimit.New())
+
+			err := i.performImagePull(t.Context(), "docker.io/library/nginx:latest", dockerClient.ImagePullOptions{})
+			assert.True(t, ratelimit.Is(err), "unexpected error %v", err)
+			assert.EqualError(t, err, wantHubPullLimit)
 		})
 
 		t.Run("backs off and succeeds when the daemon reports a sub-millisecond retry-after", func(t *testing.T) {
