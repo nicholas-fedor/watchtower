@@ -173,6 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/nicholas-fedor/shoutrrr to v0.25.0 by @renovate[bot] in [#3890](https://github.com/nicholas-fedor/watchtower/pull/3890)
 - Update module github.com/go-openapi/jsonpointer to v1.0.3 by @renovate[bot] in [#3886](https://github.com/nicholas-fedor/watchtower/pull/3886)
 - Update golang.org/x/exp digest to 7a49493 by @renovate[bot] in [#3885](https://github.com/nicholas-fedor/watchtower/pull/3885)
 - Update module github.com/gofiber/schema to v1.9.5 by @renovate[bot] in [#3881](https://github.com/nicholas-fedor/watchtower/pull/3881)
