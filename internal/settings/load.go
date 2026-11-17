@@ -63,6 +63,11 @@ var (
 	errDiskSpaceWarnNotBelowMax = errors.New(
 		"disk-space-warn must be below disk-space-max",
 	)
+	// errTLSVerifyWithoutCertPath indicates TLS verification for a remote host
+	// without the certificates that make the connection use TLS.
+	errTLSVerifyWithoutCertPath = errors.New(
+		"tlsverify requires cert-path for a remote Docker host",
+	)
 )
 
 // Load prepares the flags of a parsed root command and reads the resolved
@@ -105,7 +110,11 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 
 	cfg := Config{}
 
-	cfg.Docker = loadDocker(log, values)
+	cfg.Docker, err = loadDocker(log, values)
+	if err != nil {
+		return Config{}, log, err
+	}
+
 	cfg.Client = loadClient(values)
 	cfg.Compatibility = loadCompat(values)
 
@@ -160,7 +169,9 @@ func Load(log *zerolog.Logger, cmd *cobra.Command, args []string) (Config, *zero
 //
 // Returns:
 //   - docker.Docker: The Docker connection settings.
-//   - error: Non-nil when an environment value or a flag cannot be read.
+//   - error: Non-nil when an environment value or a flag cannot be read, or
+//     when the settings ask for TLS verification of a remote host without a
+//     certificate path.
 func LoadDocker(log *zerolog.Logger, cmd *cobra.Command) (docker.Docker, error) {
 	flagSet := cmd.PersistentFlags()
 
@@ -171,7 +182,11 @@ func LoadDocker(log *zerolog.Logger, cmd *cobra.Command) (docker.Docker, error) 
 
 	values := &flagValues{flags: flagSet}
 
-	settings := loadDocker(log, values)
+	settings, err := loadDocker(log, values)
+	if err != nil {
+		return docker.Docker{}, err
+	}
+
 	if values.err != nil {
 		return docker.Docker{}, values.err
 	}
@@ -218,9 +233,18 @@ func checkRanges(values *flagValues, specs []spec.FlagSpec) error {
 
 // loadDocker reads Docker connection settings.
 //
-// With TLS verification on, a tcp:// host becomes https://, and a host that
-// cannot use TLS logs a warning.
-func loadDocker(log *zerolog.Logger, values *flagValues) docker.Docker {
+// An https:// host becomes tcp://. With TLS verification on, a remote host
+// needs a certificate path, and a host that cannot use TLS logs a warning.
+//
+// Parameters:
+//   - log: Logger for the TLS warnings.
+//   - values: The prepared flags.
+//
+// Returns:
+//   - docker.Docker: The Docker connection settings.
+//   - error: Non-nil when TLS verification is on for a remote host without a
+//     certificate path, since the client would then connect without TLS.
+func loadDocker(log *zerolog.Logger, values *flagValues) (docker.Docker, error) {
 	settings := docker.Docker{
 		Host:       values.String("host"),
 		TLSVerify:  values.Bool("tlsverify"),
@@ -228,25 +252,36 @@ func loadDocker(log *zerolog.Logger, values *flagValues) docker.Docker {
 		CertPath:   values.String("cert-path"),
 	}
 
-	if !settings.TLSVerify {
-		return settings
+	// The certificate path, not the scheme, makes the connection use TLS.
+	// Neither Docker's CLI nor the Docker SDK's attach and exec connections,
+	// which dial with the scheme as the network name, can use an https:// host.
+	if address, ok := strings.CutPrefix(settings.Host, "https://"); ok {
+		settings.Host = "tcp://" + address
 	}
 
-	if strings.HasPrefix(settings.Host, "tcp://") {
-		settings.Host = strings.Replace(settings.Host, "tcp://", "https://", 1)
+	if !settings.TLSVerify {
+		return settings, nil
+	}
+
+	// The default host is the local socket, where TLS does not apply.
+	socket := settings.Host == "" ||
+		strings.HasPrefix(settings.Host, "unix://") ||
+		strings.HasPrefix(settings.Host, "npipe://")
+	if settings.CertPath == "" && !socket {
+		return docker.Docker{}, errTLSVerifyWithoutCertPath
 	}
 
 	switch {
 	case strings.HasPrefix(settings.Host, "http://"):
 		log.Warn().
-			Msg("TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.")
+			Msg("TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'tcp://' or disable TLS verification.")
 	case strings.HasPrefix(settings.Host, "unix://"):
 		log.Warn().
 			Msg("TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification.")
 	default:
 	}
 
-	return settings
+	return settings, nil
 }
 
 // loadClient reads Docker client construction settings.

@@ -261,9 +261,9 @@ func TestLoad_InvalidAndNegativeCooldown(t *testing.T) {
 	})
 }
 
-// TestLoadDocker checks the Docker connection settings LoadDocker reads from the
-// flags and the environment. With TLS verification on, a tcp:// host becomes
-// https://, and a host that cannot use TLS logs a warning.
+// TestLoadDocker checks the Docker connection settings loadDocker reads from the
+// flags and the environment. An https:// host becomes tcp://. With TLS
+// verification on, a host that cannot use TLS logs a warning.
 func TestLoadDocker(t *testing.T) {
 	const defaultHost = "unix:///var/run/docker.sock"
 
@@ -285,7 +285,7 @@ func TestLoadDocker(t *testing.T) {
 			flags: []string{
 				"-H", "tcp://127.0.0.1:2375", "--tlsverify", "--api-version", `"1.43"`, "--cert-path", "/certs",
 			},
-			want: docker.Docker{Host: "https://127.0.0.1:2375", TLSVerify: true, APIVersion: "1.43", CertPath: "/certs"},
+			want: docker.Docker{Host: "tcp://127.0.0.1:2375", TLSVerify: true, APIVersion: "1.43", CertPath: "/certs"},
 		},
 		{
 			name: "environment",
@@ -295,12 +295,12 @@ func TestLoadDocker(t *testing.T) {
 				"DOCKER_API_VERSION": "1.41",
 				"DOCKER_CERT_PATH":   "/env/certs",
 			},
-			want: docker.Docker{Host: "https://example.com:2376", TLSVerify: true, APIVersion: "1.41", CertPath: "/env/certs"},
+			want: docker.Docker{Host: "tcp://example.com:2376", TLSVerify: true, APIVersion: "1.41", CertPath: "/env/certs"},
 		},
 		{
 			name:  "host without a scheme keeps its form",
-			flags: []string{"--host", "some-custom-docker-host", "--tlsverify"},
-			want:  docker.Docker{Host: "some-custom-docker-host", TLSVerify: true},
+			flags: []string{"--host", "some-custom-docker-host", "--tlsverify", "--cert-path", "/certs"},
+			want:  docker.Docker{Host: "some-custom-docker-host", TLSVerify: true, CertPath: "/certs"},
 		},
 		{
 			name: "tcp host without tls verification keeps its scheme",
@@ -309,8 +309,17 @@ func TestLoadDocker(t *testing.T) {
 		},
 		{
 			name: "https host with tls verification",
-			env:  map[string]string{"DOCKER_HOST": "https://example.com:2376", "DOCKER_TLS_VERIFY": "1"},
-			want: docker.Docker{Host: "https://example.com:2376", TLSVerify: true},
+			env: map[string]string{
+				"DOCKER_HOST":       "https://example.com:2376",
+				"DOCKER_TLS_VERIFY": "1",
+				"DOCKER_CERT_PATH":  "/env/certs",
+			},
+			want: docker.Docker{Host: "tcp://example.com:2376", TLSVerify: true, CertPath: "/env/certs"},
+		},
+		{
+			name: "https host without tls verification",
+			env:  map[string]string{"DOCKER_HOST": "https://example.com:2376"},
+			want: docker.Docker{Host: "tcp://example.com:2376"},
 		},
 		{
 			name: "false tls verify env var",
@@ -347,16 +356,28 @@ func TestLoadDocker(t *testing.T) {
 		},
 		{
 			name:        "http host with tls verification warns",
-			env:         map[string]string{"DOCKER_TLS_VERIFY": "1"},
+			env:         map[string]string{"DOCKER_TLS_VERIFY": "1", "DOCKER_CERT_PATH": "/env/certs"},
 			flags:       []string{"--host", "http://example.com"},
-			want:        docker.Docker{Host: "http://example.com", TLSVerify: true},
-			wantWarning: "TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification.",
+			want:        docker.Docker{Host: "http://example.com", TLSVerify: true, CertPath: "/env/certs"},
+			wantWarning: "TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'tcp://' or disable TLS verification.",
 		},
 		{
 			name:        "unix host with tls verification warns",
 			env:         map[string]string{"DOCKER_TLS_VERIFY": "1"},
 			want:        docker.Docker{Host: defaultHost, TLSVerify: true},
 			wantWarning: "TLS verification is enabled but DOCKER_HOST uses local socket 'unix://'. TLS is not applicable for local sockets. Consider disabling TLS verification.",
+		},
+		{
+			// Without a certificate path the client builds no TLS
+			// configuration and would send plain HTTP to the daemon.
+			name:    "tls verification without a certificate path fails",
+			env:     map[string]string{"DOCKER_HOST": "tcp://example.com:2376", "DOCKER_TLS_VERIFY": "1"},
+			wantErr: "tlsverify requires cert-path for a remote Docker host",
+		},
+		{
+			name:    "https host with tls verification and no certificate path fails",
+			env:     map[string]string{"DOCKER_HOST": "https://example.com:2376", "DOCKER_TLS_VERIFY": "1"},
+			wantErr: "tlsverify requires cert-path for a remote Docker host",
 		},
 		{
 			// Startup rejects this value, so the exit path must not read it as false.

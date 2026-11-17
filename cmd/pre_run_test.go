@@ -390,14 +390,13 @@ func TestPreRun_Configuration(t *testing.T) {
 	), nil))
 
 	assert.Equal(t, "prod", appCfg.Filter.Scope)
-	// With TLS verification enabled, a tcp:// host becomes https://.
 	assert.Equal(t, dockerConfig.Docker{
-		Host:       "https://docker.example.com:2376",
+		Host:       "tcp://docker.example.com:2376",
 		TLSVerify:  true,
 		APIVersion: "1.47",
 		CertPath:   "/certs",
 	}, gotOpts.Docker)
-	assert.Equal(t, "https://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
+	assert.Equal(t, "tcp://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
 	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
 	assert.Equal(t, "/certs", os.Getenv("DOCKER_CERT_PATH"))
@@ -658,6 +657,18 @@ func TestPreRun_Exit(t *testing.T) {
 			},
 		},
 		{
+			// TLS verification without a certificate path would connect in
+			// plain HTTP, so neither startup nor the exit path connects.
+			helperCase:   "tls-verify-without-cert-path",
+			wantExitCode: 1,
+			wantOutput: []string{
+				logging.RestartsKept,
+				"Failed to load configuration",
+				"tlsverify requires cert-path for a remote Docker host",
+			},
+			unwantedOutput: []string{"newClient", "SetRestartPolicy"},
+		},
+		{
 			// Without a Docker client, the restart policy cannot be changed, so
 			// Watchtower reports that before the startup failure. Startup
 			// already waited for the daemon, so the exit does not connect
@@ -883,6 +894,8 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	case "invalid-log-format-without-container-id":
 		args = []string{"--log-format", "bogus"}
 		detection = selfDetection{}
+	case "tls-verify-without-cert-path":
+		args = []string{"--host", "tcp://socket-proxy:2376", "--tlsverify"}
 	case "invalid-log-format-with-host-flag":
 		args = []string{"--host", "tcp://socket-proxy:2375", "--log-format", "bogus"}
 	case "invalid-configuration-outside-main-process":

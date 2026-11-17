@@ -113,12 +113,12 @@ func TestExportConnection(t *testing.T) {
 	t.Setenv("DOCKER_CERT_PATH", "/old/certs")
 
 	require.NoError(t, ExportConnection(dockerConfig.Docker{
-		Host:       "https://docker.example.com:2376",
+		Host:       "tcp://docker.example.com:2376",
 		TLSVerify:  true,
 		APIVersion: "1.47",
 		CertPath:   "/certs",
 	}))
-	assert.Equal(t, "https://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
+	assert.Equal(t, "tcp://docker.example.com:2376", os.Getenv("DOCKER_HOST"))
 	assert.Equal(t, "1", os.Getenv("DOCKER_TLS_VERIFY"))
 	assert.Equal(t, "1.47", os.Getenv("DOCKER_API_VERSION"))
 	assert.Equal(t, "/certs", os.Getenv("DOCKER_CERT_PATH"))

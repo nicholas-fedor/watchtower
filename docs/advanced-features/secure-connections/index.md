@@ -28,7 +28,8 @@ Environment Variable: DOCKER_TLS_VERIFY
 
 !!! Note "When TLS verification is enabled"
     - The use of `tcp://` or `https://` schemes for the Docker host URL is required.
-    - `tcp://` is converted to `https://` when TLS verification is enabled.
+    - An `https://` host is treated as `tcp://`, since the certificates, not the scheme, make the connection use TLS.
+    - The [TLS certificate path](#tls_certificate_path) is required for a remote host. Without it, Watchtower stops at startup rather than connect without TLS.
 
 !!! Note
     Watchtower reads `DOCKER_TLS_VERIFY` as a boolean, so `0` or `false` turns verification off. The Docker CLI verifies when the variable has any value.
@@ -64,7 +65,7 @@ Environment Variable: DOCKER_HOST
 !!! Notes
     - This is required for connections to any Docker host.
     - The use of `tcp://` or `https://` schemes is required when using a TLS connection.
-    - `tcp://` is internally converted to `https://` when TLS verification is enabled.
+    - An `https://` host is treated as `tcp://`.
 
 ### Docker API Version
 
@@ -393,11 +394,11 @@ Replace the following:
 
 When [TLS verification](#tls_verification) is enabled and the [Docker host URL](#docker_host_url) uses `http://`,  Watchtower logs the following warning:
 
-!!! Warning "TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'https://' or disable TLS verification."
+!!! Warning "TLS verification is enabled but DOCKER_HOST uses insecure scheme 'http://'. Consider using 'tcp://' or disable TLS verification."
 
 Possible Solutions:
 
-- If using a secure connection, then use `https://`.
+- If using a secure connection, then use `tcp://`.
 - If using `http://`, then disable TLS verification.
 
 ### Local Socket with TLS Verification
