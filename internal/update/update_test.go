@@ -12,6 +12,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -78,7 +79,7 @@ func staleGitTestContainer(
 	t.Helper()
 
 	app, gitClient, commit := gitWatchedTestContainer(t, nil)
-	session := rebuild.NewSession(gitClient)
+	session := rebuild.NewSession(gitClient, dockerConfig.Docker{})
 
 	_, err := checkStaleness(newTestLogger(t), t.Context(), newMockClient(t), config, ratelimit.New(),
 		session, progress, []*container.Container{app})
@@ -263,7 +264,7 @@ func TestPlanRestarts(t *testing.T) {
 		}
 
 		monitored := []*container.Container{cyclic, app, db}
-		restarts := planTestRestarts(t, rebuild.NewSession(nil), updateParams.Params{}, &state.Progress{},
+		restarts := planTestRestarts(t, rebuild.NewSession(nil, dockerConfig.Docker{}), updateParams.Params{}, &state.Progress{},
 			monitored, map[container.ContainerID]struct{}{cyclic.ID(): {}})
 
 		assert.Equal(t, []*container.Container{db, app}, restarts)
@@ -320,7 +321,7 @@ func TestPlanRestarts(t *testing.T) {
 		require.NoError(t, err)
 
 		restarts, err := planRestarts(log, t.Context(), newMockClient(t), updateParams.Params{},
-			rebuild.NewSession(nil), &state.Progress{}, graph, monitored, monitored, nil)
+			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored, nil)
 
 		require.ErrorIs(t, err, errSortDependenciesFailed)
 		assert.Nil(t, restarts)

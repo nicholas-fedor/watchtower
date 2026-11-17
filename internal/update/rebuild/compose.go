@@ -266,13 +266,8 @@ func (s *Session) runComposeApply(
 	progress *state.Progress,
 	failed map[container.ContainerID]error,
 ) ([]composeApply.Container, bool) {
-	applier := s.apply
-	if applier == nil {
-		applier = composeApply.NewClient()
-	}
-
 	applyCtx, cancelApply := context.WithTimeout(ctx, rebuildTimeout)
-	applied, err := applier.Apply(applyCtx, composeApply.Request{
+	applied, err := s.apply.Apply(applyCtx, composeApply.Request{
 		Ref:       batch.ref,
 		Services:  services.names,
 		Labels:    services.labels,

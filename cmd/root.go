@@ -373,7 +373,8 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
-	// Compose rebuilds read the Docker connection settings from the process environment.
+	// The build tools that Compose rebuilds start read the Docker connection from the process
+	// environment.
 	err = composeApply.ExportConnection(appCfg.Docker)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to configure Docker environment", code: 1}

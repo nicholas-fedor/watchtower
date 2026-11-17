@@ -9,14 +9,12 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v7"
-	"github.com/docker/go-connections/tlsconfig"
 	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
@@ -181,7 +179,7 @@ type ImageDiskUsage struct {
 //   - error: Non-nil when the client cannot be built or rebuilt. An unanswered ping is not an
 //     error.
 func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*Client, error) {
-	connection, err := connectionOptions(opts.Docker)
+	connection, err := opts.Docker.ConnectionOptions()
 	if err != nil {
 		return nil, fmt.Errorf("create Docker client: %w", err)
 	}
@@ -283,49 +281,6 @@ func negotiateDockerAPI(
 	}
 
 	return cli, result, nil
-}
-
-// connectionOptions returns the Docker SDK options that connect to the daemon the settings
-// name, without an API version.
-//
-// A certificate path loads ca.pem, cert.pem and key.pem from that directory for TLS 1.2 or
-// later, and the daemon's certificate is verified only when TLS verification is on. An empty
-// host keeps the SDK's default socket.
-//
-// Parameters:
-//   - settings: Docker connection settings.
-//
-// Returns:
-//   - []dockerClient.Opt: Options for the TLS transport and the host.
-//   - error: Non-nil when the certificate files cannot be loaded.
-func connectionOptions(settings dockerConfig.Docker) ([]dockerClient.Opt, error) {
-	var options []dockerClient.Opt
-
-	// These match the SDK's own environment options. The TLS option replaces the HTTP client,
-	// so it comes first, and the host option then configures the new transport.
-	if settings.CertPath != "" {
-		tlsConfig, err := tlsconfig.Client(tlsconfig.Options{
-			CAFile:             filepath.Join(settings.CertPath, "ca.pem"),
-			CertFile:           filepath.Join(settings.CertPath, "cert.pem"),
-			KeyFile:            filepath.Join(settings.CertPath, "key.pem"),
-			InsecureSkipVerify: !settings.TLSVerify,
-			MinVersion:         tls.VersionTLS12,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("configure TLS from %q: %w", settings.CertPath, err)
-		}
-
-		options = append(options, dockerClient.WithHTTPClient(&http.Client{
-			Transport:     &http.Transport{TLSClientConfig: tlsConfig},
-			CheckRedirect: dockerClient.CheckRedirect,
-		}))
-	}
-
-	if settings.Host != "" {
-		options = append(options, dockerClient.WithHost(settings.Host))
-	}
-
-	return options, nil
 }
 
 // pingUntilServing pings the daemon until it answers, for up to three minutes or until ctx
