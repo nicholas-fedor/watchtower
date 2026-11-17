@@ -170,6 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/compose/v5 to v5.7.2 by @renovate[bot] in [#3870](https://github.com/nicholas-fedor/watchtower/pull/3870)
 - Update module github.com/sergi/go-diff to v1.4.5 by @renovate[bot] in [#3868](https://github.com/nicholas-fedor/watchtower/pull/3868)
 - Update module github.com/grpc-ecosystem/grpc-gateway/v2 to v2.34.0 by @renovate[bot] in [#3864](https://github.com/nicholas-fedor/watchtower/pull/3864)
 - Update actions/setup-go action to v7.1.0 by @renovate[bot] in [#3860](https://github.com/nicholas-fedor/watchtower/pull/3860)
