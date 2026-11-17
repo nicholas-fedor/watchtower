@@ -171,6 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/moby/extensions digest to 2b6b3bd by @renovate[bot] in [#3876](https://github.com/nicholas-fedor/watchtower/pull/3876)
 - Update module github.com/docker/compose/v5 to v5.8.0 by @renovate[bot] in [#3874](https://github.com/nicholas-fedor/watchtower/pull/3874)
 - Update module github.com/docker/compose/v5 to v5.7.2 by @renovate[bot] in [#3870](https://github.com/nicholas-fedor/watchtower/pull/3870)
 - Update module github.com/sergi/go-diff to v1.4.5 by @renovate[bot] in [#3868](https://github.com/nicholas-fedor/watchtower/pull/3868)
