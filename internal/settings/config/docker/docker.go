@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/docker/go-connections/tlsconfig"
 
@@ -23,6 +24,12 @@ type Docker struct {
 	TLSVerify bool
 }
 
+// idleConnTimeout is how long an idle connection to the daemon stays open.
+//
+// It matches the Docker SDK's default transport, which closes idle connections
+// so that a long-running process does not keep them.
+const idleConnTimeout = 30 * time.Second
+
 // ConnectionOptions returns the Docker SDK options that connect to the daemon these
 // settings name, without an API version.
 //
@@ -38,8 +45,9 @@ type Docker struct {
 func (d Docker) ConnectionOptions() ([]dockerClient.Opt, error) {
 	var options []dockerClient.Opt
 
-	// These match the SDK's own environment options. The TLS option replaces the HTTP client,
-	// so it comes first, and the host option then configures the new transport.
+	// These match the SDK's own environment options, with the idle timeout of its default
+	// transport. The TLS option replaces the HTTP client, so it comes first, and the host
+	// option then configures the new transport.
 	if d.CertPath != "" {
 		// tlsconfig adds ca.pem to the system roots and skips it when verification is off.
 		tlsConfig, err := tlsconfig.Client(tlsconfig.Options{
@@ -54,7 +62,10 @@ func (d Docker) ConnectionOptions() ([]dockerClient.Opt, error) {
 		}
 
 		options = append(options, dockerClient.WithHTTPClient(&http.Client{
-			Transport:     &http.Transport{TLSClientConfig: tlsConfig},
+			Transport: &http.Transport{
+				TLSClientConfig: tlsConfig,
+				IdleConnTimeout: idleConnTimeout,
+			},
 			CheckRedirect: dockerClient.CheckRedirect,
 		}))
 	}
