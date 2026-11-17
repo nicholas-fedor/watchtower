@@ -175,6 +175,64 @@ func TestClient_newDockerCLI(t *testing.T) {
 	}
 }
 
+// TestClient_newDockerCLI_apiVersion checks which API version the Docker CLI
+// Compose uses sends its requests with. A configured version newer than the
+// daemon's falls back to the daemon's version, as the container client does. The
+// fallback comes from the Docker CLI's own startup ping, which negotiates even a
+// fixed version. A Docker CLI update that stops doing that fails this test. It
+// sets environment variables, so it does not run in parallel.
+func TestClient_newDockerCLI_apiVersion(t *testing.T) {
+	// Keep docker/cli away from the real Docker configuration and context. It
+	// reads DOCKER_CONFIG once per process, so the directory spans every case.
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+
+	const daemonVersion = "1.44"
+
+	tests := []struct {
+		name string
+		// apiVersion is the configured API version, empty for negotiation.
+		apiVersion string
+		wantPath   string
+	}{
+		{name: "configured version newer than the daemon's", apiVersion: "1.47", wantPath: "/v1.44/containers/json"},
+		{name: "configured version the daemon supports", apiVersion: "1.41", wantPath: "/v1.41/containers/json"},
+		{name: "no configured version", apiVersion: "", wantPath: "/v1.44/containers/json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, name := range []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_API_VERSION", "DOCKER_TLS", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"} {
+				t.Setenv(name, "")
+				require.NoError(t, os.Unsetenv(name))
+			}
+
+			server := httpstub.New(t)
+			server.AllowUnhandledRequests()
+
+			for _, method := range []string{http.MethodHead, http.MethodGet} {
+				server.RouteToHandler(method, httpstub.Path("/_ping"),
+					httpstub.RespondWith(http.StatusOK, "", http.Header{"Api-Version": []string{daemonVersion}}))
+			}
+
+			server.RouteToHandler(http.MethodGet, httpstub.Path(tt.wantPath),
+				httpstub.RespondWith(http.StatusOK, "[]", http.Header{"Content-Type": []string{"application/json"}}))
+
+			client := NewClient(dockerConfig.Docker{
+				Host:       "tcp://" + server.Addr(),
+				APIVersion: tt.apiVersion,
+				CertPath:   "",
+				TLSVerify:  false,
+			})
+
+			dockerCLI, err := client.newDockerCLI()
+			require.NoError(t, err)
+
+			_, err = dockerCLI.Client().ContainerList(t.Context(), dockerClient.ContainerListOptions{})
+			require.NoError(t, err, "the listing is sent to %s", tt.wantPath)
+		})
+	}
+}
+
 // TestClient_newDockerCLI_errors checks that settings the Docker CLI cannot
 // connect with return an error instead of a Docker CLI, and that the Compose
 // service passes the error on.
