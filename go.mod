@@ -7,12 +7,12 @@ retract [v1.7.2, v1.7.9]
 
 require (
 	github.com/cenkalti/backoff/v7 v7.0.3
-	github.com/compose-spec/compose-go/v2 v2.16.2
+	github.com/compose-spec/compose-go/v2 v2.17.0
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.5
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.10.0+incompatible
-	github.com/docker/compose/v5 v5.7.1
+	github.com/docker/compose/v5 v5.7.2
 	github.com/docker/go-connections v0.8.2
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/gofiber/contrib/v3/swaggo v1.0.17
