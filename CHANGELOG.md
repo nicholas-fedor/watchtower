@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep tcp docker hosts for tls connections by @nicholas-fedor in [#3846](https://github.com/nicholas-fedor/watchtower/pull/3846)
 - Unset docker variables the settings leave empty by @nicholas-fedor in [#3838](https://github.com/nicholas-fedor/watchtower/pull/3838)
 - Read integer settings from the flags by @nicholas-fedor in [#3833](https://github.com/nicholas-fedor/watchtower/pull/3833)
 - Prepare the flags inside Load by @nicholas-fedor in [#3825](https://github.com/nicholas-fedor/watchtower/pull/3825)
