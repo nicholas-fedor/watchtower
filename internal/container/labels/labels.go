@@ -29,6 +29,9 @@ const (
 	CooldownDelay = "com.centurylinklabs.watchtower.cooldown-delay"
 	// CopyFile lists in-container file paths to copy during recreation, comma-separated.
 	CopyFile = "com.centurylinklabs.watchtower.copy-file"
+	// Schedule gives a container its own update schedule (cron syntax, as --schedule),
+	// used in place of the global schedule when --container-schedules is set.
+	Schedule = "com.centurylinklabs.watchtower.schedule"
 )
 
 // Lifecycle hook labels configure commands executed during container update phases.

@@ -201,6 +201,11 @@ type ScheduleDeps struct {
 	// Watchtower instance in this process's scope. The scheduler then makes no
 	// update at startup. Its first scheduled run also skips self-updates.
 	ReplacedOlderInstance bool
+	// ContainerSchedules, when set, lets containers follow their own schedule
+	// label: it lists the containers to read the labels from at startup.
+	// After that the labels are read from each update session's own listing.
+	// Nil keeps every container on the global schedule.
+	ContainerSchedules ListContainers
 }
 
 // updatesOnStart reports whether the scheduler makes an update at startup.
@@ -253,10 +258,14 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		),
 	)
 
+	// Containers' own schedules, when enabled (set up below).
+	var containers *containerSchedules
+
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
-	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
+	// due: the containers checked for updates, or nil for every filtered container
+	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, due filters.Filter) {
 		// Acquire the update lock: blocking waits until shutdown, non-blocking returns if unavailable
 		if blocking {
 			err := lock.Lock(ctx)
@@ -295,6 +304,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 
 		params.Filter = updateFilter
+		params.Due = due
+		params.Listed = containers.listed()
 
 		if deps.RunUpdate == nil {
 			log.Debug().Msg("Update skipped: RunUpdate hook is not configured")
@@ -316,26 +327,32 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// during its first scheduled run.
 	var ranOnce atomic.Bool
 
-	scheduledUpdateFunc := func() {
+	scheduledUpdateFunc := func(due filters.Filter) {
 		skipWatchtowerSelfUpdate := deps.ReplacedOlderInstance && !ranOnce.Swap(true)
 		if skipWatchtowerSelfUpdate {
 			log.Debug().Msg("Skipping Watchtower self-update on first scheduled run due to cleanup")
 		}
 
-		updateFunc(skipWatchtowerSelfUpdate, true)
+		updateFunc(skipWatchtowerSelfUpdate, true, due)
 	}
+
+	managed := deps.Filter
+	if managed == nil {
+		managed = deps.BaseParams.Filter
+	}
+
+	containers = newContainerSchedules(log, deps.ContainerSchedules, managed, scheduler, scheduledUpdateFunc)
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
 	scheduleSpec := strings.Trim(deps.ScheduleSpec, `"'`)
 	if scheduleSpec != "" {
-		_, err := scheduler.AddFunc(
-			scheduleSpec,
-			scheduledUpdateFunc,
-		)
+		err := addSchedule(scheduler, containers, scheduleSpec, func() { scheduledUpdateFunc(nil) })
 		if err != nil {
 			return fmt.Errorf("invalid schedule %q: %w", scheduleSpec, err)
 		}
 	}
+
+	containers.refresh(ctx)
 
 	waitedForUpdate := false
 	if deps.WriteStartupMessage != nil {
@@ -356,13 +373,13 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			log.Debug().Msg("Update skipped: another update was running at startup")
 			metrics.Default().RegisterSkippedScan()
 		} else {
-			updateFunc(false, false)
+			updateFunc(false, false, containers.globalDue())
 		}
 	}
 
 	// Start the scheduler to begin periodic execution if scheduling is enabled.
 	// Only start if a schedule spec was provided (empty string means no scheduling).
-	if scheduleSpec != "" {
+	if scheduleSpec != "" || containers != nil {
 		scheduler.Start()
 	}
 
