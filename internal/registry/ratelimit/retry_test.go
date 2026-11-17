@@ -102,6 +102,29 @@ func TestDoLogsExhaustionAtWarn(t *testing.T) {
 	assert.NotContains(t, buf.String(), "Retrying after delay")
 }
 
+// TestDoStopsAtDockerHubPullQuota checks that Docker Hub's pull rate limit,
+// which gives no wait, ends the retries after one attempt instead of being
+// retried as an empty token bucket. Its quota window lasts six hours, so no
+// retry within an update cycle can succeed.
+func TestDoStopsAtDockerHubPullQuota(t *testing.T) {
+	t.Parallel()
+
+	limit := FromError(errors.New(hubPullLimit))
+	require.NotNil(t, limit)
+
+	l := New()
+
+	attempts := 0
+
+	err := l.Do(t.Context(), nil, "index.docker.io", func() error {
+		attempts++
+
+		return limit
+	})
+	require.ErrorIs(t, err, ErrRateLimited)
+	assert.Equal(t, 1, attempts)
+}
+
 func TestDoLogsTinyTokenBucketExhaustionAtDebug(t *testing.T) {
 	l := New()
 
