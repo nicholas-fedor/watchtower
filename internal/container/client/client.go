@@ -391,13 +391,14 @@ func pingUntilServing(
 // API.
 //
 // It accepts the lost connections that the container list retries, such as the
-// Docker client's "Cannot connect" error and an unexpected end of the answer.
+// Docker client's "Cannot connect" error and an unexpected end of the response.
 // It also accepts any transport failure, which the Docker client reports as a
 // connection failure.
 // Examples are a name that does not resolve yet, a refused connection, and a
-// missing socket. A 5xx answer counts too, since a socket proxy answers that
-// way while its daemon is down, and so does a request that timed out. TLS and
-// certificate errors and other answers never pass.
+// missing socket. A 5xx response other than 501 Not Implemented counts too,
+// since a socket proxy responds that way while its daemon is down, and so does
+// a request that timed out. TLS and certificate errors and other responses
+// never pass.
 //
 // Parameters:
 //   - err: Error from a Docker API call.

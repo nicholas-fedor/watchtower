@@ -2420,9 +2420,23 @@ func TestPingUntilServing(t *testing.T) {
 			wantRequests: 11,
 		},
 		{
-			name:           "proxy that answers 503 is retried",
+			name:           "proxy that responds with 502 is retried",
+			ready:          20 * time.Second,
+			notReadyStatus: http.StatusBadGateway,
+			wantWait:       25 * time.Second,
+			wantRequests:   11,
+		},
+		{
+			name:           "proxy that responds with 503 is retried",
 			ready:          20 * time.Second,
 			notReadyStatus: http.StatusServiceUnavailable,
+			wantWait:       25 * time.Second,
+			wantRequests:   11,
+		},
+		{
+			name:           "proxy that responds with 504 is retried",
+			ready:          20 * time.Second,
+			notReadyStatus: http.StatusGatewayTimeout,
 			wantWait:       25 * time.Second,
 			wantRequests:   11,
 		},
@@ -2456,6 +2470,12 @@ func TestPingUntilServing(t *testing.T) {
 		{
 			name:         "daemon that rejects the ping ends the wait at once",
 			status:       http.StatusForbidden,
+			wantRequests: 2,
+			wantErr:      true,
+		},
+		{
+			name:         "daemon that does not implement the ping ends the wait at once",
+			status:       http.StatusNotImplemented,
 			wantRequests: 2,
 			wantErr:      true,
 		},
