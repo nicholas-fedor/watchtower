@@ -64,6 +64,9 @@ var (
 	// errSupersededInstance ends a Watchtower instance that runs in an old
 	// container, which a newer instance has replaced.
 	errSupersededInstance = errors.New("superseded Watchtower instance")
+	// errOrchestratorFinished ends the ephemeral self-update orchestrator after
+	// its handoff completed.
+	errOrchestratorFinished = errors.New("self-update orchestrator finished")
 	// errUnknownContainerID indicates that Watchtower does not know the ID of
 	// its own container, so it cannot change the container's restart policy.
 	errUnknownContainerID = errors.New("own container ID is not known")
@@ -208,9 +211,11 @@ type exitError struct {
 	err error
 	// msg is the static message Execute logs at fatal level with the cause.
 	// Execute logs nothing when it is empty, since the failure was already
-	// logged.
+	// logged. The code that logged it has also decided whether to disable
+	// restarts.
 	msg string
-	// code is the process exit code for a failure that was already reported.
+	// code is the process exit code when msg is empty. An exit with a message
+	// always uses code 1.
 	code int
 }
 
@@ -403,14 +408,14 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	if appCfg.Mode.SelfUpdateOrchestrator {
 		p.log.Info().Msg("Running in ephemeral self-update orchestrator mode")
 
-		selfupdate.RunOrchestrator(p.log, context.Background(), client)
+		// The orchestrator's container is removed when it exits, so its
+		// restart policy is left alone.
+		err = selfupdate.RunOrchestrator(p.log, context.Background(), client)
+		if err != nil {
+			return &exitError{err: err, msg: "", code: 1}
+		}
 
-		_ = p.detectCurrentContainerID()
-		p.disableRestarts()
-
-		p.log.Fatal().
-			Str("flag", "self-update-orchestrator").
-			Msg("RunOrchestrator returned unexpectedly. Exiting to prevent unintended execution")
+		return &exitError{err: errOrchestratorFinished, msg: "", code: 0}
 	}
 
 	ctx, cancel := context.WithTimeout(

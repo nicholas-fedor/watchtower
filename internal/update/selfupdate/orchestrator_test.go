@@ -3,9 +3,6 @@ package selfupdate
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -20,7 +17,6 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
-	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	mockSelfupdate "github.com/nicholas-fedor/watchtower/internal/update/selfupdate/mocks"
@@ -35,7 +31,6 @@ const (
 	orchestratorOriginalName = "watchtower"
 	orchestratorNewImage     = "watchtower:v2"
 	orchestratorOldImage     = "watchtower:v1"
-	orchestratorHelperEnv    = "WATCHTOWER_ACTIONS_ORCHESTRATOR_HELPER"
 )
 
 // Errors returned by the Docker client in the orchestrator tests.
@@ -236,15 +231,8 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			wantCalls: []string{"GetContainer 01d"},
 		},
 		{
-			name: "success removes the renamed old container",
-			setup: func(client *mockSelfupdate.MockHandoffClient, old *container.Container) {
-				expectOldInspect(client, old)
-				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
-				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-				client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
-				expectNewRunning(client, true)
-				client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
-			},
+			name:  "success removes the renamed old container",
+			setup: expectHandoffSuccess,
 			wantCalls: []string{
 				"GetContainer 01d",
 				"StopContainer 01d",
@@ -581,6 +569,18 @@ func expectOldInspect(client *mockSelfupdate.MockHandoffClient, old *container.C
 	client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).Return(old, nil).Once()
 }
 
+// expectHandoffSuccess expects every Docker call of a handoff that completes
+// without cleanup: inspect, stop, rename, start, verify and remove the old
+// container.
+func expectHandoffSuccess(client *mockSelfupdate.MockHandoffClient, old *container.Container) {
+	expectOldInspect(client, old)
+	client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
+	client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
+	client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
+	expectNewRunning(client, true)
+	client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
+}
+
 // expectNewRunning expects one inspection of the new container, reporting it
 // running or stopped, and returns the container it reports.
 func expectNewRunning(client *mockSelfupdate.MockHandoffClient, running bool) *container.Container {
@@ -685,86 +685,60 @@ func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 	}
 }
 
-// TestRunOrchestrator_Exit verifies how the orchestrator process ends: a
-// missing setting ends it with a fatal log, a failed handoff exits with 1, and
-// a completed handoff exits with 0.
-func TestRunOrchestrator_Exit(t *testing.T) {
-	if helperCase := os.Getenv(orchestratorHelperEnv); helperCase != "" {
-		runOrchestratorHelper(t, helperCase)
-
-		// RunOrchestrator must exit. Reaching here means it did not.
-		os.Exit(2)
-	}
-
+// TestRunOrchestrator verifies what the orchestrator returns and logs at error
+// level for an invalid environment variable, a failed handoff and a completed
+// one.
+//
+// The cases set environment variables, so they do not run in parallel.
+func TestRunOrchestrator(t *testing.T) {
 	tests := []struct {
-		helperCase   string
-		wantExitCode int
-		wantOutput   string
+		name          string
+		oldID         string
+		expect        func(client *mockSelfupdate.MockHandoffClient)
+		wantErr       error
+		wantErrorLogs []string
 	}{
-		{helperCase: "missing-env", wantExitCode: 1, wantOutput: "Failed to read orchestrator environment variables"},
-		{helperCase: "handoff-fails", wantExitCode: 1, wantOutput: "Orchestration failed"},
-		{helperCase: "handoff-succeeds", wantExitCode: 0, wantOutput: "Started new container"},
+		{
+			name:          "missing old container ID",
+			oldID:         "",
+			expect:        func(*mockSelfupdate.MockHandoffClient) {},
+			wantErr:       errOrchestratorMissingEnv,
+			wantErrorLogs: []string{"Failed to read orchestrator environment variables"},
+		},
+		{
+			name:  "handoff fails",
+			oldID: orchestratorOldID,
+			expect: func(client *mockSelfupdate.MockHandoffClient) {
+				client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(nil, errOrchestratorTestDocker)
+			},
+			wantErr:       errOrchestratorTestDocker,
+			wantErrorLogs: []string{"Orchestration failed"},
+		},
+		{
+			name:  "handoff completes",
+			oldID: orchestratorOldID,
+			expect: func(client *mockSelfupdate.MockHandoffClient) {
+				expectHandoffSuccess(client, orchestratorContainer(orchestratorOldID, orchestratorOldName, true))
+			},
+		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.helperCase, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
-			defer cancel()
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("WT_ORCHESTRATOR_OLD_ID", tt.oldID)
+			t.Setenv("WT_ORCHESTRATOR_NEW_IMAGE", orchestratorNewImage)
+			t.Setenv("WT_ORCHESTRATOR_ORIGINAL_NAME", orchestratorOriginalName)
+			t.Setenv("WT_ORCHESTRATOR_CONTAINER_CHAIN", "")
+			t.Setenv("WT_ORCHESTRATOR_CLEANUP", "")
 
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRunOrchestrator_Exit$", "-test.v=false")
+			client := mockSelfupdate.NewMockHandoffClient(t)
+			tt.expect(client)
 
-			cmd.Env = append(os.Environ(), orchestratorHelperEnv+"="+tt.helperCase)
+			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
-			out, err := cmd.CombinedOutput()
-
-			exitCode := 0
-
-			var exitErr *exec.ExitError
-
-			switch {
-			case errors.As(err, &exitErr):
-				exitCode = exitErr.ExitCode()
-			default:
-				require.NoError(t, err, "output:\n%s", out)
-			}
-
-			assert.Equal(t, tt.wantExitCode, exitCode, "output:\n%s", out)
-			assert.Contains(t, string(out), tt.wantOutput)
+			err := RunOrchestrator(log, t.Context(), client)
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.wantErrorLogs, logcapture.Messages(t, logBuf.String(), "error"))
 		})
 	}
-}
-
-// runOrchestratorHelper runs RunOrchestrator in the re-executed test binary
-// for the named case, logging to stderr so the parent can read the outcome.
-func runOrchestratorHelper(t *testing.T, helperCase string) {
-	t.Helper()
-
-	log := logging.New(os.Stderr, logging.DebugLevel)
-	client := mockSelfupdate.NewMockHandoffClient(t)
-
-	if helperCase != "missing-env" {
-		t.Setenv("WT_ORCHESTRATOR_OLD_ID", orchestratorOldID)
-		t.Setenv("WT_ORCHESTRATOR_NEW_IMAGE", orchestratorNewImage)
-		t.Setenv("WT_ORCHESTRATOR_ORIGINAL_NAME", orchestratorOriginalName)
-	}
-
-	old := orchestratorContainer(orchestratorOldID, orchestratorOldName, true)
-
-	switch helperCase {
-	case "missing-env":
-		t.Setenv("WT_ORCHESTRATOR_OLD_ID", "")
-	case "handoff-fails":
-		client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(nil, errOrchestratorTestDocker)
-	case "handoff-succeeds":
-		expectOldInspect(client, old)
-		client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil)
-		client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).Return(nil)
-		client.EXPECT().StartContainer(mock.Anything, old).Return(container.ContainerID(orchestratorNewID), nil)
-		expectNewRunning(client, true)
-		client.EXPECT().RemoveContainer(mock.Anything, old).Return(nil)
-	default:
-		panic(fmt.Sprintf("unknown orchestrator helper case %q", helperCase))
-	}
-
-	RunOrchestrator(log, context.Background(), client)
 }
