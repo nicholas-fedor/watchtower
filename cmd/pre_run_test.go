@@ -58,14 +58,35 @@ func cgroupWithSelf() string {
 	return "12:memory:/docker/" + string(selfID) + "\n"
 }
 
-// setPreRunState prepares the process state preRun reads and writes, and
-// restores it when the test ends. newClient returns client, self container ID
-// detection reads only detection, and the Docker variables preRun reads and
-// sets are cleared and restored.
-func setPreRunState(t *testing.T, client DockerClient, detection selfDetection) {
+// newPreRunProcess returns a process that holds only a logger, as Execute
+// creates it for preRun.
+//
+// It prepares the package state preRun reads and restores it when the test
+// ends. newClient returns client, and self container ID detection reads only
+// detection. The Docker variables preRun reads and sets are cleared and
+// restored.
+//
+// Parameters:
+//   - t: Test that owns the process.
+//   - client: Docker client newClient returns.
+//   - detection: Files self container ID detection reads.
+//
+// Returns:
+//   - *process: The process to run preRun with.
+func newPreRunProcess(t *testing.T, client DockerClient, detection selfDetection) *process {
 	t.Helper()
 
-	setRunState(t, runTestState{})
+	setProcessFuncs(t)
+
+	proc := &process{log: new(zerolog.Nop())}
+
+	// preRun creates the notifier, except for a health check or a startup that
+	// fails first.
+	t.Cleanup(func() {
+		if proc.notifier != nil {
+			proc.notifier.Close()
+		}
+	})
 
 	savedNewClient := newClient
 
@@ -105,9 +126,7 @@ func setPreRunState(t *testing.T, client DockerClient, detection selfDetection) 
 		t.Setenv("HOSTNAME", detection.hostname)
 	}
 
-	// preRun replaces the notifier with one hooked to its logger, except for a
-	// health check.
-	t.Cleanup(func() { notifier.Close() })
+	return proc
 }
 
 // setProcessFs replaces the filesystem that holds the container marker files
@@ -299,14 +318,12 @@ func TestPreRun_SelfDetection(t *testing.T) {
 				tt.setup(mockClient)
 			}
 
-			setPreRunState(t, mockClient, tt.detection)
-
-			fixtureNotifier := notifier
+			proc := newPreRunProcess(t, mockClient, tt.detection)
 
 			readStderr := captureStderr(t)
 			args := slices.Concat(tt.args, []string{"--log-level", "warn", "--log-format", "logfmt"})
 
-			require.NoError(t, newRunProcess().preRun(newTestRootCommand(t, args...), nil))
+			require.NoError(t, proc.preRun(newTestRootCommand(t, args...), nil))
 
 			logOutput := readStderr()
 			if tt.wantWarning == "" {
@@ -317,16 +334,16 @@ func TestPreRun_SelfDetection(t *testing.T) {
 				assert.Contains(t, logOutput, tt.wantError)
 			}
 
-			assert.Equal(t, tt.wantID, currentWatchtowerContainerID)
-			assert.Equal(t, tt.wantUnknown, currentWatchtowerContainerUnknown)
-			assert.Equal(t, tt.wantName, containerName(currentWatchtowerContainer))
+			assert.Equal(t, tt.wantID, proc.currentContainerID)
+			assert.Equal(t, tt.wantUnknown, proc.currentContainerUnknown())
+			assert.Equal(t, tt.wantName, containerName(proc.currentContainer))
 			assert.Equal(t, tt.wantCalls, runCalls(mockClient))
-			assert.Same(t, mockClient, client, "preRun uses the client from newClient")
+			assert.Same(t, mockClient, proc.client, "preRun uses the client from newClient")
 
 			if slices.Contains(tt.args, "--health-check") {
-				assert.Same(t, fixtureNotifier, notifier, "preRun sets up no notifications")
+				assert.Nil(t, proc.notifier, "preRun sets up no notifications")
 			} else {
-				assert.NotSame(t, fixtureNotifier, notifier, "preRun creates its own notifier")
+				assert.NotNil(t, proc.notifier, "preRun creates the notifier")
 			}
 		})
 	}
@@ -371,7 +388,7 @@ func containerName(c *container.Container) string {
 // exports them to the environment, where Compose rebuilds read them.
 func TestPreRun_Configuration(t *testing.T) {
 	mockClient := mockCmd.NewMockDockerClient(t)
-	setPreRunState(t, mockClient, selfDetection{})
+	proc := newPreRunProcess(t, mockClient, selfDetection{})
 
 	var gotOpts containerClient.ClientOptions
 
@@ -381,7 +398,7 @@ func TestPreRun_Configuration(t *testing.T) {
 		return mockClient, nil
 	}
 
-	require.NoError(t, newRunProcess().preRun(newTestRootCommand(t,
+	require.NoError(t, proc.preRun(newTestRootCommand(t,
 		"--scope", "prod",
 		"--host", "tcp://docker.example.com:2376",
 		"--tlsverify",
@@ -389,7 +406,7 @@ func TestPreRun_Configuration(t *testing.T) {
 		"--cert-path", "/certs",
 	), nil))
 
-	assert.Equal(t, "prod", appCfg.Filter.Scope)
+	assert.Equal(t, "prod", proc.cfg.Filter.Scope)
 	assert.Equal(t, dockerConfig.Docker{
 		Host:       "tcp://docker.example.com:2376",
 		TLSVerify:  true,
@@ -412,22 +429,21 @@ func TestPreRun_loadsSettingsOnce(t *testing.T) {
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
 
-	setPreRunState(t, mockClient, selfDetection{})
+	proc := newPreRunProcess(t, mockClient, selfDetection{})
 
 	// Outside a container, so the run has no restart policy to disable.
 	processID = func() int { return 4242 }
 
 	readStderr := captureStderr(t)
-	proc := newRunProcess()
 
 	require.NoError(t, newExecuteCommand(t, proc,
 		"--run-once", "--monitor-only", "--no-pull", "--notification-url", "logger://", "web",
 	).Execute())
 
 	// Closing the notifier sends what it still holds.
-	notifier.Close()
+	proc.notifier.Close()
 
-	assert.Equal(t, []string{"web"}, appCfg.Filter.Names)
+	assert.Equal(t, []string{"web"}, proc.cfg.Filter.Names)
 	assert.Equal(t, 1, strings.Count(readStderr(), "Combining monitor-only and no-pull might result in no updates"))
 }
 
@@ -446,18 +462,18 @@ func TestPreRun_scopeLabel(t *testing.T) {
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 
-	setPreRunState(t, mockClient, selfDetection{mountinfo: mountinfoWithSelf()})
+	proc := newPreRunProcess(t, mockClient, selfDetection{mountinfo: mountinfoWithSelf()})
 
-	require.NoError(t, newExecuteCommand(t, newRunProcess(), "--run-once", "--log-level", "error").Execute())
+	require.NoError(t, newExecuteCommand(t, proc, "--run-once", "--log-level", "error").Execute())
 
-	assert.Equal(t, "prod", appCfg.Filter.Scope)
-	assert.Equal(t, "Only checking containers in scope prod", appCfg.Filter.Desc)
+	assert.Equal(t, "prod", proc.cfg.Filter.Scope)
+	assert.Equal(t, "Only checking containers in scope prod", proc.cfg.Filter.Desc)
 
 	inScope := runFixtureContainer("a1a1", "/app", "2026-10-01T12:00:00Z", map[string]string{scopeLabelKey: "prod"})
 	unscoped := runFixtureContainer("b2b2", "/other", "2026-10-01T12:00:00Z", nil)
 
-	assert.True(t, appCfg.Filter.Predicate(inScope), "a container in the label's scope is selected")
-	assert.False(t, appCfg.Filter.Predicate(unscoped), "a container without a scope is not selected")
+	assert.True(t, proc.cfg.Filter.Predicate(inScope), "a container in the label's scope is selected")
+	assert.False(t, proc.cfg.Filter.Predicate(unscoped), "a container without a scope is not selected")
 }
 
 // TestPreRun_RegistryTLSSettings verifies that the container client and the
@@ -509,7 +525,7 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mockCmd.NewMockDockerClient(t)
-			setPreRunState(t, mockClient, selfDetection{})
+			proc := newPreRunProcess(t, mockClient, selfDetection{})
 
 			var clientOptions containerClient.ClientOptions
 
@@ -525,11 +541,11 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			require.NoError(t, newRunProcess().preRun(cmd, nil))
+			require.NoError(t, proc.preRun(cmd, nil))
 
 			assert.Equal(t, tt.wantSkip, clientOptions.Registry.TLSSkip)
 			assert.Equal(t, tt.wantMinVersion, clientOptions.Registry.TLSMinVersion)
-			assert.Equal(t, clientOptions.Registry, appCfg.UpdateParams(settings.RunOverrides{}).Registry)
+			assert.Equal(t, clientOptions.Registry, proc.cfg.UpdateParams(settings.RunOverrides{}).Registry)
 		})
 	}
 }
@@ -579,7 +595,7 @@ func TestPreRun_PorcelainKeepsExplicitSettings(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setPreRunState(t, mockCmd.NewMockDockerClient(t), selfDetection{})
+			proc := newPreRunProcess(t, mockCmd.NewMockDockerClient(t), selfDetection{})
 
 			cmd := newTestRootCommand(t, tt.args...)
 
@@ -587,11 +603,11 @@ func TestPreRun_PorcelainKeepsExplicitSettings(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			require.NoError(t, newRunProcess().preRun(cmd, nil))
+			require.NoError(t, proc.preRun(cmd, nil))
 
-			assert.Equal(t, tt.wantTemplate, appCfg.Notify.Template)
-			assert.Equal(t, tt.wantReport, appCfg.Notify.Report)
-			assert.Equal(t, tt.wantLogStdout, appCfg.Notify.LogStdout)
+			assert.Equal(t, tt.wantTemplate, proc.cfg.Notify.Template)
+			assert.Equal(t, tt.wantReport, proc.cfg.Notify.Report)
+			assert.Equal(t, tt.wantLogStdout, proc.cfg.Notify.LogStdout)
 		})
 	}
 }
@@ -1071,7 +1087,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		panic("unknown preRun exit helper case " + helperCase)
 	}
 
-	setPreRunState(t, mockClient, detection)
+	proc := newPreRunProcess(t, mockClient, detection)
 
 	processID = func() int { return pid }
 
@@ -1104,7 +1120,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		t.Setenv(key, "")
 	}
 
-	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
+	proc.log = logging.New(os.Stderr, logging.InfoLevel)
 
 	if execute {
 		executed, err := newExecuteCommand(t, proc, args...).ExecuteContextC(processCtx)

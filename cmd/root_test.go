@@ -423,7 +423,7 @@ func TestCommands_ErrorOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			root := newExecuteCommand(t, newRunProcess(), tt.args...)
+			root := newExecuteCommand(t, &process{log: new(zerolog.Nop())}, tt.args...)
 
 			var out bytes.Buffer
 
@@ -475,7 +475,7 @@ func TestIsContainerMainProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setPreRunState(t, nil, selfDetection{})
+			setProcessFuncs(t)
 
 			fsys := fstest.MapFS{}
 			if tt.inContainer {
@@ -710,7 +710,7 @@ func TestDisableRestarts(t *testing.T) {
 				currentID = ""
 			}
 
-			setRunState(t, runTestState{client: mockClient, current: tt.current, currentID: currentID})
+			proc := newRunProcess(t, runTestState{client: mockClient, current: tt.current, currentID: currentID})
 			setProcessFs(t, fstest.MapFS{
 				".dockerenv":             &fstest.MapFile{},
 				"proc/1/task/1/children": &fstest.MapFile{Data: []byte("7")},
@@ -727,7 +727,8 @@ func TestDisableRestarts(t *testing.T) {
 			}
 
 			log, logOutput := logcapture.New(zerolog.ErrorLevel)
-			(&process{log: log}).disableRestarts(processCtx)
+			proc.log = log
+			proc.disableRestarts(processCtx)
 
 			if tt.wantError {
 				assert.Contains(t, logOutput.String(), logging.RestartsKept)

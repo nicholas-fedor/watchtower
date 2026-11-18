@@ -72,62 +72,68 @@ var (
 // would also match that missing argument.
 var withFilter = mock.MatchedBy(func([]filters.Filter) bool { return true })
 
-// runTestState is the process state run and runMain read from package
-// variables, set by setRunState.
+// runTestState is the process state run and runMain read, set by newRunProcess.
 type runTestState struct {
 	client    DockerClient
 	current   *container.Container
 	currentID container.ContainerID
 }
 
-// setRunState sets the package variables run and runMain read, and restores
-// every one of them when the test ends. Watchtower runs as the main process of
-// its container. The Docker readiness sleep is skipped. The notifier has no
-// services, so it sends nothing.
-func setRunState(t *testing.T, state runTestState) {
+// setProcessFuncs replaces the package functions run reads about the process,
+// and restores them when the test ends.
+//
+// Watchtower runs as the main process of its container. The Docker readiness
+// sleep is skipped.
+//
+// Parameters:
+//   - t: Test that owns the replaced functions.
+func setProcessFuncs(t *testing.T) {
 	t.Helper()
 
-	savedCfg := appCfg
-	savedClient := client
-	savedRateLimiter := rateLimiter
-	savedNotifier := notifier
-	savedCurrent := currentWatchtowerContainer
-	savedCurrentID := currentWatchtowerContainerID
-	savedCurrentUnknown := currentWatchtowerContainerUnknown
-	savedRunUpdates := runUpdatesWithNotifications
 	savedSleep := sleepFunc
 	savedProcessID := processID
 	savedParentProcessID := parentProcessID
 
 	t.Cleanup(func() {
-		appCfg = savedCfg
-		client = savedClient
-		rateLimiter = savedRateLimiter
-		notifier = savedNotifier
-		currentWatchtowerContainer = savedCurrent
-		currentWatchtowerContainerID = savedCurrentID
-		currentWatchtowerContainerUnknown = savedCurrentUnknown
-		runUpdatesWithNotifications = savedRunUpdates
 		sleepFunc = savedSleep
 		processID = savedProcessID
 		parentProcessID = savedParentProcessID
 	})
 
-	appCfg = settings.Config{}
-	client = state.client
-	rateLimiter = ratelimit.New()
-	currentWatchtowerContainer = state.current
-	currentWatchtowerContainerID = state.currentID
-	currentWatchtowerContainerUnknown = false
 	sleepFunc = func(time.Duration) {}
 	processID = func() int { return 1 }
 	parentProcessID = func() int { return 0 }
+}
+
+// newRunProcess returns a process with the state run and runMain read.
+//
+// The process logs nothing. Its notifier has no services, so it sends nothing.
+// Until the test ends, Watchtower runs as the main process of its container
+// and the Docker readiness sleep is skipped.
+//
+// Parameters:
+//   - t: Test that owns the process.
+//   - state: Docker client and Watchtower's own container.
+//
+// Returns:
+//   - *process: The process to run.
+func newRunProcess(t *testing.T, state runTestState) *process {
+	t.Helper()
+
+	setProcessFuncs(t)
 
 	created, err := notify.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
 	require.NoError(t, err)
+	t.Cleanup(created.Close)
 
-	notifier = created
-	t.Cleanup(notifier.Close)
+	return &process{
+		log:                new(zerolog.Nop()),
+		client:             state.client,
+		rateLimiter:        ratelimit.New(),
+		notifier:           created,
+		currentContainer:   state.current,
+		currentContainerID: state.currentID,
+	}
 }
 
 // newLoggerNotifier returns a notifier hooked to log whose logger:// service
@@ -260,15 +266,15 @@ func containerLabel(arg any) string {
 	return strings.TrimPrefix(c.Name(), "/")
 }
 
-// runUntilCanceled runs the command in a synctest bubble until the scheduler
-// is idle, then cancels the process context the way a signal would.
-func runUntilCanceled(t *testing.T, args ...string) {
+// runUntilCanceled runs the command with proc in a synctest bubble until the
+// scheduler is idle, then cancels the process context the way a signal would.
+func runUntilCanceled(t *testing.T, proc *process, args ...string) {
 	t.Helper()
 
-	cmd := newRunCommand(t, args...)
+	cmd := newRunCommand(t, proc, args...)
 
 	synctest.Test(t, func(t *testing.T) {
-		cancel, done := runInBackground(t, newRunProcess(), cmd)
+		cancel, done := runInBackground(t, proc, cmd)
 
 		synctest.Wait()
 
@@ -283,22 +289,18 @@ func runUntilCanceled(t *testing.T, args ...string) {
 	})
 }
 
-// newRunProcess returns a process that logs nothing.
-func newRunProcess() *process {
-	return &process{log: new(zerolog.Nop())}
-}
-
-// newRunCommand returns a test root command parsed from args, with its
-// configuration loaded as preRun loads it, for tests that call run without
-// preRun. Call it after setRunState, which clears the configuration.
+// newRunCommand returns a test root command parsed from args, and loads its
+// configuration into proc as preRun does, for tests that call run without
+// preRun.
 //
 // Parameters:
 //   - t: Test that fails when the configuration cannot be loaded.
+//   - proc: Process that receives the configuration.
 //   - args: Command arguments, including positional container names.
 //
 // Returns:
 //   - *cobra.Command: The parsed command.
-func newRunCommand(t *testing.T, args ...string) *cobra.Command {
+func newRunCommand(t *testing.T, proc *process, args ...string) *cobra.Command {
 	t.Helper()
 
 	cmd := newTestRootCommand(t, args...)
@@ -306,7 +308,7 @@ func newRunCommand(t *testing.T, args ...string) *cobra.Command {
 	loaded, _, err := settings.Load(new(zerolog.Nop()), cmd, cmd.Flags().Args())
 	require.NoError(t, err)
 
-	appCfg = loaded
+	proc.cfg = loaded
 
 	return cmd
 }
@@ -369,8 +371,8 @@ func waitForAPI(t *testing.T, addr string) {
 // runInBackground runs the command in its own goroutine, with a process
 // context that the returned cancel ends the way a signal would. When the test
 // ends, it cancels that context and waits for run to return, so run stops
-// before setRunState restores the package state it reads. A run still going
-// after 10 seconds fails the test, and the wait goes on. Cleanups the caller
+// before the test's cleanups restore the package state it reads. A run still
+// going after 10 seconds fails the test, and the wait goes on. Cleanups the caller
 // registers later run first, so they can release anything run waits on.
 //
 // Parameters:
@@ -472,13 +474,13 @@ func TestRun_RunOnce(t *testing.T) {
 				state.currentID = tt.current.ID()
 			}
 
-			setRunState(t, state)
+			proc := newRunProcess(t, state)
 
 			if tt.hostBinary {
 				processID = func() int { return 4242 }
 			}
 
-			require.NoError(t, newRunProcess().run(newRunCommand(t, "--run-once"), nil))
+			require.NoError(t, proc.run(newRunCommand(t, proc, "--run-once"), nil))
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
@@ -494,7 +496,7 @@ func TestRun_RunOnceStoppedAtStartup(t *testing.T) {
 	// The mock fails the test on any Docker call.
 	mockClient := mockCmd.NewMockDockerClient(t)
 
-	setRunState(t, runTestState{client: mockClient})
+	proc := newRunProcess(t, runTestState{client: mockClient})
 
 	// Outside a container, so the run has no restart policy to disable.
 	processID = func() int { return 4242 }
@@ -502,12 +504,13 @@ func TestRun_RunOnceStoppedAtStartup(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	cmd := newRunCommand(t, "--run-once")
+	cmd := newRunCommand(t, proc, "--run-once")
 	cmd.SetContext(ctx)
 
 	log, output := logcapture.New(zerolog.InfoLevel)
+	proc.log = log
 
-	require.NoError(t, (&process{log: log}).run(cmd, nil))
+	require.NoError(t, proc.run(cmd, nil))
 
 	assert.NotContains(t, output.String(), "Running a one time update",
 		"a stopping run-once process wrote the startup message")
@@ -634,9 +637,9 @@ func TestRun_Continuous(t *testing.T) {
 				state.currentID = current.ID()
 			}
 
-			setRunState(t, state)
+			proc := newRunProcess(t, state)
 
-			runUntilCanceled(t, tt.args...)
+			runUntilCanceled(t, proc, tt.args...)
 
 			assert.Equal(t, tt.want, runCalls(mockClient))
 		})
@@ -683,9 +686,9 @@ func TestRun_PublishedPortsBlockSelfUpdates(t *testing.T) {
 					Return(false, current.ImageID(), "", nil).Once()
 			}
 
-			setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+			proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-			runUntilCanceled(t, append([]string{"--update-on-start"}, tt.args...)...)
+			runUntilCanceled(t, proc, append([]string{"--update-on-start"}, tt.args...)...)
 		})
 	}
 }
@@ -712,12 +715,12 @@ func TestRun_ScheduledUpdate(t *testing.T) {
 			return false, current.ImageID(), "", nil
 		}).Maybe()
 
-	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	cmd := newRunCommand(t, "--schedule", "@every 1h")
+	cmd := newRunCommand(t, proc, "--schedule", "@every 1h")
 
 	synctest.Test(t, func(t *testing.T) {
-		cancel, done := runInBackground(t, newRunProcess(), cmd)
+		cancel, done := runInBackground(t, proc, cmd)
 
 		time.Sleep(59 * time.Minute)
 		synctest.Wait()
@@ -760,12 +763,12 @@ func TestRun_UpdatesAfterCleanup(t *testing.T) {
 			return []*container.Container{current}, nil
 		})
 
-	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	cmd := newRunCommand(t, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
+	cmd := newRunCommand(t, proc, "--cleanup", "--update-on-start", "--schedule", "@every 1h")
 
 	synctest.Test(t, func(t *testing.T) {
-		cancel, done := runInBackground(t, newRunProcess(), cmd)
+		cancel, done := runInBackground(t, proc, cmd)
 
 		synctest.Wait()
 		assert.Zero(t, scheduledListings.Load(), "an update ran at startup")
@@ -813,14 +816,14 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 		}).Once()
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 
-	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
-	notifier = drainNotifier
+	proc.notifier = drainNotifier
 
 	addr, args := localAPIArgs(t, "--http-api-endpoints=containers", "--http-api-periodic-polls")
-	cmd := newRunCommand(t, args...)
+	cmd := newRunCommand(t, proc, args...)
 
-	cancelRun, done := runInBackground(t, newRunProcess(), cmd)
+	cancelRun, done := runInBackground(t, proc, cmd)
 
 	// Release the request even when the test fails early, so the API and run
 	// do not stay blocked after the test ends.
@@ -878,7 +881,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	// The process closes the notifier when it ends, after run returns. Closing
 	// waits for the worker to send what is queued. A notifier closed during the
 	// drain would have dropped the line instead.
-	newRunProcess().exit(cmd.Context(), cmd, nil)
+	proc.exit(cmd.Context(), cmd, nil)
 
 	assert.Contains(t, notifierLogs.String(), "Shoutrrr: Logged while the HTTP API drains")
 }
@@ -911,12 +914,12 @@ func TestRun_APISharesUpdateLock(t *testing.T) {
 	mockClient.EXPECT().IsContainerStale(mock.Anything, current, mock.Anything).
 		Return(false, current.ImageID(), "", nil).Maybe()
 
-	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
 	addr, args := localAPIArgs(t, "--update-on-start", "--http-api-endpoints=update", "--http-api-periodic-polls")
-	cmd := newRunCommand(t, args...)
+	cmd := newRunCommand(t, proc, args...)
 
-	runInBackground(t, newRunProcess(), cmd)
+	runInBackground(t, proc, cmd)
 
 	// Release the update when the test ends, before run is stopped.
 	t.Cleanup(func() { close(release) })
@@ -958,13 +961,15 @@ func TestRun_APIOnlyWritesOneStartupMessage(t *testing.T) {
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, orchestratorLabelKey).Return(nil, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 
-	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
 	addr, args := localAPIArgs(t, "--http-api-endpoints=update")
-	cmd := newRunCommand(t, args...)
+	cmd := newRunCommand(t, proc, args...)
 
 	log, output := logcapture.New(zerolog.InfoLevel)
-	cancelRun, done := runInBackground(t, &process{log: log}, cmd)
+	proc.log = log
+
+	cancelRun, done := runInBackground(t, proc, cmd)
 
 	waitForAPI(t, addr)
 	cancelRun()
@@ -1002,7 +1007,7 @@ func TestRun_HealthCheck(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mockCmd.NewMockDockerClient(t)
-			setRunState(t, runTestState{client: mockClient})
+			proc := newRunProcess(t, runTestState{client: mockClient})
 			setProcessFs(t, fstest.MapFS{
 				".dockerenv":             &fstest.MapFile{},
 				"proc/1/task/1/children": &fstest.MapFile{Data: []byte(tt.initChildren)},
@@ -1011,7 +1016,7 @@ func TestRun_HealthCheck(t *testing.T) {
 			processID = func() int { return tt.pid }
 			parentProcessID = func() int { return tt.ppid }
 
-			err := newRunProcess().run(newRunCommand(t, "--health-check"), nil)
+			err := proc.run(newRunCommand(t, proc, "--health-check"), nil)
 
 			assert.Empty(t, runCalls(mockClient))
 
@@ -1115,7 +1120,7 @@ func runExitHelper(t *testing.T, helperCase string) {
 		panic("unknown run exit helper case " + helperCase)
 	}
 
-	setRunState(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
 
 	// Watchtower runs as the main process of its container.
 	processID = func() int { return 1 }
@@ -1123,11 +1128,11 @@ func runExitHelper(t *testing.T, helperCase string) {
 	log := logging.New(os.Stderr, logging.InfoLevel)
 
 	// The notifier holds every line until the startup message, as at startup.
-	notifier = newLoggerNotifier(t, log)
+	proc.notifier = newLoggerNotifier(t, log)
 
-	cmd := newRunCommand(t, args...)
+	cmd := newRunCommand(t, proc, args...)
 
-	proc := &process{log: log}
+	proc.log = log
 	proc.exit(cmd.Context(), cmd, proc.run(cmd, nil))
 }
 
@@ -1147,12 +1152,12 @@ func TestRun_OldInstanceStops(t *testing.T) {
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, oldSelf.ID(),
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil)
 
-	setRunState(t, runTestState{client: mockClient, current: oldSelf, currentID: oldSelf.ID()})
+	proc := newRunProcess(t, runTestState{client: mockClient, current: oldSelf, currentID: oldSelf.ID()})
 
-	cmd := newRunCommand(t, "--update-on-start")
+	cmd := newRunCommand(t, proc, "--update-on-start")
 
 	synctest.Test(t, func(t *testing.T) {
-		_, done := runInBackground(t, newRunProcess(), cmd)
+		_, done := runInBackground(t, proc, cmd)
 
 		synctest.Wait()
 
