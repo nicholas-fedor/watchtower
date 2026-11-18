@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Isolate tests from settings in the shell environment by @nicholas-fedor in [#3919](https://github.com/nicholas-fedor/watchtower/pull/3919)
 
+### Chores
+
+- Update google.golang.org/genproto/googleapis/api digest to e6950dc by @renovate[bot] in [#3930](https://github.com/nicholas-fedor/watchtower/pull/3930)
+- Update golang.org/x/exp digest to 45f4102 by @renovate[bot] in [#3929](https://github.com/nicholas-fedor/watchtower/pull/3929)
+
 ## [1.24.1] - 2026-11-18
 
 ### Fixed
