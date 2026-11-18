@@ -1,10 +1,8 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -115,21 +113,20 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 		int(cleanupTimeout/time.Minute),
 	))
 
-	// Wait for the timeout or an interrupt, then remove the file.
+	// Wait for the timeout or a stop signal, which cancels the command's
+	// context, then remove the file.
 	timer := time.NewTimer(cleanupTimeout)
 	defer timer.Stop()
 
-	signalChannel := make(chan os.Signal, 1)
-	signal.Notify(signalChannel, os.Interrupt, syscall.SIGTERM)
-
-	defer signal.Stop(signalChannel)
+	ctx := cmd.Context()
 
 	select {
 	case <-timer.C:
 		log.Info().Msg("Timed out")
-	case sig := <-signalChannel:
+	case <-ctx.Done():
+		// The cause names the signal that stopped the process.
 		log.Info().
-			Str("signal", sig.String()).
+			Err(context.Cause(ctx)).
 			Msg("Stopping")
 	}
 

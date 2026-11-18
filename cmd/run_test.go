@@ -90,7 +90,6 @@ func setRunState(t *testing.T, state runTestState) {
 	savedCurrentUnknown := currentWatchtowerContainerUnknown
 	savedRunUpdates := runUpdatesWithNotifications
 	savedSleep := sleepFunc
-	savedSignalContext := createSignalContext
 	savedProcessID := processID
 	savedParentProcessID := parentProcessID
 
@@ -104,7 +103,6 @@ func setRunState(t *testing.T, state runTestState) {
 		currentWatchtowerContainerUnknown = savedCurrentUnknown
 		runUpdatesWithNotifications = savedRunUpdates
 		sleepFunc = savedSleep
-		createSignalContext = savedSignalContext
 		processID = savedProcessID
 		parentProcessID = savedParentProcessID
 	})
@@ -381,9 +379,7 @@ func runInBackground(t *testing.T, proc *process, cmd *cobra.Command) (context.C
 	t.Helper()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	createSignalContext = func(context.Context, ...os.Signal) (context.Context, context.CancelFunc) {
-		return ctx, cancel
-	}
+	cmd.SetContext(ctx)
 
 	done := make(chan struct{})
 
@@ -497,16 +493,15 @@ func TestRun_RunOnceStoppedAtStartup(t *testing.T) {
 	// Outside a container, so the run has no restart policy to disable.
 	processID = func() int { return 4242 }
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	createSignalContext = func(context.Context, ...os.Signal) (context.Context, context.CancelFunc) {
-		return ctx, cancel
-	}
+	cmd := newRunCommand(t, "--run-once")
+	cmd.SetContext(ctx)
 
 	log, output := logcapture.New(zerolog.InfoLevel)
 
-	require.NoError(t, (&process{log: log}).run(newRunCommand(t, "--run-once"), nil))
+	require.NoError(t, (&process{log: log}).run(cmd, nil))
 
 	assert.NotContains(t, output.String(), "Running a one time update",
 		"a stopping run-once process wrote the startup message")
@@ -877,7 +872,7 @@ func TestRun_WaitsForAPIDrain(t *testing.T) {
 	// The process closes the notifier when it ends, after run returns. Closing
 	// waits for the worker to send what is queued. A notifier closed during the
 	// drain would have dropped the line instead.
-	newRunProcess().exit(cmd, nil)
+	newRunProcess().exit(cmd.Context(), cmd, nil)
 
 	assert.Contains(t, notifierLogs.String(), "Shoutrrr: Logged while the HTTP API drains")
 }
@@ -1127,7 +1122,7 @@ func runExitHelper(t *testing.T, helperCase string) {
 	cmd := newRunCommand(t, args...)
 
 	proc := &process{log: log}
-	proc.exit(cmd, proc.run(cmd, nil))
+	proc.exit(cmd.Context(), cmd, proc.run(cmd, nil))
 }
 
 // TestRun_OldInstanceStops verifies that continuous mode stops on its own

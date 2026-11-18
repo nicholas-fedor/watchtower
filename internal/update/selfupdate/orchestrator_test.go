@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -561,6 +562,59 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 			assert.Equal(t, tt.wantErrorLogs, logcapture.Messages(t, logBuf.String(), "error"))
 		})
 	}
+}
+
+// TestOrchestrateSelfUpdate_StopCanceledMidway verifies that a stop signal
+// arriving while Docker stops the old container still leaves a Watchtower
+// running. The stop call fails with the cancellation after Docker stopped the
+// container. The orchestrator checks the container with a context of its own,
+// finds it stopped, and starts it again when the rename fails on the canceled
+// context.
+func TestOrchestrateSelfUpdate_StopCanceledMidway(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	old := orchestratorContainer(orchestratorOldID, orchestratorOldName, true)
+	client := mockSelfupdate.NewMockHandoffClient(t)
+
+	expectOldInspect(client, old)
+	client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).
+		RunAndReturn(func(context.Context, *container.Container, time.Duration) error {
+			cancel()
+
+			return fmt.Errorf("stop container: %w", context.Canceled)
+		}).Once()
+	// The Docker client fails every call made on an ended context.
+	client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
+		RunAndReturn(func(ctx context.Context, _ container.ContainerID) (*container.Container, error) {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+
+			return orchestratorContainer(orchestratorOldID, orchestratorOldName, false), nil
+		}).Once()
+	client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).
+		RunAndReturn(func(ctx context.Context, _ *container.Container, _ string) error {
+			return ctx.Err()
+		}).Once()
+	client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).
+		RunAndReturn(func(ctx context.Context, _ container.ContainerID) error {
+			return ctx.Err()
+		}).Once()
+
+	err := orchestrateSelfUpdate(newTestLogger(t), ctx, client,
+		orchestratorOldID, orchestratorNewImage, orchestratorOriginalName, "", false)
+	require.ErrorIs(t, err, context.Canceled)
+
+	assert.Equal(t, []string{
+		"GetContainer 01d",
+		"StopContainer 01d",
+		"GetContainer 01d",
+		"RenameContainer 01d to watchtower-old-01d000000000",
+		"StartContainerByID 01d",
+	}, orchestratorCalls(client))
 }
 
 // expectOldInspect expects the orchestrator's first inspection of the old

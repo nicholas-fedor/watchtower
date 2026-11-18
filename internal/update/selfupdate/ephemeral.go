@@ -647,6 +647,11 @@ func inspectOldContainer(
 // before the replacement is created. The container is left in place for rename
 // and optional recovery.
 //
+// A failed stop is checked against the container's state with a context of its
+// own, bounded like a recovery step. Docker may have stopped the container
+// although the call failed, also when ctx ended during it. A stopped container
+// then goes on to the rename, whose failure starts it again.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
@@ -676,9 +681,13 @@ func stopOldContainer(
 			return true, nil
 		}
 
-		// Re-inspect after a non-NotFound stop error. The cached view may be stale.
+		// Re-inspect after a non-NotFound stop error. The cached view may be
+		// stale, and ctx may have ended after Docker accepted the stop.
+		inspectCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
+		defer cancel()
+
 		freshContainer, inspectErr := client.GetContainer(
-			ctx,
+			inspectCtx,
 			oldContainer.ID(),
 		)
 		if inspectErr != nil {

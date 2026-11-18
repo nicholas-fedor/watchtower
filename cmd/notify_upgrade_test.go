@@ -29,11 +29,13 @@ const (
 )
 
 // newNotifyUpgradeCommand returns a notify-upgrade command under a new root
-// command, configured only by args.
+// command, configured only by args. Its context is the test's context, as
+// Execute passes the process context down to it.
 func newNotifyUpgradeCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
 	sub := &cobra.Command{Use: "notify-upgrade"}
+	sub.SetContext(t.Context())
 	newTestRootCommand(t, args...).AddCommand(sub)
 
 	return sub
@@ -74,6 +76,10 @@ func runNotifyUpgradeUntilTimeout(t *testing.T, args ...string) notifyUpgradeRun
 		cmd := newNotifyUpgradeCommand(t, args...)
 
 		synctest.Test(t, func(t *testing.T) {
+			// The wait selects on the context, so the context belongs to the
+			// bubble too. Otherwise the wait would not count as blocked.
+			cmd.SetContext(t.Context())
+
 			done := make(chan error, 1)
 
 			go func() {
@@ -248,7 +254,7 @@ func TestRunNotifyUpgrade_ExitsOnFailure(t *testing.T) {
 		)
 
 		proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
-		proc.exit(cmd, proc.runNotifyUpgrade(cmd, nil))
+		proc.exit(cmd.Context(), cmd, proc.runNotifyUpgrade(cmd, nil))
 
 		// The failure must end the process. Reaching here means it did not.
 		os.Exit(2)

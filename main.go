@@ -39,7 +39,10 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/nicholas-fedor/watchtower/cmd"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -47,10 +50,17 @@ import (
 
 // main serves as the entry point for the Watchtower application.
 //
-// It constructs the process logger and delegates execution to the cmd package,
-// which handles CLI setup, flag parsing, and core logic for container updates
-// and notifications.
+// It constructs the process logger and a context that an interrupt or SIGTERM
+// cancels. It then delegates execution to the cmd package, which handles CLI
+// setup, flag parsing, and core logic for container updates and notifications.
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// The first signal starts a graceful stop. A second one ends the process
+	// at once, as the signal's default action does.
+	context.AfterFunc(ctx, stop)
+
 	log := logging.New(logging.JSONWriter(os.Stderr), logging.InfoLevel)
-	cmd.Execute(log)
+	cmd.Execute(ctx, log)
 }

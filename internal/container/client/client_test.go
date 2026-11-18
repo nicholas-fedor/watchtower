@@ -2546,6 +2546,57 @@ func TestNegotiateDockerAPI_WaitsForDaemon(t *testing.T) {
 	})
 }
 
+// TestNegotiateDockerAPI_CallerContextEnds verifies that the wait for a daemon
+// that is not serving yet returns the caller's context error when that
+// context is canceled or its deadline passes first. A stop signal cancels the
+// process context.
+func TestNegotiateDockerAPI_CallerContextEnds(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// end ends the caller's context 10 seconds into the wait.
+		end     func(ctx context.Context) (context.Context, context.CancelFunc)
+		wantErr error
+	}{
+		{
+			name: "canceled",
+			end: func(ctx context.Context) (context.Context, context.CancelFunc) {
+				ctx, cancel := context.WithCancel(ctx)
+				time.AfterFunc(10*time.Second, cancel)
+
+				return ctx, cancel
+			},
+			wantErr: context.Canceled,
+		},
+		{
+			name: "deadline passes",
+			end: func(ctx context.Context) (context.Context, context.CancelFunc) {
+				return context.WithTimeout(ctx, 10*time.Second)
+			},
+			wantErr: context.DeadlineExceeded,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				daemon := &startingDaemon{ready: time.Now().Add(75 * time.Second)}
+
+				ctx, cancel := tt.end(t.Context())
+				defer cancel()
+
+				cli, result, err := negotiateDockerAPI(ctx, newTestLogger(t), newStartingDaemonClient(t, daemon), nil)
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.NotNil(t, cli)
+				assert.Empty(t, result.APIVersion)
+			})
+		})
+	}
+}
+
 // TestGetCurrentWatchtowerContainer_Retries verifies how the inspect of the
 // running Watchtower container retries. A transient error is tried again
 // after 2 seconds, up to three attempts or until the caller's context ends.

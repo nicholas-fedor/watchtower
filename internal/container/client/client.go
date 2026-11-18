@@ -176,7 +176,8 @@ type ImageDiskUsage struct {
 //
 // Returns:
 //   - *Client: The initialized client. It is nil when the error is not.
-//   - error: Non-nil when the client cannot be built or rebuilt. An unanswered ping is not an
+//   - error: Non-nil when the client cannot be built or rebuilt, or when ctx ends before the
+//     daemon answers. A daemon that has not answered when the three minutes are up is not an
 //     error.
 func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*Client, error) {
 	connection, err := opts.Docker.ConnectionOptions()
@@ -226,8 +227,9 @@ func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*C
 // When the configured API version is incompatible with the server, it recreates the client
 // without a fixed version so negotiation can select a supported API. A fixed version is
 // incompatible when the ping fails with a not-found error, or when it is newer than the API
-// version the daemon reports. Other ping failures are non-fatal: the client is returned and
-// version negotiation is deferred until the first API call.
+// version the daemon reports. When ctx ends before the daemon answers, its error is returned.
+// Other ping failures, including the end of the three-minute wait, are non-fatal: the client
+// is returned and version negotiation is deferred until the first API call.
 //
 // Parameters:
 //   - ctx: Bounds the wait for the daemon.
@@ -239,7 +241,8 @@ func NewClient(ctx context.Context, log *zerolog.Logger, opts ClientOptions) (*C
 // Returns:
 //   - *dockerClient.Client: Client to use for subsequent API calls (possibly recreated).
 //   - dockerClient.PingResult: Result of a successful ping, or zero when ping failed.
-//   - error: Non-nil only when the client cannot be recreated after an incompatible API version.
+//   - error: Non-nil when ctx ends before the daemon answers, or when the client cannot be
+//     recreated after an incompatible API version.
 func negotiateDockerAPI(
 	ctx context.Context,
 	log *zerolog.Logger,
@@ -270,6 +273,12 @@ func negotiateDockerAPI(
 
 		cli = recreated
 		result, err = pingUntilServing(ctx, log, cli)
+	}
+
+	// An error from the end of ctx is neither a not-found error nor a version
+	// answer, so the fallback above never runs for it.
+	if err != nil && ctx.Err() != nil {
+		return cli, dockerClient.PingResult{}, fmt.Errorf("wait for Docker daemon: %w", context.Cause(ctx))
 	}
 
 	if err != nil {
