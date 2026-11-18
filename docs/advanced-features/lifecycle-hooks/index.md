@@ -207,7 +207,8 @@ The HTTP API and its event stream do not include hook output.
 !!! Note "Markup, mentions and look-alike characters"
     Watchtower does not escape the text for each notification service. A service may act on markup or mentions in it:
 
-    - Discord parses `@everyone` in a message.
+    - Discord renders Markdown in a message. It pings only the mentions that the URL's `mentions` key lists. Discord counts `@everyone` and `@here` as one kind of mention, so listing either one lets both ping.
+    - A Discord URL with the `/raw` path sends the template's JSON payload as written and ignores the `mentions` key. Without `allowed_mentions` in that payload, Discord pings every mention in its content.
     - Email sent with Shoutrrr's `usehtml` option renders the text as HTML.
     - Telegram's HTML and Markdown parse modes format it.
 

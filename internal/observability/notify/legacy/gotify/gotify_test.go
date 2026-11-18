@@ -1,12 +1,16 @@
 package gotify
 
 import (
+	"io"
+	"log"
 	"net/url"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	shoutrrrGotify "github.com/nicholas-fedor/shoutrrr/pkg/services/push/gotify"
 
 	notifyConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/notify"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
@@ -46,6 +50,27 @@ func TestURL_TLSSkipVerify(t *testing.T) {
 			assert.Equal(t, "gotify.example.com", parsed.Host)
 		})
 	}
+}
+
+// TestURL_SendsTokenInHeader verifies that Shoutrrr's Gotify service, reading
+// the converted URL, sends the token in the X-Gotify-Key header rather than in
+// the request query, where access logs record it.
+func TestURL_SendsTokenInHeader(t *testing.T) {
+	t.Parallel()
+
+	nop := zerolog.Nop()
+	raw, err := URL(&nop, notifyConfig.Legacy{
+		GotifyURL:   "https://gotify.example.com",
+		GotifyToken: "Aaaaaaaaaaaaaaa",
+	})
+	require.NoError(t, err)
+
+	parsed, err := url.Parse(raw)
+	require.NoError(t, err)
+
+	service := &shoutrrrGotify.Service{}
+	require.NoError(t, service.Initialize(parsed, log.New(io.Discard, "", 0)))
+	assert.True(t, service.Config.UseHeader)
 }
 
 // TestURL_RequiredSettings verifies that URL converts a valid server URL and
