@@ -743,6 +743,14 @@ func TestPreRun_Exit(t *testing.T) {
 			unwantedOutput: []string{"SetRestartPolicy"},
 		},
 		{
+			// An inspect failure the stop did not cause is still reported,
+			// although restarts are kept while the process stops.
+			helperCase:     "independent-inspect-failure-during-stop",
+			wantExitCode:   1,
+			wantOutput:     []string{logging.ScopeLabelUnreadable},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
 			// A stop during the inspect of Watchtower's own container ends
 			// startup before the failed inspect is reported, so no scope
 			// label failure is logged.
@@ -962,6 +970,15 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		stopProcess()
 
 		clientErr = errRunTestDocker
+	case "independent-inspect-failure-during-stop":
+		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
+			RunAndReturn(func(context.Context, container.ContainerID) (*container.Container, error) {
+				stopProcess()
+
+				return nil, errRunTestDocker
+			}).Once()
 	case "stopped-while-inspecting-own-container":
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 

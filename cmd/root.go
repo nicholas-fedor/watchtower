@@ -486,8 +486,9 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// A stop during the lookup ends startup before its failures are reported.
-	if ctx.Err() != nil {
+	// A stop during the lookup ends startup before the failures it caused are
+	// reported. An inspect failure the stop did not cause is still reported.
+	if ctx.Err() != nil && (inspectErr == nil || stoppedBy(ctx, inspectErr)) {
 		return fmt.Errorf("look up own container: %w", context.Cause(ctx))
 	}
 
