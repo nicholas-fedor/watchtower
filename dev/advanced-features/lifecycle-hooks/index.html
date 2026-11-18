@@ -3645,7 +3645,8 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
 <p class="admonition-title">Markup, mentions and look-alike characters</p>
 <p>Watchtower does not escape the text for each notification service. A service may act on markup or mentions in it:</p>
 <ul>
-<li>Discord parses <code>@everyone</code> in a message.</li>
+<li>Discord renders Markdown in a message. It pings only the mentions that the URL's <code>mentions</code> key lists. Discord counts <code>@everyone</code> and <code>@here</code> as one kind of mention, so listing either one lets both ping.</li>
+<li>A Discord URL with the <code>/raw</code> path sends the template's JSON payload as written and ignores the <code>mentions</code> key. Without <code>allowed_mentions</code> in that payload, Discord pings every mention in its content.</li>
 <li>Email sent with Shoutrrr's <code>usehtml</code> option renders the text as HTML.</li>
 <li>Telegram's HTML and Markdown parse modes format it.</li>
 </ul>
@@ -4301,7 +4302,7 @@ Any other value, such as <code>-1</code> or <code>1.5</code>, logs a warning and
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 15, 2026 11:44:12 UTC"><span class="timeago" datetime="2026-11-15T11:44:12+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 15, 2026 11:44:12 UTC">2026-11-15</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 18, 2026 00:02:29 UTC"><span class="timeago" datetime="2026-11-18T00:02:29+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 18, 2026 00:02:29 UTC">2026-11-18</span>
   </span>
 
     
