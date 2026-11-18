@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Move invocation state onto the process by @nicholas-fedor in [#3932](https://github.com/nicholas-fedor/watchtower/pull/3932)
 - Return orchestrator errors to the exit path by @nicholas-fedor in [#3925](https://github.com/nicholas-fedor/watchtower/pull/3925)
 
 ### Tests
