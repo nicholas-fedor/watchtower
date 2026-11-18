@@ -87,7 +87,8 @@ var (
 type dockerConnectionConfig struct {
 	// Host is the DOCKER_HOST value (e.g., "unix:///var/run/docker.sock", "tcp://host:2375").
 	Host string
-	// TLSVerify indicates whether TLS verification is enabled ("1" or empty).
+	// TLSVerify is the source container's DOCKER_TLS_VERIFY value, forwarded
+	// unchanged for the orchestrator's settings to read. Empty when unset.
 	TLSVerify string
 	// CertPath is the path to TLS certificates for remote connections.
 	CertPath string
@@ -148,7 +149,7 @@ func CreateOrchestrator(
 	clog.Debug().
 		Str("docker_host", connConfig.Host).
 		Bool("is_local", connConfig.IsLocal).
-		Bool("tls_verify", connConfig.TLSVerify != "").
+		Str("tls_verify", connConfig.TLSVerify).
 		Str("api_version", connConfig.APIVersion).
 		Msg("Extracted Docker connection configuration")
 

@@ -992,6 +992,65 @@ func TestEphemeralOrchestrator(t *testing.T) {
 	})
 }
 
+// TestCreateOrchestrator_logsForwardedTLSVerify verifies that the connection
+// debug line shows the DOCKER_TLS_VERIFY value the orchestrator receives. The
+// orchestrator reads that value as a boolean, so a false value such as "0"
+// must not be shown as verification turned on.
+func TestCreateOrchestrator_logsForwardedTLSVerify(t *testing.T) {
+	t.Parallel()
+
+	// connectionEntry is the debug line that describes the forwarded connection.
+	type connectionEntry struct {
+		Message   string `json:"message"`
+		TLSVerify string `json:"tls_verify"`
+	}
+
+	tests := []struct {
+		name string
+		env  []string
+		want string
+	}{
+		{name: "false as 0", env: []string{"DOCKER_TLS_VERIFY=0"}, want: "0"},
+		{name: "false as a word", env: []string{"DOCKER_TLS_VERIFY=false"}, want: "false"},
+		{name: "true", env: []string{"DOCKER_TLS_VERIFY=1"}, want: "1"},
+		{name: "unset", env: nil, want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := mockContainer.NewMockAPIClient(t)
+			api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).
+				Return(dockerClient.ContainerCreateResult{ID: "orchestrator-id"}, nil).Once()
+			api.EXPECT().ContainerStart(mock.Anything, "orchestrator-id", dockerClient.ContainerStartOptions{}).
+				Return(dockerClient.ContainerStartResult{}, nil).Once()
+
+			source := modelfixture.Container(
+				containerfixture.WithID("source123"),
+				containerfixture.WithName("watchtower-source"),
+				containerfixture.WithImageName("watchtower:latest"),
+				containerfixture.WithEnv(tt.env),
+			)
+
+			log, buf := logcapture.NewJSON(zerolog.DebugLevel)
+
+			_, err := CreateOrchestrator(log, t.Context(), api, source, "watchtower:v2", "chain1", false)
+			require.NoError(t, err)
+
+			var got []string
+
+			for _, entry := range logcapture.Entries[connectionEntry](t, buf.String()) {
+				if entry.Message == "Extracted Docker connection configuration" {
+					got = append(got, entry.TLSVerify)
+				}
+			}
+
+			assert.Equal(t, []string{tt.want}, got)
+		})
+	}
+}
+
 // TestExtractDockerConnectionConfig_DockerHostSocket verifies that the
 // orchestrator mounts the socket the source container's DOCKER_HOST names, so
 // the forwarded DOCKER_HOST reaches the daemon, and that a remote DOCKER_HOST
