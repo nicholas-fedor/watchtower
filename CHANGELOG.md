@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Wait only for the part of a rate-limit token not yet earned by @nicholas-fedor in [#3915](https://github.com/nicholas-fedor/watchtower/pull/3915)
 - Ignore advertised rate limits slower than one request per 30 seconds by @nicholas-fedor in [#3913](https://github.com/nicholas-fedor/watchtower/pull/3913)
 
 ## [1.24.1] - 2026-11-18
