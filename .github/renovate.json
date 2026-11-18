@@ -34,7 +34,7 @@
       "automerge": true
     },
     {
-      "description": "compose-go v2.16+ does not compile against docker/compose v5.5.1. Do not update it on its own. A released docker/compose module raises this requirement through go get when that module requires a newer compose-go.",
+      "description": "docker/compose builds only against the compose-go version it requires. compose-go changes its Go API in minor releases, as v2.16 did when it moved service fields into an embedded ContainerSpec. Do not update compose-go on its own. A docker/compose update raises it through go get when that release requires a newer compose-go.",
       "matchManagers": ["gomod"],
       "matchDepNames": ["github.com/compose-spec/compose-go/v2"],
       "matchPackageNames": ["github.com/compose-spec/compose-go/v2"],
