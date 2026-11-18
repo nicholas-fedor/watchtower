@@ -726,6 +726,44 @@ func TestPreRun_Exit(t *testing.T) {
 			unwantedOutput: []string{"newClient", "SetRestartPolicy", logging.RestartsKept},
 		},
 		{
+			// A stop signal during the wait for the Docker daemon ends startup
+			// as a stop ends a run, with code 0 and no failure reported. The
+			// runtime stopped Watchtower on purpose, so its restarts are kept.
+			helperCase:     "stopped-while-waiting-for-docker",
+			wantExitCode:   0,
+			wantOutput:     []string{"newClient host="},
+			unwantedOutput: []string{"SetRestartPolicy", "Failed to initialize Docker client", logging.RestartsKept},
+		},
+		{
+			// A failure that does not come from the stop is reported, even when
+			// a stop signal arrives at the same time.
+			helperCase:     "unrelated-failure-during-stop",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to initialize Docker client"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
+			// An inspect failure the stop did not cause is still reported,
+			// although restarts are kept while the process stops.
+			helperCase:     "independent-inspect-failure-during-stop",
+			wantExitCode:   1,
+			wantOutput:     []string{logging.ScopeLabelUnreadable},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
+			// A stop during the inspect of Watchtower's own container ends
+			// startup before the failed inspect is reported, so no scope
+			// label failure is logged.
+			helperCase:   "stopped-while-inspecting-own-container",
+			wantExitCode: 0,
+			unwantedOutput: []string{
+				"SetRestartPolicy",
+				logging.ScopeLabelUnreadable,
+				logging.SelfUninspected,
+				logging.RestartsKept,
+			},
+		},
+		{
 			// The orchestrator reports its own failures. Its container is
 			// removed when it exits, so its restart policy is left alone.
 			helperCase:     "orchestrator-without-settings",
@@ -879,6 +917,11 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		execute bool
 	)
 
+	// processCtx is the process context. stopProcess cancels it, as a stop
+	// signal does.
+	processCtx, stopProcess := context.WithCancel(t.Context())
+	defer stopProcess()
+
 	// Watchtower runs as PID 1, the main process of its own container, unless
 	// a case says otherwise.
 	detection := selfDetection{mountinfo: mountinfoWithSelf(), marker: true}
@@ -921,6 +964,30 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	case "subcommand-error":
 		args = []string{"notify-upgrade", "--not-a-watchtower-flag"}
 		execute = true
+	case "stopped-while-waiting-for-docker":
+		stopProcess()
+	case "unrelated-failure-during-stop":
+		stopProcess()
+
+		clientErr = errRunTestDocker
+	case "independent-inspect-failure-during-stop":
+		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
+			RunAndReturn(func(context.Context, container.ContainerID) (*container.Container, error) {
+				stopProcess()
+
+				return nil, errRunTestDocker
+			}).Once()
+	case "stopped-while-inspecting-own-container":
+		detection = selfDetection{mountinfo: mountinfoWithSelf()}
+
+		mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
+			RunAndReturn(func(ctx context.Context, _ container.ContainerID) (*container.Container, error) {
+				stopProcess()
+
+				return nil, ctx.Err()
+			}).Once()
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
 		detection = selfDetection{}
@@ -1010,13 +1077,18 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	// The client factory prints the Docker host it connects to and whether its
 	// wait for the daemon has a deadline. It fails with clientErr when a case
-	// sets it.
+	// sets it, and with the context's error when the context has ended, as the
+	// wait for the daemon does.
 	newClient = func(ctx context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
 		_, bounded := ctx.Deadline()
 		fmt.Fprintf(os.Stderr, "newClient host=%s bounded=%t\n", opts.Docker.Host, bounded)
 
 		if clientErr != nil {
 			return nil, clientErr
+		}
+
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
 
 		return mockClient, nil
@@ -1035,7 +1107,8 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
 
 	if execute {
-		proc.exit(newExecuteCommand(t, proc, args...).ExecuteC())
+		executed, err := newExecuteCommand(t, proc, args...).ExecuteContextC(processCtx)
+		proc.exit(processCtx, executed, err)
 
 		return
 	}
@@ -1047,5 +1120,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		t.Setenv(key, value)
 	}
 
-	proc.exit(cmd, proc.preRun(cmd, nil))
+	cmd.SetContext(processCtx)
+
+	proc.exit(processCtx, cmd, proc.preRun(cmd, nil))
 }

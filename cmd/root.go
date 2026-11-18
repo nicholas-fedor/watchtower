@@ -3,13 +3,12 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
-	"os/signal"
 	"slices"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -123,12 +122,6 @@ var (
 	// It is initialized to time.Sleep by default, providing a way to mock sleep behavior during testing
 	// to avoid delays in unit tests or control timing in integration tests.
 	sleepFunc = time.Sleep
-
-	// createSignalContext is a function variable for creating a signal-aware context.
-	//
-	// It wraps signal.NotifyContext to allow overriding in tests for testing signal handling behavior.
-	// The function creates a context that is canceled when the specified signals (SIGINT, SIGTERM) are received.
-	createSignalContext = signal.NotifyContext
 
 	// newClient creates the Docker client, allowing it to be overridden in tests.
 	//
@@ -278,14 +271,17 @@ func NewRootCommand() *cobra.Command {
 // interface between the CLI and the operating system.
 //
 // Parameters:
+//   - ctx: The process context, which a stop signal cancels. The commands read it from
+//     their own context.
 //   - log: Process logger from main (reconfigured in preRun from --log-format / --log-level).
-func Execute(log *zerolog.Logger) {
+func Execute(ctx context.Context, log *zerolog.Logger) {
 	proc := &process{log: log}
 	rootCmd.PreRunE = proc.preRun
 	rootCmd.RunE = proc.run
 	notifyUpgradeCmd.RunE = proc.runNotifyUpgrade
 
-	proc.exit(rootCmd.ExecuteC())
+	cmd, err := rootCmd.ExecuteContextC(ctx)
+	proc.exit(ctx, cmd, err)
 }
 
 // exit closes the notifier and ends the process when a command returns an
@@ -297,6 +293,11 @@ func Execute(log *zerolog.Logger) {
 // Because a root command failure would happen again on every start,
 // Watchtower's restarts are disabled before that line is logged.
 //
+// A command that a stop signal ended exits with code 0, as a run does when a
+// stop ends it. Its error is logged only at debug, and its restarts are left
+// alone. An error that does not come from the stop is reported as above, even
+// when a stop signal arrives at the same time.
+//
 // Closing the notifier sends every line it still holds, the fatal line
 // included. Lines logged after the close are dropped, such as those of an HTTP
 // API request that outlasts its 5-second shutdown grace period. A startup that
@@ -305,15 +306,19 @@ func Execute(log *zerolog.Logger) {
 // A command that succeeds returns after the close.
 //
 // Parameters:
+//   - ctx: The process context, which a stop signal cancels.
 //   - cmd: The command that ran.
 //   - err: The error the command returned.
-func (p *process) exit(cmd *cobra.Command, err error) {
+func (p *process) exit(ctx context.Context, cmd *cobra.Command, err error) {
 	code := 0
 
 	exitErr, ok := errors.AsType[*exitError](err)
 
 	switch {
 	case err == nil:
+	case stoppedBy(ctx, err):
+		// The error follows from the stop, so it is not reported as a failure.
+		p.log.Debug().Err(err).Msg("Stopped by a signal")
 	case ok && exitErr.msg == "":
 		code = exitErr.code
 		if code != 0 {
@@ -327,7 +332,7 @@ func (p *process) exit(cmd *cobra.Command, err error) {
 			msg, cause = exitErr.msg, exitErr.err
 		}
 
-		p.disableRestartsBeforeExit(cmd)
+		p.disableRestartsBeforeExit(ctx, cmd)
 
 		// Fatal would exit inside Msg, before the notifier could send the line.
 		p.log.WithLevel(zerolog.FatalLevel).Err(cause).Msg(msg)
@@ -342,6 +347,25 @@ func (p *process) exit(cmd *cobra.Command, err error) {
 	if err != nil {
 		os.Exit(code)
 	}
+}
+
+// stoppedBy reports whether err comes from a stop signal that canceled ctx.
+//
+// Docker calls fail with [context.Canceled] once ctx is canceled. Watchtower's
+// own steps wrap the cause of the cancellation, which names the signal.
+//
+// Parameters:
+//   - ctx: The process context, which a stop signal cancels.
+//   - err: The error to classify.
+//
+// Returns:
+//   - bool: True when ctx is canceled and err comes from that cancellation.
+func stoppedBy(ctx context.Context, err error) bool {
+	if ctx.Err() == nil {
+		return false
+	}
+
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.Cause(ctx))
 }
 
 // preRun prepares the environment and configuration before the main command execution begins.
@@ -371,6 +395,9 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	cmd.SilenceErrors = true
 	cmd.SilenceUsage = true
 
+	// A stop signal cancels ctx, which ends the startup steps that wait.
+	ctx := cmd.Context()
+
 	var err error
 
 	appCfg, p.log, err = settings.Load(p.log, cmd, args)
@@ -396,7 +423,7 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	clientOpts := appCfg.ClientOptions()
 	clientOpts.RateLimiter = rateLimiter
 
-	client, err = newClient(context.Background(), p.log, clientOpts)
+	client, err = newClient(ctx, p.log, clientOpts)
 	if err != nil {
 		p.clientErr = err
 
@@ -410,7 +437,7 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 
 		// The orchestrator's container is removed when it exits, so its
 		// restart policy is left alone.
-		err = selfupdate.RunOrchestrator(p.log, context.Background(), client)
+		err = selfupdate.RunOrchestrator(p.log, ctx, client)
 		if err != nil {
 			return &exitError{err: err, msg: "", code: 1}
 		}
@@ -418,16 +445,13 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return &exitError{err: errOrchestratorFinished, msg: "", code: 0}
 	}
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		containerLookupTimeout,
-	)
+	lookupCtx, cancel := context.WithTimeout(ctx, containerLookupTimeout)
 	defer cancel()
 
 	// Retrieve and store the current container ID for use throughout the application.
 	var detectErr, inspectErr error
 
-	currentWatchtowerContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
+	currentWatchtowerContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, client)
 	if detectErr != nil {
 		p.log.Debug().Err(detectErr).Msg("Failed to get current container ID")
 
@@ -447,9 +471,9 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	if currentWatchtowerContainerID != "" {
 		// A health check uses none of the container's data, so its inspect
 		// shares the lookup's timeout instead of waiting for every retry.
-		inspectCtx := context.Background()
+		inspectCtx := ctx
 		if appCfg.Mode.HealthCheck {
-			inspectCtx = ctx
+			inspectCtx = lookupCtx
 		}
 
 		currentWatchtowerContainer, inspectErr = client.GetCurrentWatchtowerContainer(
@@ -462,13 +486,19 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// A stop during the lookup ends startup before the failures it caused are
+	// reported. An inspect failure the stop did not cause is still reported.
+	if ctx.Err() != nil && (inspectErr == nil || stoppedBy(ctx, inspectErr)) {
+		return fmt.Errorf("look up own container: %w", context.Cause(ctx))
+	}
+
 	// Without its own ID, Watchtower cannot tell itself apart from other instances.
 	// A host binary has no container ID, so only a containerized run is unknown.
 	currentWatchtowerContainerUnknown = currentWatchtowerContainerID == "" &&
 		containerClient.InContainer(processFs)
 
 	if !appCfg.Mode.HealthCheck && container.IsSuperseded(currentWatchtowerContainer) {
-		return p.retire()
+		return p.retire(ctx)
 	}
 
 	err = p.setUpNotifications()
@@ -476,7 +506,7 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = p.resolveScope(inspectErr)
+	err = p.resolveScope(ctx, inspectErr)
 	if err != nil {
 		return err
 	}
@@ -495,9 +525,12 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 
 // retire retires Watchtower's container after a self-update replaced it.
 //
+// Parameters:
+//   - ctx: The process context, which a stop signal cancels.
+//
 // Returns:
 //   - error: An [exitError] with exit code 0.
-func (p *process) retire() error {
+func (p *process) retire(ctx context.Context) error {
 	// Notifications are set up first, so the recovery is notified.
 	err := p.setUpNotifications()
 	if err != nil {
@@ -509,7 +542,7 @@ func (p *process) retire() error {
 	label, _ := currentWatchtowerContainer.Scope()
 	scope := appCfg.Filter.ScopeWithLabel(label)
 
-	selfupdate.RetireOldInstance(p.log, context.Background(), client, currentWatchtowerContainer, scope, restartPolicyTimeout)
+	selfupdate.RetireOldInstance(p.log, ctx, client, currentWatchtowerContainer, scope, restartPolicyTimeout)
 
 	return &exitError{err: errSupersededInstance, msg: "", code: 0}
 }
@@ -550,16 +583,17 @@ func (p *process) setUpNotifications() error {
 // runs no updates, so it continues.
 //
 // Parameters:
+//   - ctx: The process context, which a stop signal cancels.
 //   - inspectErr: The error from inspecting Watchtower's own container. It is
 //     nil when the inspect succeeded.
 //
 // Returns:
 //   - error: An [exitError] when the scope label cannot be read or the filter
 //     cannot be built.
-func (p *process) resolveScope(inspectErr error) error {
+func (p *process) resolveScope(ctx context.Context, inspectErr error) error {
 	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
 		// Disable restarts first, so the runtime does not start Watchtower again.
-		p.disableRestarts()
+		p.disableRestarts(ctx)
 		p.log.Error().Err(inspectErr).Msg(logging.ScopeLabelUnreadable)
 
 		return &exitError{err: inspectErr, msg: "", code: 1}
@@ -592,12 +626,13 @@ func (p *process) resolveScope(inspectErr error) error {
 // the RunConfig from appCfg and hands it to runMain for core execution.
 //
 // Parameters:
-//   - _: The cobra.Command instance being executed, whose settings preRun already loaded.
+//   - cmd: The cobra.Command instance being executed, whose settings preRun already loaded.
+//     Its context is the process context, which a stop signal cancels.
 //   - _: Positional arguments, which preRun already loaded as container names.
 //
 // Returns:
 //   - error: An [exitError] when Watchtower cannot continue or its run failed.
-func (p *process) run(_ *cobra.Command, _ []string) error {
+func (p *process) run(cmd *cobra.Command, _ []string) error {
 	if appCfg.Mode.HealthCheck {
 		if isContainerMainProcess() {
 			sleepFunc(1 * time.Second)
@@ -623,7 +658,7 @@ func (p *process) run(_ *cobra.Command, _ []string) error {
 			Msg("HTTP API configuration options are set, but no endpoints are enabled.")
 	}
 
-	return p.runMain(cfg)
+	return p.runMain(cmd.Context(), cfg)
 }
 
 // runMain contains the core Watchtower logic after early exits are handled.
@@ -635,11 +670,12 @@ func (p *process) run(_ *cobra.Command, _ []string) error {
 // a complete [updateParams.Params] snapshot.
 //
 // Parameters:
+//   - processCtx: The process context, which a stop signal cancels.
 //   - cfg: The RunConfig struct containing filter, API, and mode parameters for this execution.
 //
 // Returns:
 //   - error: An [exitError] for a failure that was already logged.
-func (p *process) runMain(cfg settings.RunConfig) error {
+func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) error {
 	// Log the container names being processed for debugging visibility.
 	p.log.Debug().
 		Strs("container_names", cfg.Names).
@@ -675,11 +711,8 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		InsecureSkipTLS: appCfg.Git.InsecureSkipTLS,
 	})
 
-	ctx, stop := createSignalContext(
-		context.Background(),
-		os.Interrupt,
-		syscall.SIGTERM,
-	)
+	// An old instance stops its own run through stop, as a signal stops the process.
+	ctx, stop := context.WithCancel(processCtx)
 	defer stop()
 
 	runUpdatesWithNotifications = func(ctx context.Context, filter filters.Filter, params updateParams.Params) *metrics.Metric {
@@ -718,7 +751,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 			appCfg.Update.UseComposeDependsOn,
 		)
 		if err != nil {
-			p.disableRestarts()
+			p.disableRestarts(processCtx)
 			p.log.Error().Err(err).Msg(logging.RollingRestartValidationFailed)
 
 			return &exitError{err: err, msg: "", code: 1}
@@ -753,7 +786,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 
 		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
-		p.disableRestarts()
+		p.disableRestarts(processCtx)
 
 		return nil
 	}
@@ -881,7 +914,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 		},
 	)
 	if err != nil {
-		p.disableRestarts()
+		p.disableRestarts(processCtx)
 		p.log.Error().Err(err).Msg(logging.APISetupFailed)
 
 		return &exitError{err: err, msg: "", code: 1}
@@ -909,7 +942,7 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 	<-apiStopped
 
 	if err != nil {
-		p.disableRestarts()
+		p.disableRestarts(processCtx)
 		p.log.Error().Err(err).Msg(logging.SchedulingFailed)
 
 		return &exitError{err: err, msg: "", code: 1}
@@ -922,12 +955,17 @@ func (p *process) runMain(cfg settings.RunConfig) error {
 //
 // Only the container's main process changes the policy. A host binary and a
 // command started with docker exec, such as a health check probe, leave it
-// alone. A policy that is already "no" is not updated. A failure, including a
+// alone. A process that a stop signal is ending leaves it alone too. Its
+// failure follows from the stop, so a later start would not repeat it. A
+// policy that is already "no" is not updated. A failure, including a
 // container ID that is not known, is logged as an error, because the runtime
 // may then start Watchtower again. Exit paths call it before they report the
 // exit, so the exit's notification includes that error.
-func (p *process) disableRestarts() {
-	if !isContainerMainProcess() {
+//
+// Parameters:
+//   - ctx: The process context, which a stop signal cancels.
+func (p *process) disableRestarts(ctx context.Context) {
+	if !isContainerMainProcess() || ctx.Err() != nil {
 		return
 	}
 
@@ -941,10 +979,7 @@ func (p *process) disableRestarts() {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		restartPolicyTimeout,
-	)
+	ctx, cancel := context.WithTimeout(ctx, restartPolicyTimeout)
 	defer cancel()
 
 	err := client.SetRestartPolicy(
@@ -967,9 +1002,10 @@ func (p *process) disableRestarts() {
 // enabled.
 //
 // Parameters:
+//   - ctx: The process context, which a stop signal cancels.
 //   - cmd: The command that failed, whose flags hold the Docker connection
 //     settings.
-func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
+func (p *process) disableRestartsBeforeExit(ctx context.Context, cmd *cobra.Command) {
 	if cmd.HasParent() {
 		return
 	}
@@ -994,14 +1030,14 @@ func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
 			// The other client options only change how updates run. The
 			// process is exiting, so it waits only briefly for a daemon that
 			// does not answer.
-			ctx, cancel := context.WithTimeout(context.Background(), restartPolicyTimeout)
+			ctx, cancel := context.WithTimeout(ctx, restartPolicyTimeout)
 			client, err = newClient(ctx, p.log, containerClient.ClientOptions{Docker: docker})
 
 			cancel()
 		}
 
 		if err == nil {
-			err = p.detectCurrentContainerID()
+			err = p.detectCurrentContainerID(ctx)
 		}
 
 		if err != nil {
@@ -1011,7 +1047,7 @@ func (p *process) disableRestartsBeforeExit(cmd *cobra.Command) {
 		}
 	}
 
-	p.disableRestarts()
+	p.disableRestarts(ctx)
 }
 
 // isContainerMainProcess reports whether Watchtower is the main process of its
@@ -1052,10 +1088,13 @@ func isContainerMainProcess() bool {
 // exit path, waiting at most 5 seconds. A failed detection leaves the ID
 // empty.
 //
+// Parameters:
+//   - ctx: The process context, which a stop signal cancels.
+//
 // Returns:
 //   - error: Non-nil when the ID cannot be detected.
-func (p *process) detectCurrentContainerID() error {
-	ctx, cancel := context.WithTimeout(context.Background(), containerLookupTimeout)
+func (p *process) detectCurrentContainerID(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, containerLookupTimeout)
 	defer cancel()
 
 	var err error

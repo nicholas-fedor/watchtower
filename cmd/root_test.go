@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
-	"os/signal"
-	"syscall"
 	"testing"
 	"testing/fstest"
 	"testing/synctest"
@@ -193,69 +190,6 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 	})
 }
 
-// TestCreateSignalContext verifies that the signal-aware context is properly created
-// and can be canceled via the stop function.
-func TestCreateSignalContext(t *testing.T) {
-	// Save original and restore after test
-	originalCreateSignalContext := createSignalContext
-
-	defer func() { createSignalContext = originalCreateSignalContext }()
-
-	// Test with custom mock that simulates signal handling
-	callCount := 0
-	createSignalContext = func(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
-		callCount++
-
-		// Verify the correct signals are passed
-		assert.Contains(t, signals, os.Interrupt, "Should include SIGINT")
-		assert.Contains(t, signals, syscall.SIGTERM, "Should include SIGTERM")
-
-		// Return a context that's canceled via the cancel function
-		return context.WithCancel(ctx)
-	}
-
-	ctx, cancel := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
-	// Verify context is not done initially
-	assert.NotNil(t, ctx, "Context should not be nil")
-	assert.NotNil(t, ctx.Done(), "Context should not be done initially")
-
-	// Call cancel and verify context is done
-	cancel()
-
-	// Verify the function was called once
-	assert.Equal(t, 1, callCount, "createSignalContext should be called once")
-
-	// Verify context is done after cancel
-	assert.Error(t, ctx.Err(), "Context should be done after cancel")
-}
-
-// TestCreateSignalContextDefault verifies that the default implementation
-// correctly creates a signal-aware context using signal.NotifyContext.
-func TestCreateSignalContextDefault(t *testing.T) {
-	// Save original and restore after test
-	originalCreateSignalContext := createSignalContext
-
-	defer func() { createSignalContext = originalCreateSignalContext }()
-
-	// Use the default implementation
-	createSignalContext = signal.NotifyContext
-
-	ctx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Verify context is created successfully
-	assert.NotNil(t, ctx, "Context should not be nil")
-
-	// Context should not be done initially
-	select {
-	case <-ctx.Done():
-		t.Error("Context should not be done initially")
-	default:
-		// Expected: context is not done
-	}
-}
-
 // TestNewClient_FailureLeavesNoClient verifies that newClient returns a nil
 // client when the Docker client cannot be created. preRun and the exit path
 // compare the client with nil, which an interface holding a nil pointer would
@@ -272,104 +206,6 @@ func TestNewClient_FailureLeavesNoClient(t *testing.T) {
 	if got != nil {
 		t.Errorf("newClient returned a non-nil client with its error: %#v", got)
 	}
-}
-
-// TestSignalContextCancellation verifies that the signal context properly cancels
-// when signals are received, enabling graceful shutdown.
-func TestSignalContextCancellation(t *testing.T) {
-	// Skip in short test mode as this requires real signal handling
-	if testing.Short() {
-		t.Skip("Skipping signal test in short mode")
-	}
-
-	// Save original and restore after test
-	originalCreateSignalContext := createSignalContext
-
-	defer func() { createSignalContext = originalCreateSignalContext }()
-
-	// Create context that we'll control
-	ctx, cancel := context.WithCancel(context.Background())
-
-	createSignalContext = func(_ context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
-		return ctx, cancel
-	}
-
-	ctx, _ = createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-
-	// Verify context is not done initially
-	select {
-	case <-ctx.Done():
-		t.Error("Context should not be done initially")
-	default:
-		// Expected: context is not done
-	}
-}
-
-// TestSignalContextWithMultipleSignals verifies that the context correctly handles
-// multiple signal types (SIGINT and SIGTERM).
-func TestSignalContextWithMultipleSignals(t *testing.T) {
-	// Save original and restore after test
-	originalCreateSignalContext := createSignalContext
-
-	defer func() { createSignalContext = originalCreateSignalContext }()
-
-	// Track which signals were received
-	var receivedSignals []os.Signal
-
-	createSignalContext = func(ctx context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
-		receivedSignals = signals
-
-		return context.WithCancel(ctx)
-	}
-
-	ctx, cancel := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	// Verify both signals are in the received list
-	assert.Len(t, receivedSignals, 2, "Should receive exactly 2 signals")
-	assert.Contains(t, receivedSignals, os.Interrupt)
-	assert.Contains(t, receivedSignals, syscall.SIGTERM)
-
-	// Verify context is valid
-	assert.NotNil(t, ctx)
-}
-
-// TestSignalContextGracefulShutdown verifies that the context supports graceful
-// shutdown by not completing until explicitly canceled.
-func TestSignalContextGracefulShutdown(t *testing.T) {
-	// Save original and restore after test
-	originalCreateSignalContext := createSignalContext
-
-	defer func() { createSignalContext = originalCreateSignalContext }()
-
-	// Create context that we'll control
-	ctx, cancel := context.WithCancel(context.Background())
-
-	createSignalContext = func(_ context.Context, _ ...os.Signal) (context.Context, context.CancelFunc) {
-		return ctx, cancel
-	}
-
-	// Create signal context
-	sigCtx, stop := createSignalContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Verify context is valid and not done
-	assert.NotNil(t, sigCtx)
-
-	// Simulate work - context should still be valid
-	select {
-	case <-sigCtx.Done():
-		t.Error("Context should not be done during graceful operation")
-	default:
-		// Expected: context is not done
-	}
-
-	// Now cancel to simulate signal receipt
-	cancel()
-
-	// Context should be done after cancellation
-	<-sigCtx.Done()
-	assert.ErrorIs(t, sigCtx.Err(), context.Canceled)
 }
 
 func TestContextDeadlineExceededErrorHandling(t *testing.T) {
@@ -842,7 +678,9 @@ func TestDisableRestarts(t *testing.T) {
 		// as its only child.
 		ppid int
 		// unknownID leaves Watchtower's own container ID unknown.
-		unknownID  bool
+		unknownID bool
+		// stopped cancels the process context, as a stop signal does.
+		stopped    bool
 		wantUpdate bool
 		updateErr  error
 		wantError  bool
@@ -855,6 +693,7 @@ func TestDisableRestarts(t *testing.T) {
 		{name: "main process under an init", current: currentWatchtower(), pid: 7, ppid: 1, wantUpdate: true},
 		{name: "probe started with docker exec on OpenVZ", current: currentWatchtower(), pid: 8, ppid: 1, wantUpdate: false},
 		{name: "the container ID is not known", pid: 1, unknownID: true, wantUpdate: false, wantError: true},
+		{name: "a stop signal is ending the process", current: currentWatchtower(), pid: 1, stopped: true, wantUpdate: false},
 	}
 
 	for _, tt := range tests {
@@ -880,8 +719,15 @@ func TestDisableRestarts(t *testing.T) {
 			processID = func() int { return tt.pid }
 			parentProcessID = func() int { return tt.ppid }
 
+			processCtx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			if tt.stopped {
+				cancel()
+			}
+
 			log, logOutput := logcapture.New(zerolog.ErrorLevel)
-			(&process{log: log}).disableRestarts()
+			(&process{log: log}).disableRestarts(processCtx)
 
 			if tt.wantError {
 				assert.Contains(t, logOutput.String(), logging.RestartsKept)
@@ -911,4 +757,39 @@ func currentWatchtowerWithoutRestarts() *container.Container {
 		},
 		nil,
 	)
+}
+
+// TestStoppedBy verifies which errors count as coming from a stop signal: only
+// a cancellation, from a Docker call or wrapping the stop's cause, once the
+// process context is canceled.
+func TestStoppedBy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// stopped cancels the process context with a stop signal's cause.
+		stopped bool
+		err     error
+		want    bool
+	}{
+		{name: "Docker call canceled by the stop", stopped: true, err: fmt.Errorf("list: %w", context.Canceled), want: true},
+		{name: "step wrapping the stop's cause", stopped: true, err: fmt.Errorf("look up: %w", errRunTestStopSignal), want: true},
+		{name: "unrelated failure during the stop", stopped: true, err: errRunTestDocker, want: false},
+		{name: "cancellation without a stop", stopped: false, err: context.Canceled, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, stop := context.WithCancelCause(t.Context())
+			defer stop(nil)
+
+			if tt.stopped {
+				stop(errRunTestStopSignal)
+			}
+
+			assert.Equal(t, tt.want, stoppedBy(ctx, tt.err))
+		})
+	}
 }

@@ -211,7 +211,8 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 // Stop before create releases published host ports. Rename keeps the stopped
 // predecessor for recovery if create or start fails (restore name and start).
 //
-// RunOrchestrator logs each failure at error level before returning it.
+// RunOrchestrator logs each failure before returning it, at error level, or at
+// debug level when a stop signal that canceled ctx caused it.
 //
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
@@ -264,13 +265,20 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 		cleanup,
 	)
 	if err != nil {
-		// The steps log their failures at debug. This line reports the failure.
-		clog.Error().
+		// The steps log their failures at debug. This line reports the failure,
+		// unless a stop signal ended the handoff on purpose. The handoff's own
+		// deadline ends it with a different error, which is still reported.
+		level, msg := zerolog.ErrorLevel, "Orchestration failed"
+		if ctx.Err() != nil && errors.Is(err, context.Canceled) {
+			level, msg = zerolog.DebugLevel, "Orchestration stopped by a signal"
+		}
+
+		clog.WithLevel(level).
 			Err(err).
 			Str("old_id", oldID).
 			Str("new_image", newImage).
 			Str("original_name", originalName).
-			Msg("Orchestration failed")
+			Msg(msg)
 
 		return err
 	}
@@ -647,6 +655,14 @@ func inspectOldContainer(
 // before the replacement is created. The container is left in place for rename
 // and optional recovery.
 //
+// A stop that has begun runs to its end with a context of its own, bounded by
+// the longer of 30 seconds and the container's stop timeout plus 30 seconds.
+// A stop signal that cancels ctx during it therefore leaves the container
+// stopped, and the rename that follows fails on ctx and starts the container
+// again. When ctx has ended before the stop begins, the container is left
+// running. A failed stop is checked against the container's state with a
+// context of its own, bounded like a recovery step.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
@@ -662,10 +678,22 @@ func stopOldContainer(
 	clog *zerolog.Logger,
 	oldContainer *container.Container,
 ) (bool, error) {
+	if ctx.Err() != nil {
+		return false, fmt.Errorf("stop old container: %w", context.Cause(ctx))
+	}
+
 	clog.Debug().Msg("Stopping old Watchtower container")
 
+	// A stop cut short would leave the container stopping with no step left
+	// to start it again, so it is not canceled with ctx.
+	stopCtx, cancelStop := context.WithTimeout(
+		context.WithoutCancel(ctx),
+		updateParams.Params{Timeout: orchestratorStopTimeout}.DetachedStopTimeout(oldContainer),
+	)
+	defer cancelStop()
+
 	err := client.StopContainer(
-		ctx,
+		stopCtx,
 		oldContainer,
 		orchestratorStopTimeout,
 	)
@@ -676,9 +704,13 @@ func stopOldContainer(
 			return true, nil
 		}
 
-		// Re-inspect after a non-NotFound stop error. The cached view may be stale.
+		// Re-inspect after a non-NotFound stop error. The cached view may be
+		// stale.
+		inspectCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), orchestratorRecoveryTimeout)
+		defer cancel()
+
 		freshContainer, inspectErr := client.GetContainer(
-			ctx,
+			inspectCtx,
 			oldContainer.ID(),
 		)
 		if inspectErr != nil {

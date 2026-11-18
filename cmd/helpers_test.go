@@ -29,15 +29,16 @@ func isolateStartupEnv(t *testing.T) {
 }
 
 // newTestRootCommand returns a new root command with every flag registered
-// and args parsed, so tests never change the package's root command. Logging
-// is limited to errors. The DOCKER_* variables its startup writes are undone
-// when the test ends.
+// and args parsed, so tests never change the package's root command. Its
+// context is the test's context. Logging is limited to errors. The DOCKER_*
+// variables its startup writes are undone when the test ends.
 func newTestRootCommand(t *testing.T, args ...string) *cobra.Command {
 	t.Helper()
 
 	isolateStartupEnv(t)
 
 	root := NewRootCommand()
+	root.SetContext(t.Context())
 
 	settings.RegisterAll(root)
 

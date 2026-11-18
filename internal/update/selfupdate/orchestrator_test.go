@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -563,6 +564,93 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 	}
 }
 
+// TestOrchestrateSelfUpdate_StopSignal verifies that a stop signal during the
+// handoff never leaves Watchtower without a running instance. A signal before
+// the stop begins leaves the old container running. A signal while Docker
+// stops the old container lets the stop finish on a context of its own. The
+// rename then fails on the canceled context, and the old container is started
+// again on a live context.
+func TestOrchestrateSelfUpdate_StopSignal(t *testing.T) {
+	t.Parallel()
+
+	// requireLive fails the test when a call that must outlast the stop
+	// signal receives an ended context.
+	requireLive := func(t *testing.T, ctx context.Context) {
+		t.Helper()
+		require.NoError(t, ctx.Err(), "the call received an ended context")
+	}
+
+	tests := []struct {
+		name      string
+		setup     func(t *testing.T, client *mockSelfupdate.MockHandoffClient, old *container.Container, cancel context.CancelFunc)
+		wantCalls []string
+	}{
+		{
+			name: "before the stop begins",
+			setup: func(_ *testing.T, client *mockSelfupdate.MockHandoffClient, old *container.Container, cancel context.CancelFunc) {
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID(orchestratorOldID)).
+					RunAndReturn(func(context.Context, container.ContainerID) (*container.Container, error) {
+						cancel()
+
+						return old, nil
+					}).Once()
+			},
+			wantCalls: []string{"GetContainer 01d"},
+		},
+		{
+			name: "while the old container stops",
+			setup: func(t *testing.T, client *mockSelfupdate.MockHandoffClient, old *container.Container, cancel context.CancelFunc) {
+				t.Helper()
+
+				expectOldInspect(client, old)
+				client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).
+					RunAndReturn(func(ctx context.Context, _ *container.Container, _ time.Duration) error {
+						cancel()
+						requireLive(t, ctx)
+
+						return nil
+					}).Once()
+				// The Docker client fails every call made on an ended context.
+				client.EXPECT().RenameContainer(mock.Anything, old, orchestratorRenamedName[1:]).
+					RunAndReturn(func(ctx context.Context, _ *container.Container, _ string) error {
+						return ctx.Err()
+					}).Once()
+				client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID(orchestratorOldID)).
+					RunAndReturn(func(ctx context.Context, _ container.ContainerID) error {
+						requireLive(t, ctx)
+
+						return nil
+					}).Once()
+			},
+			wantCalls: []string{
+				"GetContainer 01d",
+				"StopContainer 01d",
+				"RenameContainer 01d to watchtower-old-01d000000000",
+				"StartContainerByID 01d",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			old := orchestratorContainer(orchestratorOldID, orchestratorOldName, true)
+			client := mockSelfupdate.NewMockHandoffClient(t)
+			tt.setup(t, client, old, cancel)
+
+			err := orchestrateSelfUpdate(newTestLogger(t), ctx, client,
+				orchestratorOldID, orchestratorNewImage, orchestratorOriginalName, "", false)
+			require.ErrorIs(t, err, context.Canceled)
+
+			assert.Equal(t, tt.wantCalls, orchestratorCalls(client))
+		})
+	}
+}
+
 // expectOldInspect expects the orchestrator's first inspection of the old
 // container.
 func expectOldInspect(client *mockSelfupdate.MockHandoffClient, old *container.Container) {
@@ -692,32 +780,48 @@ func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 // The cases set environment variables, so they do not run in parallel.
 func TestRunOrchestrator(t *testing.T) {
 	tests := []struct {
-		name          string
-		oldID         string
-		expect        func(client *mockSelfupdate.MockHandoffClient)
+		name  string
+		oldID string
+		// expect sets up the client. cancel ends the orchestrator's context,
+		// as a stop signal does.
+		expect        func(client *mockSelfupdate.MockHandoffClient, cancel context.CancelFunc)
 		wantErr       error
 		wantErrorLogs []string
 	}{
 		{
 			name:          "missing old container ID",
 			oldID:         "",
-			expect:        func(*mockSelfupdate.MockHandoffClient) {},
+			expect:        func(*mockSelfupdate.MockHandoffClient, context.CancelFunc) {},
 			wantErr:       errOrchestratorMissingEnv,
 			wantErrorLogs: []string{"Failed to read orchestrator environment variables"},
 		},
 		{
 			name:  "handoff fails",
 			oldID: orchestratorOldID,
-			expect: func(client *mockSelfupdate.MockHandoffClient) {
+			expect: func(client *mockSelfupdate.MockHandoffClient, _ context.CancelFunc) {
 				client.EXPECT().GetContainer(mock.Anything, mock.Anything).Return(nil, errOrchestratorTestDocker)
 			},
 			wantErr:       errOrchestratorTestDocker,
 			wantErrorLogs: []string{"Orchestration failed"},
 		},
 		{
+			// A stop signal ends the handoff on purpose, so it is no failure.
+			name:  "handoff stopped by a signal",
+			oldID: orchestratorOldID,
+			expect: func(client *mockSelfupdate.MockHandoffClient, cancel context.CancelFunc) {
+				client.EXPECT().GetContainer(mock.Anything, mock.Anything).
+					RunAndReturn(func(context.Context, container.ContainerID) (*container.Container, error) {
+						cancel()
+
+						return nil, fmt.Errorf("inspect container: %w", context.Canceled)
+					})
+			},
+			wantErr: context.Canceled,
+		},
+		{
 			name:  "handoff completes",
 			oldID: orchestratorOldID,
-			expect: func(client *mockSelfupdate.MockHandoffClient) {
+			expect: func(client *mockSelfupdate.MockHandoffClient, _ context.CancelFunc) {
 				expectHandoffSuccess(client, orchestratorContainer(orchestratorOldID, orchestratorOldName, true))
 			},
 		},
@@ -731,12 +835,15 @@ func TestRunOrchestrator(t *testing.T) {
 			t.Setenv("WT_ORCHESTRATOR_CONTAINER_CHAIN", "")
 			t.Setenv("WT_ORCHESTRATOR_CLEANUP", "")
 
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
 			client := mockSelfupdate.NewMockHandoffClient(t)
-			tt.expect(client)
+			tt.expect(client, cancel)
 
 			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
-			err := RunOrchestrator(log, t.Context(), client)
+			err := RunOrchestrator(log, ctx, client)
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.wantErrorLogs, logcapture.Messages(t, logBuf.String(), "error"))
 		})
