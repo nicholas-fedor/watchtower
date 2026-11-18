@@ -531,6 +531,56 @@ func TestObserve_RecoveryKeepsAdvertisedQuota(t *testing.T) {
 	})
 }
 
+// TestObserve_IgnoresQuotaSlowerThanHonorWait verifies that an advertised
+// quota allowing fewer than one request per 30 seconds paces the host like a
+// 429 without a quota. Docker Hub has been observed sending "RateLimit-Limit:
+// 100;w=3600", which works out to 36 seconds per request. Pacing at that rate
+// would hold every later Docker Hub request, including the HEAD version checks
+// Docker Hub does not count, for the life of the process. One request per 30 seconds is still paced, as
+// TestObserve_RecoveryKeepsAdvertisedQuota shows.
+func TestObserve_IgnoresQuotaSlowerThanHonorWait(t *testing.T) {
+	t.Parallel()
+
+	t.Run("pacing ends with recovery", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			l := New()
+
+			l.Observe(recoveryHost, &Error{Allowed: 100, AllowedWindow: time.Hour})
+
+			assert.Zero(t, waitTime(t, l))
+			assert.Equal(t, minHonorWait, waitTime(t, l), "the quota made up for a 429 without a wait paces the rest")
+
+			time.Sleep(throttleRecovery)
+
+			for range 20 {
+				assert.Zero(t, waitTime(t, l), "requests are not paced after recovery")
+			}
+
+			state := l.hostStates[recoveryHost]
+			assert.Zero(t, state.allowed)
+			assert.Zero(t, state.window)
+		})
+	})
+
+	t.Run("earlier advertised quota is kept", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			l := New()
+
+			l.Observe(recoveryHost, &Error{Allowed: 2, AllowedWindow: time.Minute})
+			l.Observe(recoveryHost, &Error{Allowed: 100, AllowedWindow: time.Hour})
+
+			state := l.hostStates[recoveryHost]
+			assert.Equal(t, 2, state.allowed)
+			assert.Equal(t, time.Minute, state.window)
+			assert.False(t, state.synthesized)
+		})
+	})
+}
+
 // TestObserve_ThrottleDuringRecoveryExtendsIt verifies that a 429 while the
 // host is recovering moves the end of recovery later.
 func TestObserve_ThrottleDuringRecoveryExtendsIt(t *testing.T) {
