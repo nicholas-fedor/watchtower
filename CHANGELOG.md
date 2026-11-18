@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Skip containers that docker engine runs for jobs by @nicholas-fedor in [#3892](https://github.com/nicholas-fedor/watchtower/pull/3892)
 - Send the legacy gotify token in the request header by @nicholas-fedor in [#3893](https://github.com/nicholas-fedor/watchtower/pull/3893)
 - Keep compose jobs out of git-monitored applies by @nicholas-fedor in [#3888](https://github.com/nicholas-fedor/watchtower/pull/3888)
 - Recognize engine-reported pull rate limits by @nicholas-fedor in [#3883](https://github.com/nicholas-fedor/watchtower/pull/3883)
