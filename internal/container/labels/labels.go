@@ -85,6 +85,14 @@ const (
 	ComposeDir = "com.centurylinklabs.watchtower.compose-dir"
 )
 
+// Engine labels are set by Docker Engine on the containers it creates.
+// Watchtower reads them and never sets them.
+const (
+	// JobID names the Docker Engine job that runs the container.
+	// Engine 29.10 and later set it on each container its jobs extension runs.
+	JobID = "com.docker.job.id"
+)
+
 // Label values with a fixed meaning.
 const (
 	// NoScope is the scope of a container whose scope label is unset, empty, or
