@@ -2615,6 +2615,9 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 		// stopAfter cancels the caller's context after this long, as a stop
 		// signal does. Zero leaves it running.
 		stopAfter time.Duration
+		// stopDuringInspect cancels the caller's context while the first
+		// inspect runs, as a stop signal that arrives with its answer does.
+		stopDuringInspect bool
 		// ended is how the caller's context has already ended when the lookup
 		// starts, context.Canceled or context.DeadlineExceeded. The inspect then
 		// fails with its context's error, as the Docker client does. Nil leaves
@@ -2626,7 +2629,10 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 		wantErr error
 		// wantEnd is the context error the result also matches, when the
 		// caller's context ended the retries.
-		wantEnd      error
+		wantEnd error
+		// wantOwnError requires an error that does not match the caller's
+		// context error, since the context did not end the retries.
+		wantOwnError bool
 		wantAttempts int
 		wantWait     time.Duration
 	}{
@@ -2692,6 +2698,15 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 			wantErr:      cerrdefs.ErrPermissionDenied,
 			wantAttempts: 1,
 		},
+		{
+			// The error ended the retries, not the stop that came with it.
+			name:              "error that waiting cannot fix stays its own when a stop arrives with it",
+			results:           []error{fmt.Errorf("inspect: %w", cerrdefs.ErrPermissionDenied)},
+			stopDuringInspect: true,
+			wantErr:           cerrdefs.ErrPermissionDenied,
+			wantOwnError:      true,
+			wantAttempts:      1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2701,14 +2716,29 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				api := newDockerAPI(t)
 
-				for _, result := range tt.results {
+				ctx := t.Context()
+
+				var cancel context.CancelFunc
+
+				if tt.stopDuringInspect {
+					ctx, cancel = context.WithCancel(ctx)
+					defer cancel()
+				}
+
+				for i, result := range tt.results {
 					var inspect dockerClient.ContainerInspectResult
 					if result == nil {
 						inspect.Container = sourceInspect("/watchtower", true, &dockerContainer.HostConfig{})
 					}
 
 					api.EXPECT().ContainerInspect(mock.Anything, testContainerID, dockerClient.ContainerInspectOptions{}).
-						Return(inspect, result).Once()
+						RunAndReturn(func(context.Context, string, dockerClient.ContainerInspectOptions) (dockerClient.ContainerInspectResult, error) {
+							if tt.stopDuringInspect && i == 0 {
+								cancel()
+							}
+
+							return inspect, result
+						}).Once()
 				}
 
 				if tt.ended != nil {
@@ -2717,10 +2747,6 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 							return dockerClient.ContainerInspectResult{}, ctx.Err()
 						}).Once()
 				}
-
-				ctx := t.Context()
-
-				var cancel context.CancelFunc
 
 				switch {
 				case tt.deadline > 0:
@@ -2753,6 +2779,10 @@ func TestGetCurrentWatchtowerContainer_Retries(t *testing.T) {
 
 					if tt.wantEnd != nil {
 						require.ErrorIs(t, err, tt.wantEnd)
+					}
+
+					if tt.wantOwnError {
+						require.NotErrorIs(t, err, ctx.Err())
 					}
 
 					return

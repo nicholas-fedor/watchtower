@@ -669,10 +669,13 @@ func (c *Client) GetCurrentWatchtowerContainer(
 		// Report the last inspect error rather than the retry loop's summary.
 		// When ctx ended the retries, the error also matches ctx's cause, so
 		// the caller can tell a lookup that ctx cut short from one that failed.
+		// An error that ended them for another reason stays its own.
 		retryErr := backoff.AsRetryError(err)
 		if retryErr != nil {
 			err = retryErr.LastErr
-			if ctx.Err() != nil && !errors.Is(err, ctx.Err()) {
+
+			endedByCtx := ctx.Err() != nil && errors.Is(retryErr.Cause, context.Cause(ctx))
+			if endedByCtx && !errors.Is(err, ctx.Err()) {
 				err = fmt.Errorf("%w: %w", err, context.Cause(ctx))
 			}
 		}
