@@ -137,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Note that local plain-http registries need insecure-registries by @nicholas-fedor in [#3900](https://github.com/nicholas-fedor/watchtower/pull/3900)
 - Document compose jobs and backups alongside watchtower by @nicholas-fedor in [#3896](https://github.com/nicholas-fedor/watchtower/pull/3896)
 - Correct the no-restart notes for self-updates by @nicholas-fedor in [#3763](https://github.com/nicholas-fedor/watchtower/pull/3763)
 - Correct the legacy smtp relay notes by @nicholas-fedor in [#3747](https://github.com/nicholas-fedor/watchtower/pull/3747)
