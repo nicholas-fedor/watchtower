@@ -47,10 +47,21 @@ func (s *Session) Check(
 		return false, "", fmt.Errorf("git cooldown: %w", err)
 	}
 
-	newest := container.ImageID("git:" + result.Commit)
-	if newest == "git:" {
-		newest = container.ImageID("git:unknown")
+	return true, gitImageID(result.Commit), nil
+}
+
+// gitImageID returns the image ID that stands for a Git commit until an image
+// is built from it.
+//
+// Parameters:
+//   - commit: The commit, or empty when the check did not report one.
+//
+// Returns:
+//   - container.ImageID: The commit prefixed with "git:", which is "git:unknown" for an empty commit.
+func gitImageID(commit string) container.ImageID {
+	if commit == "" {
+		commit = "unknown"
 	}
 
-	return true, newest, nil
+	return container.ImageID("git:" + commit)
 }

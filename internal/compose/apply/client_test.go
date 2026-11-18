@@ -2,6 +2,7 @@ package apply
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"net/http"
 	"os"
@@ -21,6 +22,7 @@ import (
 	mockCompose "github.com/nicholas-fedor/watchtower/internal/compose/apply/mocks"
 	composeProject "github.com/nicholas-fedor/watchtower/internal/compose/project"
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/httpstub"
 )
@@ -166,13 +168,15 @@ func TestClient_newDockerCLI(t *testing.T) {
 				assert.NotNil(t, request.TLS, "the ping is sent over TLS")
 			}
 
-			// The Compose service is created once and reused.
-			service, err := client.composeService()
+			// The Compose service and its API client are created once and reused.
+			service, engine, err := client.composeService()
 			require.NoError(t, err)
+			require.NotNil(t, engine)
 
-			again, err := client.composeService()
+			again, againEngine, err := client.composeService()
 			require.NoError(t, err)
 			assert.Same(t, service, again)
+			assert.Same(t, engine, againEngine)
 		})
 	}
 }
@@ -279,9 +283,10 @@ func TestClient_newDockerCLI_errors(t *testing.T) {
 			require.ErrorContains(t, err, tt.wantErr)
 			assert.Nil(t, dockerCLI)
 
-			service, err := client.composeService()
+			service, engine, err := client.composeService()
 			require.ErrorContains(t, err, tt.wantErr)
 			assert.Nil(t, service)
+			assert.Nil(t, engine)
 		})
 	}
 }
@@ -432,6 +437,54 @@ jobs:
 	assert.Empty(t, upProject.DisabledJobs)
 }
 
+// TestClientApplyBuildOnlyReportsBuiltImages verifies that a build-only apply
+// reports the image each service's tag names after the build. The containers
+// keep running their old image, which compose images would report, so the
+// test fails on any call to it. A tag that cannot be inspected leaves its
+// service's image ID empty.
+func TestClientApplyBuildOnlyReportsBuiltImages(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte(`
+services:
+  app:
+    build: .
+  worker:
+    image: registry.example.com/worker:dev
+    build: .
+`), 0o600))
+
+	service := mockCompose.NewMockCompose(t)
+	service.EXPECT().Build(mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
+	service.EXPECT().Ps(mock.Anything, "project", mock.Anything).
+		Return([]api.ContainerSummary{
+			{Service: "app", Name: "project-app-1", ID: "app-1", Image: "sha256:old"},
+			{Service: "app", Name: "project-app-2", ID: "app-2", Image: "sha256:old"},
+			{Service: "worker", Name: "project-worker-1", ID: "worker-1", Image: "sha256:old"},
+		}, nil).Once()
+
+	// A service without an image key is tagged with the project and service names.
+	engine := mockContainer.NewMockAPIClient(t)
+	engine.EXPECT().ImageInspect(mock.Anything, "project-app").
+		Return(dockerClient.ImageInspectResult{ID: "sha256:built"}, nil).Once()
+	engine.EXPECT().ImageInspect(mock.Anything, "registry.example.com/worker:dev").
+		Return(dockerClient.ImageInspectResult{}, errors.New("no such image")).Once()
+
+	client := &Client{service: service, engine: engine}
+	containers, err := client.Apply(t.Context(), Request{
+		Ref:       composeProject.ProjectRef{Dir: dir, Name: "project"},
+		Services:  []string{"app", "worker"},
+		BuildOnly: true,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []Container{
+		{Service: "app", Name: "project-app-1", ID: "app-1", ImageID: "sha256:built"},
+		{Service: "app", Name: "project-app-2", ID: "app-2", ImageID: "sha256:built"},
+		{Service: "worker", Name: "project-worker-1", ID: "worker-1"},
+	}, containers)
+}
+
 // TestClientApplyRejectsInvalidRequests verifies that Client.Apply rejects invalid requests before invoking Compose.
 func TestClientApplyRejectsInvalidRequests(t *testing.T) {
 	t.Parallel()
@@ -520,9 +573,11 @@ func TestClientApplyStampsComposeIdentity(t *testing.T) {
 				return nil
 			}).Once()
 		service.EXPECT().Ps(mock.Anything, "jobs", mock.Anything).Return([]api.ContainerSummary{}, nil).Once()
-		service.EXPECT().Images(mock.Anything, "jobs", mock.Anything).Return(map[string]api.ImageSummary{}, nil).Once()
 
-		client := &Client{service: service}
+		engine := mockContainer.NewMockAPIClient(t)
+		engine.EXPECT().ImageInspect(mock.Anything, "app").Return(dockerClient.ImageInspectResult{}, nil).Once()
+
+		client := &Client{service: service, engine: engine}
 		_, err := client.Apply(t.Context(), Request{
 			Ref:       composeProject.ProjectRef{Dir: dir, Name: "jobs"},
 			Services:  []string{"api"},
