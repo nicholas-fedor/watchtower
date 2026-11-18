@@ -72,6 +72,17 @@ Environment Variable: WATCHTOWER_REGISTRY_TLS_SKIP
     Use cautiously, as it reduces security.
     Suitable for testing or private registries.
 
+!!! Note "Local registries that serve plain HTTP"
+    This option applies only to Watchtower's own registry requests. The Docker daemon pulls the image itself, and it pulls from a plain-HTTP registry, such as one at `localhost:5000`, only when its `insecure-registries` setting covers that registry.
+
+    Docker Engine 29.10.0 and later count `localhost` and other loopback addresses as insecure only while `insecure-registries` is not set ([moby/moby#53868](https://github.com/moby/moby/pull/53868){target="_blank" rel="noopener noreferrer"}). Once the list names any registry, add the local one in the same form your images use, such as `localhost:5000`. A pull by `127.0.0.1:5000` needs its own entry. Otherwise the daemon's pull fails with `http: server gave HTTP response to HTTPS client`.
+
+    ```json title="/etc/docker/daemon.json"
+    {
+        "insecure-registries": ["registry.example.com", "localhost:5000"]
+    }
+    ```
+
 ### Minimum Registry TLS Version
 
 Sets the minimum TLS version for registry connections, overriding the default (TLS 1.2).
