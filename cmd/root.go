@@ -72,51 +72,6 @@ var (
 )
 
 var (
-	// appCfg is the resolved process configuration from settings.Load.
-	//
-	// It is the single source of operational policy for run-once, schedule, and API paths.
-	// Values originate from CLI flags and environment variables registered in internal/settings
-	// and are loaded once at startup, in preRun. preRun then takes the scope from Watchtower's
-	// own scope label when no scope is set.
-	appCfg settings.Config
-
-	// client is the Docker client instance used to interact with container operations in Watchtower.
-	//
-	// It provides an interface for listing, stopping, starting, and managing containers, initialized during
-	// the preRun phase with options derived from appCfg.ClientOptions(), which include the Docker
-	// connection settings.
-	client DockerClient
-
-	// rateLimiter paces every registry request, so image pulls, digest checks,
-	// image age lookups, and release tag lookups share one budget per registry
-	// host. It is created in preRun with client.
-	rateLimiter *ratelimit.Limiter
-
-	// notifier is the notification system instance responsible for sending update status messages to configured channels.
-	//
-	// It is initialized in preRun from appCfg.Notify via notify.NewNotifier, supporting
-	// Shoutrrr URLs and (deprecated) legacy types such as email, Slack, or MSTeams.
-	// A health check and a subcommand leave it unset. Execute closes it before
-	// the process ends.
-	notifier *notify.Notifier
-
-	// currentWatchtowerContainerID stores the current Watchtower container ID.
-	//
-	// It is initialized once in preRun after the client is set up, and used throughout the application
-	// to avoid repeated calls to GetCurrentContainerID. If retrieval fails, it is set to an empty string.
-	currentWatchtowerContainerID container.ContainerID
-
-	// currentWatchtowerContainerUnknown is true when Watchtower runs in a container
-	// whose ID could not be determined. Self-updates are then disabled.
-	currentWatchtowerContainerUnknown bool
-
-	// currentWatchtowerContainer holds the current Watchtower container instance.
-	//
-	// It is initialized in preRun by retrieving the container object using the currentWatchtowerContainerID,
-	// remains nil if retrieval fails or yields an unexpected type, and is used for operations like updating
-	// restart policy, validating restarts, and cleaning up excess instances.
-	currentWatchtowerContainer *container.Container
-
 	// sleepFunc is a function variable for time.Sleep, allowing it to be overridden in tests.
 	//
 	// It is initialized to time.Sleep by default, providing a way to mock sleep behavior during testing
@@ -155,13 +110,6 @@ var (
 	// replace it to run under a container's init process.
 	parentProcessID = os.Getppid
 
-	// runUpdatesWithNotifications is a function variable for performing container updates and sending notifications.
-	//
-	// It is initialized inside runMain with a closure that executes update.RunUpdatesWithNotifications,
-	// allowing it to be overridden in tests to mock the update process. It takes a context, filter, and update params,
-	// and returns a metric summarizing the update session.
-	runUpdatesWithNotifications func(context.Context, filters.Filter, updateParams.Params) *metrics.Metric
-
 	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
 	//
 	// It defines the base usage string and the short and long descriptions. Execute assigns its lifecycle hooks
@@ -185,16 +133,36 @@ type DockerClient interface {
 	GetCurrentWatchtowerContainer(ctx context.Context, containerID container.ContainerID) (*container.Container, error)
 }
 
-// process holds composition-root dependencies for a single CLI invocation.
+// process holds the state of a single CLI invocation.
 //
 // The logger is constructed in main and reconfigured in preRun after flags are
-// parsed. It is never stored as a package-level global.
+// parsed. preRun sets the rest, and run and the exit paths read it.
 type process struct {
 	// log is the process logger.
 	log *zerolog.Logger
 	// clientErr is the error from creating the Docker client at startup. An
 	// exit reports it instead of waiting for the daemon again.
 	clientErr error
+	// client is the Docker client, created in preRun from the configuration's
+	// client options.
+	client DockerClient
+	// rateLimiter paces every registry request, so image pulls, digest checks,
+	// image age lookups and release tag lookups share one budget per registry
+	// host. preRun creates it with the client.
+	rateLimiter *ratelimit.Limiter
+	// notifier sends notifications. preRun creates it from the notification
+	// settings. A health check and a subcommand leave it unset. The exit path
+	// closes it before the process ends.
+	notifier *notify.Notifier
+	// currentContainer is Watchtower's own container. It is nil when the
+	// container could not be found or inspected.
+	currentContainer *container.Container
+	// currentContainerID is the ID of Watchtower's own container. It is empty
+	// when the ID could not be detected.
+	currentContainerID container.ContainerID
+	// cfg is the configuration preRun loads once. preRun then takes the scope
+	// from Watchtower's own scope label when no scope is set.
+	cfg settings.Config
 }
 
 // exitError is an error that ends the process. Execute reports it and exits
@@ -250,8 +218,8 @@ func init() {
 // It establishes the base usage string ("watchtower"), a short description summarizing its purpose,
 // and a long description with additional context and a project URL.
 //
-// PreRunE and RunE are wired in Execute with a logger-capturing process instance so the
-// composition root can pass *zerolog.Logger without a package-level global.
+// Execute wires PreRunE and RunE to the process that holds the invocation's
+// logger and state.
 //
 // Returns:
 //   - *cobra.Command: A pointer to the fully configured root command, ready for flag registration and execution.
@@ -340,8 +308,8 @@ func (p *process) exit(ctx context.Context, cmd *cobra.Command, err error) {
 		code = 1
 	}
 
-	if notifier != nil {
-		notifier.Close()
+	if p.notifier != nil {
+		p.notifier.Close()
 	}
 
 	if err != nil {
@@ -400,30 +368,30 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 
 	var err error
 
-	appCfg, p.log, err = settings.Load(p.log, cmd, args)
+	p.cfg, p.log, err = settings.Load(p.log, cmd, args)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to load configuration", code: 1}
 	}
 
 	// The build tools that Compose rebuilds start read the Docker connection from the process
 	// environment.
-	err = composeApply.ExportConnection(appCfg.Docker)
+	err = composeApply.ExportConnection(p.cfg.Docker)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to configure Docker environment", code: 1}
 	}
 
 	p.log.Debug().
-		Str("scheduleSpec", appCfg.Schedule.Spec).
+		Str("scheduleSpec", p.cfg.Schedule.Spec).
 		Msg("Retrieved cron schedule specification from configuration")
 
 	// Initialize the Docker client from the resolved ClientOptions projection,
 	// with the rate limiter that update sessions also use for release tag lookups.
-	rateLimiter = ratelimit.New()
+	p.rateLimiter = ratelimit.New()
 
-	clientOpts := appCfg.ClientOptions()
-	clientOpts.RateLimiter = rateLimiter
+	clientOpts := p.cfg.ClientOptions()
+	clientOpts.RateLimiter = p.rateLimiter
 
-	client, err = newClient(ctx, p.log, clientOpts)
+	p.client, err = newClient(ctx, p.log, clientOpts)
 	if err != nil {
 		p.clientErr = err
 
@@ -432,12 +400,12 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 
 	// Check for orchestrator mode early. This is an internal mode where Watchtower
 	// runs as a one-shot orchestrator for self-update.
-	if appCfg.Mode.SelfUpdateOrchestrator {
+	if p.cfg.Mode.SelfUpdateOrchestrator {
 		p.log.Info().Msg("Running in ephemeral self-update orchestrator mode")
 
 		// The orchestrator's container is removed when it exits, so its
 		// restart policy is left alone.
-		err = selfupdate.RunOrchestrator(p.log, ctx, client)
+		err = selfupdate.RunOrchestrator(p.log, ctx, p.client)
 		if err != nil {
 			return &exitError{err: err, msg: "", code: 1}
 		}
@@ -451,11 +419,11 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	// Retrieve and store the current container ID for use throughout the application.
 	var detectErr, inspectErr error
 
-	currentWatchtowerContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, client)
+	p.currentContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, p.client)
 	if detectErr != nil {
 		p.log.Debug().Err(detectErr).Msg("Failed to get current container ID")
 
-		currentWatchtowerContainerID = ""
+		p.currentContainerID = ""
 	}
 
 	// Retrieve the current Watchtower container.
@@ -468,21 +436,21 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	//
 	// Another failed inspect keeps the detected ID, so the checks that tell
 	// Watchtower apart from other instances still work.
-	if currentWatchtowerContainerID != "" {
+	if p.currentContainerID != "" {
 		// A health check uses none of the container's data, so its inspect
 		// shares the lookup's timeout instead of waiting for every retry.
 		inspectCtx := ctx
-		if appCfg.Mode.HealthCheck {
+		if p.cfg.Mode.HealthCheck {
 			inspectCtx = lookupCtx
 		}
 
-		currentWatchtowerContainer, inspectErr = client.GetCurrentWatchtowerContainer(
+		p.currentContainer, inspectErr = p.client.GetCurrentWatchtowerContainer(
 			inspectCtx,
-			currentWatchtowerContainerID,
+			p.currentContainerID,
 		)
 		if cerrdefs.IsNotFound(inspectErr) {
 			detectErr, inspectErr = inspectErr, nil
-			currentWatchtowerContainerID = ""
+			p.currentContainerID = ""
 		}
 	}
 
@@ -492,12 +460,7 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("look up own container: %w", context.Cause(ctx))
 	}
 
-	// Without its own ID, Watchtower cannot tell itself apart from other instances.
-	// A host binary has no container ID, so only a containerized run is unknown.
-	currentWatchtowerContainerUnknown = currentWatchtowerContainerID == "" &&
-		containerClient.InContainer(processFs)
-
-	if !appCfg.Mode.HealthCheck && container.IsSuperseded(currentWatchtowerContainer) {
+	if !p.cfg.Mode.HealthCheck && container.IsSuperseded(p.currentContainer) {
 		return p.retire(ctx)
 	}
 
@@ -511,14 +474,14 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if currentWatchtowerContainerUnknown {
+	if p.currentContainerUnknown() {
 		p.log.Warn().Err(detectErr).Msg(logging.SelfUnidentified)
 	} else if inspectErr != nil {
 		p.log.Warn().Err(inspectErr).Msg(logging.SelfUninspected)
 	}
 
 	// Log deprecated notification configuration options, if set.
-	notify.LogLegacyDeprecationWarnings(p.log, appCfg.Notify.LegacyTypes)
+	notify.LogLegacyDeprecationWarnings(p.log, p.cfg.Notify.LegacyTypes)
 
 	return nil
 }
@@ -539,10 +502,10 @@ func (p *process) retire(ctx context.Context) error {
 
 	// Startup retires before it settles the scope, so the scope is worked out
 	// here from the configuration and the old container's scope label.
-	label, _ := currentWatchtowerContainer.Scope()
-	scope := appCfg.Filter.ScopeWithLabel(label)
+	label, _ := p.currentContainer.Scope()
+	scope := p.cfg.Filter.ScopeWithLabel(label)
 
-	selfupdate.RetireOldInstance(p.log, ctx, client, currentWatchtowerContainer, scope, restartPolicyTimeout)
+	selfupdate.RetireOldInstance(p.log, ctx, p.client, p.currentContainer, scope, restartPolicyTimeout)
 
 	return &exitError{err: errSupersededInstance, msg: "", code: 0}
 }
@@ -557,18 +520,18 @@ func (p *process) retire(ctx context.Context) error {
 // Returns:
 //   - error: An [exitError] when the notifier cannot be created.
 func (p *process) setUpNotifications() error {
-	if appCfg.Mode.HealthCheck {
+	if p.cfg.Mode.HealthCheck {
 		return nil
 	}
 
 	var err error
 
-	notifier, err = notify.NewNotifier(p.log, appCfg.Notify)
+	p.notifier, err = notify.NewNotifier(p.log, p.cfg.Notify)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to initialize notifications", code: 1}
 	}
 
-	notifier.RegisterHook(p.log)
+	p.notifier.RegisterHook(p.log)
 
 	return nil
 }
@@ -591,7 +554,7 @@ func (p *process) setUpNotifications() error {
 //   - error: An [exitError] when the scope label cannot be read or the filter
 //     cannot be built.
 func (p *process) resolveScope(ctx context.Context, inspectErr error) error {
-	if inspectErr != nil && appCfg.Filter.Scope == "" && !appCfg.Mode.HealthCheck {
+	if inspectErr != nil && p.cfg.Filter.Scope == "" && !p.cfg.Mode.HealthCheck {
 		// Disable restarts first, so the runtime does not start Watchtower again.
 		p.disableRestarts(ctx)
 		p.log.Error().Err(inspectErr).Msg(logging.ScopeLabelUnreadable)
@@ -600,20 +563,20 @@ func (p *process) resolveScope(ctx context.Context, inspectErr error) error {
 	}
 
 	var label string
-	if currentWatchtowerContainer != nil {
-		label, _ = currentWatchtowerContainer.Scope()
+	if p.currentContainer != nil {
+		label, _ = p.currentContainer.Scope()
 	}
 
-	scoped, err := appCfg.Filter.WithLabelScope(p.log, label)
+	scoped, err := p.cfg.Filter.WithLabelScope(p.log, label)
 	if err != nil {
 		return &exitError{err: err, msg: "Failed to build container filter", code: 1}
 	}
 
-	appCfg.Filter = scoped
+	p.cfg.Filter = scoped
 
-	if appCfg.Filter.Scope != "" {
+	if p.cfg.Filter.Scope != "" {
 		p.log.Debug().
-			Str("scope", appCfg.Filter.Scope).
+			Str("scope", p.cfg.Filter.Scope).
 			Msg("Resolved operational scope")
 	}
 
@@ -623,7 +586,7 @@ func (p *process) resolveScope(ctx context.Context, inspectErr error) error {
 // run executes the main Watchtower logic based on parsed command-line flags.
 //
 // It uses the configuration preRun prepared. A health check exits early. Otherwise run builds
-// the RunConfig from appCfg and hands it to runMain for core execution.
+// the RunConfig from the configuration and hands it to runMain for core execution.
 //
 // Parameters:
 //   - cmd: The cobra.Command instance being executed, whose settings preRun already loaded.
@@ -633,7 +596,7 @@ func (p *process) resolveScope(ctx context.Context, inspectErr error) error {
 // Returns:
 //   - error: An [exitError] when Watchtower cannot continue or its run failed.
 func (p *process) run(cmd *cobra.Command, _ []string) error {
-	if appCfg.Mode.HealthCheck {
+	if p.cfg.Mode.HealthCheck {
 		if isContainerMainProcess() {
 			sleepFunc(1 * time.Second)
 
@@ -647,18 +610,18 @@ func (p *process) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	cfg, err := appCfg.BuildRunConfig()
+	runCfg, err := p.cfg.BuildRunConfig()
 	if err != nil {
 		return &exitError{err: err, msg: logging.RunConfigurationFailed, code: 1}
 	}
 
 	// Warn if HTTP API configuration options are set without an endpoint enabled.
-	if !settings.HTTPAPIEndpointsEnabled(cfg) && settings.AnyHTTPAPIConfig(cfg) {
+	if !settings.HTTPAPIEndpointsEnabled(runCfg) && settings.AnyHTTPAPIConfig(runCfg) {
 		p.log.Warn().
 			Msg("HTTP API configuration options are set, but no endpoints are enabled.")
 	}
 
-	return p.runMain(cmd.Context(), cfg)
+	return p.runMain(cmd.Context(), runCfg)
 }
 
 // runMain contains the core Watchtower logic after early exits are handled.
@@ -666,19 +629,19 @@ func (p *process) run(cmd *cobra.Command, _ []string) error {
 // It validates rolling-restart compatibility, performs one-time updates when run-once is set,
 // cleans up excess Watchtower instances, sets up the HTTP API when endpoints are enabled,
 // and schedules periodic updates while managing context and concurrency for graceful shutdown.
-// Update policy is taken from appCfg.UpdateParams so run-once, schedule, and API paths share
+// Update policy is taken from the configuration's UpdateParams so run-once, schedule, and API paths share
 // a complete [updateParams.Params] snapshot.
 //
 // Parameters:
 //   - processCtx: The process context, which a stop signal cancels.
-//   - cfg: The RunConfig struct containing filter, API, and mode parameters for this execution.
+//   - runCfg: The RunConfig struct containing filter, API, and mode parameters for this execution.
 //
 // Returns:
 //   - error: An [exitError] for a failure that was already logged.
-func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) error {
+func (p *process) runMain(processCtx context.Context, runCfg settings.RunConfig) error {
 	// Log the container names being processed for debugging visibility.
 	p.log.Debug().
-		Strs("container_names", cfg.Names).
+		Strs("container_names", runCfg.Names).
 		Msg("Processing specified containers")
 
 	// Give a self-updated instance a moment before it lists its predecessors.
@@ -688,51 +651,38 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 	// Declared before runUpdatesWithNotifications so the closure can capture it.
 	eventsBroadcaster := events.NewBroadcaster()
 
-	// runUpdatesWithNotifications performs container updates and sends notifications about the results.
-	//
-	// It executes the update action with configured parameters, batches notifications, and returns a metric
-	// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
-	//
-	// Parameters:
-	//   - ctx: Context for cancellation and timeouts.
-	//   - filter: The filters.Filter determining which containers are targeted for updates.
-	//   - params: The updateParams.Params struct containing update configuration parameters.
-	//
-	// Returns:
-	//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
 	gitClient := git.New(p.log, git.Options{
-		Token:           appCfg.Git.Token,
-		Username:        appCfg.Git.Username,
-		Password:        appCfg.Git.Password,
-		SSHKeyPath:      appCfg.Git.SSHKeyPath,
-		SSHKnownHosts:   appCfg.Git.SSHKnownHosts,
-		Timeout:         appCfg.Git.Timeout,
-		CABundle:        appCfg.Git.CABundle,
-		InsecureSkipTLS: appCfg.Git.InsecureSkipTLS,
+		Token:           p.cfg.Git.Token,
+		Username:        p.cfg.Git.Username,
+		Password:        p.cfg.Git.Password,
+		SSHKeyPath:      p.cfg.Git.SSHKeyPath,
+		SSHKnownHosts:   p.cfg.Git.SSHKnownHosts,
+		Timeout:         p.cfg.Git.Timeout,
+		CABundle:        p.cfg.Git.CABundle,
+		InsecureSkipTLS: p.cfg.Git.InsecureSkipTLS,
 	})
 
 	// An old instance stops its own run through stop, as a signal stops the process.
 	ctx, stop := context.WithCancel(processCtx)
 	defer stop()
 
-	runUpdatesWithNotifications = func(ctx context.Context, filter filters.Filter, params updateParams.Params) *metrics.Metric {
+	// runUpdatesWithNotifications runs one update session for run-once, the
+	// scheduler and the HTTP API, and returns its metric. A nil filter keeps
+	// the one in params. The session notifies its outcome and publishes events.
+	runUpdatesWithNotifications := func(ctx context.Context, filter filters.Filter, params updateParams.Params) *metrics.Metric {
 		runParams := params
 		if filter != nil {
 			runParams.Filter = filter
 		}
 
-		if runParams.CurrentContainerID == "" {
-			runParams.CurrentContainerID = currentWatchtowerContainerID
-		}
-
 		return update.RunUpdatesWithNotifications(ctx, update.RunUpdatesWithNotificationsParams{
 			Logger:                       p.log,
-			Client:                       client,
+			Client:                       p.client,
 			GitClient:                    gitClient,
-			RateLimiter:                  rateLimiter,
-			Notifier:                     notifier,
-			NotificationSplitByContainer: appCfg.Notify.SplitByContainer,
-			NotificationReport:           appCfg.Notify.Report,
+			RateLimiter:                  p.rateLimiter,
+			Notifier:                     p.notifier,
+			NotificationSplitByContainer: p.cfg.Notify.SplitByContainer,
+			NotificationReport:           p.cfg.Notify.Report,
 			EventBroadcaster:             eventsBroadcaster,
 			Update:                       runParams,
 			// Stop the process, as a signal would, when this is an old instance.
@@ -742,13 +692,13 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 
 	// If rolling restarts are enabled, validate that the containers being monitored for
 	// updates do not have linked dependencies.
-	if appCfg.Update.RollingRestart {
+	if p.cfg.Update.RollingRestart {
 		err := update.ValidateRollingRestartDependencies(
 			p.log,
 			ctx,
-			client,
-			cfg.Filter,
-			appCfg.Update.UseComposeDependsOn,
+			p.client,
+			runCfg.Filter,
+			p.cfg.Update.UseComposeDependsOn,
 		)
 		if err != nil {
 			p.disableRestarts(processCtx)
@@ -762,29 +712,30 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 	// updates never run at the same time.
 	updateLock := schedule.NewUpdateLock()
 
-	baseParams := appCfg.UpdateParams(settings.RunOverrides{
-		Filter:             cfg.Filter,
-		SkipSelfUpdate:     currentWatchtowerContainerUnknown,
-		CurrentContainerID: currentWatchtowerContainerID,
+	baseParams := p.cfg.UpdateParams(settings.RunOverrides{
+		Filter:             runCfg.Filter,
+		SkipSelfUpdate:     p.currentContainerUnknown(),
+		CurrentContainerID: p.currentContainerID,
 	})
 
+	// Startup messaging snapshot for run-once, the scheduler and the HTTP API.
+	// Sched and UpdateOnStart are filled by the schedule or API callers.
+	startupBase := p.cfg.StartupParams(runCfg)
+	startupBase.Filtering = runCfg.FilterDesc
+	startupBase.Scope = p.cfg.Filter.Scope
+	startupBase.Client = p.client
+	startupBase.Notifier = p.notifier
+	startupBase.Version = meta.Version
+	startupBase.Logger = p.log
+
 	// Handle one-time update mode, executing updates and registering metrics.
-	if cfg.RunOnce {
-		// Write startup message from resolved config (no CLI flag reads).
-		startup := appCfg.StartupParams(cfg)
-		startup.Sched = time.Time{}
-		startup.Filtering = cfg.FilterDesc
-		startup.Scope = appCfg.Filter.Scope
-		startup.Client = client
-		startup.Notifier = notifier
-		startup.Version = meta.Version
-		startup.Logger = p.log
-		logging.WriteStartupMessage(ctx, startup)
+	if runCfg.RunOnce {
+		logging.WriteStartupMessage(ctx, startupBase)
 
 		params := baseParams
 		params.RunOnce = true
 
-		metric := runUpdatesWithNotifications(ctx, cfg.Filter, params)
+		metric := runUpdatesWithNotifications(ctx, runCfg.Filter, params)
 		metrics.Default().RegisterScan(metric)
 		p.disableRestarts(processCtx)
 
@@ -795,11 +746,11 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 	totalRemovedInstances, err := cleanup.RemoveExcessWatchtowerInstances(
 		p.log,
 		ctx,
-		client,
-		appCfg.Update.Cleanup,
-		appCfg.Filter.Scope,
+		p.client,
+		p.cfg.Update.Cleanup,
+		p.cfg.Filter.Scope,
 		nil, // Remove the images of stopped instances right away.
-		currentWatchtowerContainer,
+		p.currentContainer,
 	)
 	if err != nil {
 		// Cleanup failure is non-fatal — log a warning and continue.
@@ -812,7 +763,7 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 	}
 
 	// Remove ephemeral orchestrators that a crash or failed start left behind.
-	removedOrchestratorCount, orchestratorErr := cleanup.RemoveOrphanedOrchestrators(p.log, ctx, client)
+	removedOrchestratorCount, orchestratorErr := cleanup.RemoveOrphanedOrchestrators(p.log, ctx, p.client)
 	if orchestratorErr != nil {
 		p.log.Warn().
 			Err(orchestratorErr).
@@ -830,9 +781,9 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 	// Perform this check here rather than inside SetupAndStartAPI so the
 	// published port warning always appears, even when no HTTP API endpoints
 	// are enabled and SetupAndStartAPI returns early.
-	selfUpdateBlock := selfupdate.Blocked(currentWatchtowerContainer,
-		currentWatchtowerContainerID,
-		appCfg.Update.EphemeralSelfUpdate,
+	selfUpdateBlock := selfupdate.Blocked(p.currentContainer,
+		p.currentContainerID,
+		p.cfg.Update.EphemeralSelfUpdate,
 	)
 	if selfUpdateBlock == selfupdate.BlockedByPublishedPorts {
 		p.log.Warn().Msg("Published port detected - self-updates disabled.")
@@ -844,16 +795,6 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 		sharedBase.SkipSelfUpdate = true
 	}
 
-	// Startup messaging snapshot. Sched and UpdateOnStart are filled by schedule or API
-	// callers. Populate the rest here so scheduling does not re-derive them from scalar deps.
-	startupBase := appCfg.StartupParams(cfg)
-	startupBase.Filtering = cfg.FilterDesc
-	startupBase.Scope = appCfg.Filter.Scope
-	startupBase.Client = client
-	startupBase.Notifier = notifier
-	startupBase.Version = meta.Version
-	startupBase.Logger = p.log
-
 	// API request/auth logs must not fan into notification hooks.
 	apiLog := p.log.With().Str("notify", "no").Logger()
 
@@ -861,41 +802,41 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 		ctx,
 		routes.Options{
 			Logger:                      &apiLog,
-			Host:                        cfg.APIHost,
-			Port:                        cfg.APIPort,
-			Token:                       cfg.APIToken,
-			EventsToken:                 cfg.APIEventsToken,
-			RateLimit:                   cfg.APIRateLimit,
-			EnableCheckAPI:              cfg.EnableCheckAPI,
-			EnableConfigAPI:             cfg.EnableConfigAPI,
-			EnableContainersAPI:         cfg.EnableContainersAPI,
-			EnableEventsAPI:             cfg.EnableEventsAPI,
-			EnableHealthAPI:             cfg.EnableHealthAPI,
-			EnableHistoryAPI:            cfg.EnableHistoryAPI,
-			EnableImagesAPI:             cfg.EnableImagesAPI,
-			EnableMetricsAPI:            cfg.EnableMetricsAPI,
-			EnableSwaggerAPI:            cfg.EnableSwaggerAPI,
-			EnableUpdateAPI:             cfg.EnableUpdateAPI,
-			CheckTimeout:                cfg.CheckAPITimeout,
-			UpdateTimeout:               cfg.UpdateAPITimeout,
-			TLSCertPath:                 cfg.TLSCertPath,
-			TLSKeyPath:                  cfg.TLSKeyPath,
-			CORSAllowedOrigins:          cfg.CORSAllowedOrigins,
-			TrustedProxies:              cfg.TrustedProxies,
-			ProxyHeader:                 cfg.ProxyHeader,
-			UnblockHTTPAPI:              cfg.UnblockHTTPAPI,
-			NoStartupMessage:            cfg.NoStartupMessage,
-			Filter:                      cfg.Filter,
-			FilterDesc:                  cfg.FilterDesc,
+			Host:                        runCfg.APIHost,
+			Port:                        runCfg.APIPort,
+			Token:                       runCfg.APIToken,
+			EventsToken:                 runCfg.APIEventsToken,
+			RateLimit:                   runCfg.APIRateLimit,
+			EnableCheckAPI:              runCfg.EnableCheckAPI,
+			EnableConfigAPI:             runCfg.EnableConfigAPI,
+			EnableContainersAPI:         runCfg.EnableContainersAPI,
+			EnableEventsAPI:             runCfg.EnableEventsAPI,
+			EnableHealthAPI:             runCfg.EnableHealthAPI,
+			EnableHistoryAPI:            runCfg.EnableHistoryAPI,
+			EnableImagesAPI:             runCfg.EnableImagesAPI,
+			EnableMetricsAPI:            runCfg.EnableMetricsAPI,
+			EnableSwaggerAPI:            runCfg.EnableSwaggerAPI,
+			EnableUpdateAPI:             runCfg.EnableUpdateAPI,
+			CheckTimeout:                runCfg.CheckAPITimeout,
+			UpdateTimeout:               runCfg.UpdateAPITimeout,
+			TLSCertPath:                 runCfg.TLSCertPath,
+			TLSKeyPath:                  runCfg.TLSKeyPath,
+			CORSAllowedOrigins:          runCfg.CORSAllowedOrigins,
+			TrustedProxies:              runCfg.TrustedProxies,
+			ProxyHeader:                 runCfg.ProxyHeader,
+			UnblockHTTPAPI:              runCfg.UnblockHTTPAPI,
+			NoStartupMessage:            runCfg.NoStartupMessage,
+			Filter:                      runCfg.Filter,
+			FilterDesc:                  runCfg.FilterDesc,
 			UpdateLock:                  updateLock,
 			BaseParams:                  sharedBase,
-			IncludeStopped:              appCfg.Client.IncludeStopped,
-			IncludeRestarting:           appCfg.Client.IncludeRestarting,
-			LabelEnable:                 appCfg.Filter.LabelEnable,
-			Client:                      client,
+			IncludeStopped:              p.cfg.Client.IncludeStopped,
+			IncludeRestarting:           p.cfg.Client.IncludeRestarting,
+			LabelEnable:                 p.cfg.Filter.LabelEnable,
+			Client:                      p.client,
 			GitClient:                   gitClient,
-			Notifier:                    notifier,
-			Scope:                       appCfg.Filter.Scope,
+			Notifier:                    p.notifier,
+			Scope:                       p.cfg.Filter.Scope,
 			Version:                     meta.Version,
 			Startup:                     startupBase,
 			RunUpdatesWithNotifications: runUpdatesWithNotifications,
@@ -925,13 +866,13 @@ func (p *process) runMain(processCtx context.Context, cfg settings.RunConfig) er
 	// only waits for an update the API started and announces nothing.
 	err = schedule.RunUpgradesOnSchedule(ctx, schedule.ScheduleDeps{
 		Logger:                p.log,
-		Filter:                cfg.Filter,
+		Filter:                runCfg.Filter,
 		Lock:                  updateLock,
-		ScheduleSpec:          appCfg.Schedule.Spec,
+		ScheduleSpec:          p.cfg.Schedule.Spec,
 		Startup:               startupBase,
 		WriteStartupMessage:   logging.WriteStartupMessage,
 		RunUpdate:             runUpdatesWithNotifications,
-		UpdateOnStart:         cfg.UpdateOnStart,
+		UpdateOnStart:         runCfg.UpdateOnStart,
 		ReplacedOlderInstance: totalRemovedInstances > 0,
 		BaseParams:            sharedBase,
 	})
@@ -969,22 +910,22 @@ func (p *process) disableRestarts(ctx context.Context) {
 		return
 	}
 
-	if currentWatchtowerContainerID == "" {
+	if p.currentContainerID == "" {
 		p.log.Error().Err(errUnknownContainerID).Msg(logging.RestartsKept)
 
 		return
 	}
 
-	if currentWatchtowerContainer != nil && !currentWatchtowerContainer.RestartsAutomatically() {
+	if p.currentContainer != nil && !p.currentContainer.RestartsAutomatically() {
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, restartPolicyTimeout)
 	defer cancel()
 
-	err := client.SetRestartPolicy(
+	err := p.client.SetRestartPolicy(
 		ctx,
-		currentWatchtowerContainerID,
+		p.currentContainerID,
 		dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled},
 	)
 	if err != nil {
@@ -1010,7 +951,7 @@ func (p *process) disableRestartsBeforeExit(ctx context.Context, cmd *cobra.Comm
 		return
 	}
 
-	if client == nil {
+	if p.client == nil {
 		// Only the main process changes the restart policy, so only it
 		// connects for that.
 		if !isContainerMainProcess() {
@@ -1031,7 +972,7 @@ func (p *process) disableRestartsBeforeExit(ctx context.Context, cmd *cobra.Comm
 			// process is exiting, so it waits only briefly for a daemon that
 			// does not answer.
 			ctx, cancel := context.WithTimeout(ctx, restartPolicyTimeout)
-			client, err = newClient(ctx, p.log, containerClient.ClientOptions{Docker: docker})
+			p.client, err = newClient(ctx, p.log, containerClient.ClientOptions{Docker: docker})
 
 			cancel()
 		}
@@ -1099,9 +1040,22 @@ func (p *process) detectCurrentContainerID(ctx context.Context) error {
 
 	var err error
 
-	currentWatchtowerContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, processFs, client)
+	p.currentContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, processFs, p.client)
 
 	return err //nolint:wrapcheck // The error already says that the container ID could not be detected.
+}
+
+// currentContainerUnknown reports whether Watchtower runs in a container whose
+// ID it could not detect.
+//
+// Without its own ID, Watchtower cannot tell itself apart from other
+// instances, so self-updates are disabled.
+//
+// Returns:
+//   - bool: True when the container's ID is unknown.
+func (p *process) currentContainerUnknown() bool {
+	// A host binary has no container ID, so only a containerized run counts.
+	return p.currentContainerID == "" && containerClient.InContainer(processFs)
 }
 
 // awaitDockerClient pauses for one second before Watchtower first lists containers.
