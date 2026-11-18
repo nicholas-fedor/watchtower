@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ignore advertised rate limits slower than one request per 30 seconds by @nicholas-fedor in [#3913](https://github.com/nicholas-fedor/watchtower/pull/3913)
+
+## [1.24.1] - 2026-11-18
+
+### Fixed
+
 - Skip containers that docker engine runs for jobs by @nicholas-fedor in [#3892](https://github.com/nicholas-fedor/watchtower/pull/3892)
 - Send the legacy gotify token in the request header by @nicholas-fedor in [#3893](https://github.com/nicholas-fedor/watchtower/pull/3893)
 - Keep compose jobs out of git-monitored applies by @nicholas-fedor in [#3888](https://github.com/nicholas-fedor/watchtower/pull/3888)
@@ -4543,7 +4549,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.24.0...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.24.1...HEAD)
+- [1.24.1](https://github.com/nicholas-fedor/watchtower/compare/v1.24.0...v1.24.1)
 - [1.24.0](https://github.com/nicholas-fedor/watchtower/compare/v1.23.2...v1.24.0)
 - [1.23.2](https://github.com/nicholas-fedor/watchtower/compare/v1.23.1...v1.23.2)
 - [1.23.1](https://github.com/nicholas-fedor/watchtower/compare/v1.23.0...v1.23.1)
