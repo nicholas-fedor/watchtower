@@ -87,8 +87,10 @@ var (
 type dockerConnectionConfig struct {
 	// Host is the DOCKER_HOST value (e.g., "unix:///var/run/docker.sock", "tcp://host:2375").
 	Host string
-	// TLSVerify is the source container's DOCKER_TLS_VERIFY value, forwarded
-	// unchanged for the orchestrator's settings to read. Empty when unset.
+	// TLSVerify is the source container's DOCKER_TLS_VERIFY value.
+	//
+	// A non-empty value is forwarded unchanged for the orchestrator's settings
+	// to read. An empty or unset value is not forwarded.
 	TLSVerify string
 	// CertPath is the path to TLS certificates for remote connections.
 	CertPath string
