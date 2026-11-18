@@ -190,21 +190,20 @@ func TestRenderParseError(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestRenderPorcelainJSONWithNilReport(t *testing.T) {
+// TestRender_porcelainWithoutReport verifies that the porcelain templates
+// render nothing without a session report. Watchtower sends no message for
+// an empty render. The templates run in report mode against data whose
+// Report is nil, as porcelain turns report mode on.
+func TestRender_porcelainWithoutReport(t *testing.T) {
 	t.Parallel()
 
-	result, err := Render(
-		templates.Templates["porcelain.json"],
-		nil,
-		nil,
-	)
-	require.NoError(t, err)
+	for _, name := range []string{"porcelain.json", "porcelain.v1.summary-no-log"} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	var decoded map[string]any
-	require.NoError(t, json.Unmarshal([]byte(result), &decoded))
-	require.Contains(t, decoded, "containers")
-
-	containers, ok := decoded["containers"].([]any)
-	require.True(t, ok)
-	assert.Empty(t, containers)
+			result, err := Execute(templates.Templates[name], notify.Data{}, true)
+			require.NoError(t, err)
+			assert.Empty(t, result)
+		})
+	}
 }

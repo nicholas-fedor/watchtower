@@ -159,7 +159,7 @@ var Templates = map[string]string{
 {{- end -}}
 {{- end -}}`,
 	"json.v1":        `{{ . | ToJSON }}`,
-	"porcelain.json": `{{ .Report | ToPorcelainJSON }}`,
+	"porcelain.json": `{{ with .Report }}{{ ToPorcelainJSON . }}{{ end }}`,
 	"porcelain.v1.summary-no-log": `
 {{- if .Report -}}
   {{- /* Iterate over all containers */ -}}
@@ -169,7 +169,5 @@ var Templates = map[string]string{
   {{- else -}}
     no containers matched filter
   {{- end -}}
-{{- else -}}
-  no containers matched filter
 {{- end -}}`,
 }
