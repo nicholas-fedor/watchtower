@@ -341,12 +341,14 @@ Watchtower reads the `retry-after` value of a `429` response and handles it in o
 
 After a `429`, Watchtower also paces later requests to that registry so they cannot empty the bucket again in a burst. Pacing depends on whether the `429` advertised a rate:
 
-| `429` advertised a rate                   | For 3 minutes after the wait                                                                             | Afterwards                                        |
-|-------------------------------------------|----------------------------------------------------------------------------------------------------------|---------------------------------------------------|
-| Yes, one request per 30 seconds or faster | One request at a time, at the advertised rate                                                            | The advertised rate, with bursts up to its budget |
-| No, or a slower rate                      | One request per `retry-after` wait, held between 100ms and 30 seconds, or 100ms when the `429` sent none | Not paced                                         |
+| `429` advertised a rate                           | For 3 minutes after the wait                                                                             | Afterwards                                        |
+|---------------------------------------------------|----------------------------------------------------------------------------------------------------------|---------------------------------------------------|
+| Yes, one request per 30 seconds or faster         | One request at a time, at the advertised rate                                                            | The advertised rate, with bursts up to its budget |
+| No, or a slower rate, with no earlier rate in use | One request per `retry-after` wait, held between 100ms and 30 seconds, or 100ms when the `429` sent none | Not paced                                         |
 
-A rate slower than one request per 30 seconds, such as Docker Hub's 100 pulls per hour, is not used for pacing. Pacing at it would hold every later request to the registry for longer than Watchtower honors a wait, including the version checks that Docker Hub does not count as pulls.
+A registry that already has a rate from an earlier `429` keeps it when a later `429` advertises none or a slower one.
+
+A rate slower than one request per 30 seconds is not used for pacing. Docker Hub has been observed sending `RateLimit-Limit: 100;w=3600`, which Watchtower reads as 100 requests per 3600 seconds, or 36 seconds per request. Pacing at that rate would hold every later request to the registry for longer than Watchtower honors a wait, including the version checks that Docker Hub does not count as pulls.
 
 Retries within a cycle are logged at debug so they do not become notifications. When the retry window is exhausted:
 

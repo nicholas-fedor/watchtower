@@ -533,10 +533,10 @@ func TestObserve_RecoveryKeepsAdvertisedQuota(t *testing.T) {
 
 // TestObserve_IgnoresQuotaSlowerThanHonorWait verifies that an advertised
 // quota allowing fewer than one request per 30 seconds paces the host like a
-// 429 without a quota. Docker Hub advertises 100 pulls per hour, and pacing at
-// 36 seconds a request would hold every later Docker Hub request, including
-// the HEAD version checks Docker Hub does not count, for the life of the
-// process. One request per 30 seconds is still paced, as
+// 429 without a quota. Docker Hub has been observed sending "RateLimit-Limit:
+// 100;w=3600", which works out to 36 seconds per request. Pacing at that rate
+// would hold every later Docker Hub request, including the HEAD version checks
+// Docker Hub does not count, for the life of the process. One request per 30 seconds is still paced, as
 // TestObserve_RecoveryKeepsAdvertisedQuota shows.
 func TestObserve_IgnoresQuotaSlowerThanHonorWait(t *testing.T) {
 	t.Parallel()

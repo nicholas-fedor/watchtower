@@ -160,9 +160,11 @@ func (l *Limiter) HoldAnonymous(ctx context.Context, host string, authenticated 
 // recovery. Recovery keeps an advertised quota and drops a quota made up from
 // the cooldown. Cooldown time does not accrue tokens.
 //
-// An advertised quota that allows fewer than one request per 30 seconds, such
-// as Docker Hub's 100 per hour, counts as no quota. Pacing at that rate would
-// hold every later request to the host for longer than a 429 wait is honored.
+// An advertised quota that allows fewer than one request per 30 seconds counts
+// as no quota. Docker Hub has been observed sending "RateLimit-Limit:
+// 100;w=3600", which works out to 36 seconds per request. Pacing at such a rate
+// would hold every later request to the host for longer than a 429 wait is
+// honored.
 //
 // Parameters:
 //   - host: Registry host. Empty values are ignored.
