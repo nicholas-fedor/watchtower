@@ -233,6 +233,18 @@ For stable images (with binaries/archives), use the stable config as above.
 
 The shared `build/docker/Dockerfile` is used for both, with COPY watchtower /watchtower matching GoReleaser's binary placement.
 
+### Releases
+
+A stable release starts when a `vX.Y.Z` tag is pushed. To tag the next release, run the task for the part of the version to increase:
+
+```bash
+task tag:bump-patch # v1.2.3 to v1.2.4
+task tag:bump-minor # v1.2.3 to v1.3.0
+task tag:bump-major # v1.2.3 to v2.0.0
+```
+
+The task fetches origin first. It refuses unless HEAD is a clean `main` that matches `origin/main` and has no release tag. It asks for confirmation and then pushes a signed annotated `vX.Y.Z` tag, which starts the `release-stable.yaml` workflow.
+
 ## Documentation
 
 ### Placeholders
