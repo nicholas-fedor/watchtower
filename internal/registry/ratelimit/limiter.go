@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
 	"time"
@@ -387,6 +388,10 @@ func (l *Limiter) observeSuccess(host string) {
 
 // nextWait computes how long the caller must wait before contacting host.
 //
+// Without a whole token, the caller waits until the host earns the rest of
+// one. A made-up quota is dropped when recovery ends, so a wait under it ends
+// no later than that.
+//
 // Parameters:
 //   - host: Registry host whose cooldown and quota should be inspected.
 //
@@ -417,9 +422,23 @@ func (l *Limiter) nextWait(host string) time.Duration {
 		return 0
 	}
 
-	perToken := max(state.window/time.Duration(state.allowed), time.Millisecond)
+	missing := (1 - state.tokens) * float64(state.window) / float64(state.allowed)
+	wait := time.Duration(math.Ceil(missing))
 
-	return perToken
+	// Float rounding can leave the refill after the rounded-up wait just under
+	// a whole token. One more nanosecond earns far more than that shortfall.
+	if state.tokens+state.earned(wait) < 1 {
+		wait++
+	}
+
+	wait = max(wait, time.Millisecond)
+
+	// Recovery is still ahead here, so the capped wait stays positive.
+	if state.synthesized {
+		wait = min(wait, state.recoverAt.Sub(now))
+	}
+
+	return wait
 }
 
 // nextCooldownWait returns remaining 429 cooldown for host without taking a token.
@@ -508,12 +527,25 @@ func (s *hostState) refillLocked(now time.Time) {
 		return
 	}
 
-	s.tokens += float64(elapsed) / float64(s.window) * float64(s.allowed)
+	s.tokens += s.earned(elapsed)
 	if ceiling := s.tokenCap(); s.tokens > ceiling {
 		s.tokens = ceiling
 	}
 
 	s.lastRefill = now
+}
+
+// earned returns the tokens this host earns over elapsed at its fill rate.
+//
+// Parameters:
+//   - elapsed: Time spent earning tokens.
+//
+// Returns:
+//   - float64: Tokens earned, before the burst cap applies.
+func (s *hostState) earned(elapsed time.Duration) float64 {
+	// Multiplying first earns a whole token for exactly the time one token
+	// takes, without rounding just under it.
+	return float64(elapsed) * float64(s.allowed) / float64(s.window)
 }
 
 // tokenCap is the maximum tokens this host may hold.

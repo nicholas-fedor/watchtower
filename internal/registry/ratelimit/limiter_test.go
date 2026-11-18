@@ -654,3 +654,97 @@ func TestObserve_ThrottleAfterRecoveryPacesAgain(t *testing.T) {
 		assert.Equal(t, 2*time.Second, waitTime(t, l), "the new made-up quota paces the rest")
 	})
 }
+
+// TestLimiter_Wait_restOfToken verifies that a paced request waits only for
+// the part of a token the host has not yet earned. A request 6.9 seconds into
+// a 7 second interval waits 100ms. Back-to-back requests each wait one
+// interval with no extra wait left over from rounding.
+func TestLimiter_Wait_restOfToken(t *testing.T) {
+	t.Parallel()
+
+	t.Run("partly earned token", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			l := New()
+
+			l.Observe(recoveryHost, &Error{Allowed: 1, AllowedWindow: 7 * time.Second})
+			assert.Zero(t, waitTime(t, l))
+
+			time.Sleep(6900 * time.Millisecond)
+			assert.Equal(t, 100*time.Millisecond, waitTime(t, l))
+		})
+	})
+
+	t.Run("back-to-back requests", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			// 10s / 3, rounded up to the nanosecond.
+			const interval = 3333333334 * time.Nanosecond
+
+			l := New()
+
+			l.Observe(recoveryHost, &Error{Allowed: 3, AllowedWindow: 10 * time.Second})
+			assert.Zero(t, waitTime(t, l))
+
+			for range 5 {
+				assert.Equal(t, interval, waitTime(t, l))
+			}
+		})
+	})
+
+	t.Run("rounding shortfall", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			l := New()
+
+			l.Observe(recoveryHost, &Error{Allowed: 4, AllowedWindow: 12 * time.Second})
+
+			// Refilling for the rounded-up 2.544664238s from this balance comes
+			// to 0.9999999999999999 tokens, so the wait takes one more nanosecond.
+			l.hostStates[recoveryHost].tokens = 0.15177858733333327
+
+			assert.Equal(t, 2544664239*time.Nanosecond, waitTime(t, l))
+		})
+	})
+}
+
+// TestLimiter_Wait_madeUpQuotaEndsWithRecovery verifies that a request paced
+// by a quota made up from a cooldown waits no later than the end of recovery.
+// The made-up quota is dropped then, so the request does not wait a full
+// interval past it. A wait shorter than the 1ms floor still ends with
+// recovery.
+func TestLimiter_Wait_madeUpQuotaEndsWithRecovery(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		left time.Duration
+	}{
+		{name: "one second left", left: time.Second},
+		{name: "less than a millisecond left", left: 300 * time.Microsecond},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				l := New()
+
+				l.Observe(recoveryHost, &Error{RetryAfter: 20 * time.Second})
+				assert.Equal(t, 20*time.Second, waitTime(t, l), "the cooldown holds the first request")
+
+				time.Sleep(throttleRecovery - tt.left)
+				assert.Zero(t, waitTime(t, l), "a token was earned during recovery")
+				assert.Equal(t, tt.left, waitTime(t, l), "the next request waits only until recovery ends")
+
+				for range 20 {
+					assert.Zero(t, waitTime(t, l), "requests are not paced after recovery")
+				}
+			})
+		})
+	}
+}
