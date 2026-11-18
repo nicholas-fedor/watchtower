@@ -222,6 +222,7 @@ var commonTemplates = map[string]string{
 	// If no containers matched the filter, outputs "no containers matched filter".
 	// Expects .Report.All []Container slice with Name, ImageName, State, Error fields.
 	// States include: Updated, Restarted, Fresh, Skipped, Failed.
+	// It renders nothing without a session report. Log lines outside an update session, such as the startup messages, then send nothing.
 	`porcelain.v1.summary-no-log`: `
 {{- if .Report -}}
   {{- /* Iterate over all containers */ -}}
@@ -231,8 +232,6 @@ var commonTemplates = map[string]string{
   {{- else -}}
     no containers matched filter
   {{- end -}}
-{{- else -}}
-  no containers matched filter
 {{- end -}}`,
 
 	// "json.v1" template outputs the entire data structure as JSON for programmatic consumption.
@@ -243,5 +242,6 @@ var commonTemplates = map[string]string{
 	// "porcelain.json" template outputs the update report as a stable JSON document with per-container details.
 	// It omits log entries and focuses on the report: name, image, image_id, latest_image_id, state, update_available, and error.
 	// Expects .Report with an All() method returning the report's containers.
-	`porcelain.json`: `{{ .Report | ToPorcelainJSON }}`,
+	// It renders nothing without a session report. Log lines outside an update session, such as the startup messages, then send nothing.
+	`porcelain.json`: `{{ with .Report }}{{ ToPorcelainJSON . }}{{ end }}`,
 }

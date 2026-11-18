@@ -440,8 +440,8 @@ func TestSessionSend_CooldownFocusWithOneContextContainer(t *testing.T) {
 
 // TestNotifier_StartNotification_EndEmptyBatch verifies that a batch's end
 // sends nothing when nothing is queued, with every built-in template, and
-// still ends batching. The JSON and porcelain templates render a document even
-// without entries. The end would otherwise send it as an empty notification.
+// still ends batching. The JSON template renders a document even without
+// entries. The end would otherwise send it as an empty notification.
 func TestNotifier_StartNotification_EndEmptyBatch(t *testing.T) {
 	t.Parallel()
 
@@ -463,6 +463,44 @@ func TestNotifier_StartNotification_EndEmptyBatch(t *testing.T) {
 				assert.Empty(t, sentMessages(n))
 			})
 		}
+	}
+}
+
+// TestNotifier_StartNotification_porcelain verifies that the porcelain
+// templates send nothing for the startup messages of a run-once. These log
+// lines end their batch without a session report. The session's report is
+// then sent in one message.
+func TestNotifier_StartNotification_porcelain(t *testing.T) {
+	t.Parallel()
+
+	for _, tpl := range []string{"porcelain.json", "porcelain.v1.summary-no-log"} {
+		t.Run(tpl, func(t *testing.T) {
+			t.Parallel()
+
+			n := createNotifier(newTestLogger(t), nil, nil, zerolog.InfoLevel, tpl, false, format.StaticData{}, 0)
+			t.Cleanup(n.Close)
+
+			endStartup := n.StartNotification()
+
+			hooked := zerolog.New(io.Discard).Hook(n)
+			hooked.Info().Msg("Running a one time update")
+
+			endStartup()
+
+			assert.Empty(t, sentMessages(n), "the startup batch has no report")
+
+			report := reportfixture.Report(state.UpdatedState)
+			require.NotEmpty(t, report.Updated())
+
+			send, end := n.StartSessionNotification()
+			send(report)
+			end()
+
+			sent := sentMessages(n)
+			require.Len(t, sent, 1, "the session's report is sent once")
+			assert.Contains(t, sent[0], report.Updated()[0].Name())
+			assert.Contains(t, sent[0], "Updated")
+		})
 	}
 }
 

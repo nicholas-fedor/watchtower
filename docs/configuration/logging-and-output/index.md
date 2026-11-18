@@ -111,6 +111,8 @@ Environment Variable: WATCHTOWER_PORCELAIN
 
 Porcelain only fills in the notification-template, notification-report, and notification-log-stdout configuration options you have not set. A value you set yourself, with a flag or an environment variable, is kept.
 
+The porcelain templates print only the result of each update session, not log messages such as the startup messages. With them, a session that fails before it has a result prints nothing. A notification template you set yourself decides what is printed instead. The `default` template, for example, also prints log messages that come without a result.
+
 For `v1`, the template is `porcelain.v1.summary-no-log`, producing one container per line.
 
 For `json`, the template is `porcelain.json`, producing a JSON document:
