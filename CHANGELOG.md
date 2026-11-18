@@ -179,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/schema to v1.10.0 by @renovate[bot] in [#3911](https://github.com/nicholas-fedor/watchtower/pull/3911)
 - Add tasks that tag the next release by @nicholas-fedor in [#3909](https://github.com/nicholas-fedor/watchtower/pull/3909)
 - Update module github.com/mattn/go-shellwords to v1.0.17 by @renovate[bot] in [#3906](https://github.com/nicholas-fedor/watchtower/pull/3906)
 - Update step-security/harden-runner action to v2.23.0 by @renovate[bot] in [#3907](https://github.com/nicholas-fedor/watchtower/pull/3907)
