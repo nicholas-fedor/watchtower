@@ -23,6 +23,7 @@ To use this feature, set an [API token](../../../configuration/http-api/index.md
 |----------------------------------------------|---------|------------------------------------------------------------------------------------|
 | `watchtower_containers_scanned`              | Gauge   | Number of containers scanned for changes during the last scan                      |
 | `watchtower_containers_updated`              | Gauge   | Number of containers updated during the last scan                                  |
+| `watchtower_updates_available`               | Gauge   | Number of containers with a new image identified during the last scan               |
 | `watchtower_containers_failed`               | Gauge   | Number of containers where update failed during the last scan                      |
 | `watchtower_containers_restarted_total`      | Counter | Number of containers restarted due to linked dependencies since watchtower started |
 | `watchtower_containers_skipped`              | Gauge   | Number of containers skipped during the last scan                                  |
@@ -36,6 +37,12 @@ To use this feature, set an [API token](../../../configuration/http-api/index.md
 
 A scan is skipped when a scheduled run starts while the previous one is still running, or when the update at startup finds another update already running.
 A skipped scan does not change the scan total or the last-scan gauges.
+
+`watchtower_updates_available` includes monitor-only containers and containers
+whose identified update was applied, skipped, or failed during the scan.
+Containers without an identified new image are not counted. The gauge describes
+what the scan found, so an applied update can count toward both
+`watchtower_updates_available` and `watchtower_containers_updated`.
 
 The four image-usage gauges are updated when [`disk-space-max`](../../../configuration/update-behavior/index.md#disk_space_max) or [`disk-space-warn`](../../../configuration/update-behavior/index.md#disk_space_warn) are set.
 See [Disk Usage Monitor](../../../advanced-features/disk-usage-monitor/index.md#metrics).

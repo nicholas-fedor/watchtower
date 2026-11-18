@@ -1622,7 +1622,7 @@ func Test_newScanMetric(t *testing.T) {
 				state.SkippedState,
 				state.FreshState,
 			},
-			want: &metrics.Metric{Scanned: 10, Updated: 3, Failed: 2, Restarted: 4, Skipped: 1},
+			want: &metrics.Metric{Scanned: 10, UpdatesAvailable: 5, Updated: 3, Failed: 2, Restarted: 4, Skipped: 1},
 		},
 	}
 

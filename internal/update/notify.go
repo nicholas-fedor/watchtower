@@ -650,7 +650,7 @@ func generateAndLogMetric(log *zerolog.Logger, result *state.Report) *metrics.Me
 	return metricResults
 }
 
-// newScanMetric counts the containers in each category of a session report.
+// newScanMetric counts the session's outcomes and identified image updates.
 //
 // Parameters:
 //   - report: The session report. It must not be nil.
@@ -658,11 +658,20 @@ func generateAndLogMetric(log *zerolog.Logger, result *state.Report) *metrics.Me
 // Returns:
 //   - *metrics.Metric: The session's counts, with ScanFailed unset.
 func newScanMetric(report *state.Report) *metrics.Metric {
+	available := 0
+
+	for _, c := range report.All() {
+		if latest := c.LatestImageID(); latest != "" && latest != c.CurrentImageID() {
+			available++
+		}
+	}
+
 	return &metrics.Metric{
-		Scanned:   len(report.Scanned()),
-		Updated:   len(report.Updated()),
-		Failed:    len(report.Failed()),
-		Restarted: len(report.Restarted()),
-		Skipped:   len(report.Skipped()),
+		UpdatesAvailable: available,
+		Scanned:          len(report.Scanned()),
+		Updated:          len(report.Updated()),
+		Failed:           len(report.Failed()),
+		Restarted:        len(report.Restarted()),
+		Skipped:          len(report.Skipped()),
 	}
 }

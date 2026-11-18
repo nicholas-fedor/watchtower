@@ -503,12 +503,13 @@ func TestNewWithRegistry(t *testing.T) {
 				t.Fatalf("Failed to gather metrics: %v", err)
 			}
 
-			if len(metricFamilies) != 14 {
-				t.Errorf("Expected 14 metric families registered, got %d", len(metricFamilies))
+			if len(metricFamilies) != 15 {
+				t.Errorf("Expected 15 metric families registered, got %d", len(metricFamilies))
 			}
 
 			expectedNames := map[string]bool{
 				"watchtower_containers_scanned":              true,
+				"watchtower_updates_available":               true,
 				"watchtower_containers_updated":              true,
 				"watchtower_containers_failed":               true,
 				"watchtower_containers_restarted":            true,
@@ -841,6 +842,8 @@ func TestMetrics_HandleUpdate(t *testing.T) {
 				cancel:  cancel,
 				scanned: promauto.With(reg).
 					NewGauge(prometheus.GaugeOpts{Name: "test_scanned"}),
+				updatesAvailable: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_updates_available"}),
 				updated: promauto.With(reg).
 					NewGauge(prometheus.GaugeOpts{Name: "test_updated"}),
 				failed: promauto.With(reg).
@@ -987,6 +990,8 @@ func TestMetrics_HandleUpdate_ContextCancellation(t *testing.T) {
 				cancel:  cancel,
 				scanned: promauto.With(reg).
 					NewGauge(prometheus.GaugeOpts{Name: "test_scanned_ctx"}),
+				updatesAvailable: promauto.With(reg).
+					NewGauge(prometheus.GaugeOpts{Name: "test_updates_available_ctx"}),
 				updated: promauto.With(reg).
 					NewGauge(prometheus.GaugeOpts{Name: "test_updated_ctx"}),
 				failed: promauto.With(reg).

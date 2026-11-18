@@ -72,11 +72,12 @@ func FuzzMetricJSON(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, scanned, updated, failed, restarted, skipped int) {
 		m := &Metric{
-			Scanned:   scanned,
-			Updated:   updated,
-			Failed:    failed,
-			Restarted: restarted,
-			Skipped:   skipped,
+			Scanned:          scanned,
+			UpdatesAvailable: scanned,
+			Updated:          updated,
+			Failed:           failed,
+			Restarted:        restarted,
+			Skipped:          skipped,
 		}
 
 		data, err := json.Marshal(m)
@@ -86,6 +87,7 @@ func FuzzMetricJSON(f *testing.F) {
 		require.NoError(t, json.Unmarshal(data, &unmarshaled))
 
 		assert.Equal(t, m.Scanned, unmarshaled.Scanned)
+		assert.Equal(t, m.UpdatesAvailable, unmarshaled.UpdatesAvailable)
 		assert.Equal(t, m.Updated, unmarshaled.Updated)
 		assert.Equal(t, m.Failed, unmarshaled.Failed)
 		assert.Equal(t, m.Restarted, unmarshaled.Restarted)

@@ -60,7 +60,7 @@ func Test_handleUpdateResult(t *testing.T) {
 
 		err := errors.New("rolling restart canceled")
 		result := handleUpdateResult(newTestLogger(t), report, err, nil)
-		assert.Equal(t, &metrics.Metric{Scanned: 3, Updated: 1, Failed: 2, ScanFailed: true}, result)
+		assert.Equal(t, &metrics.Metric{Scanned: 3, UpdatesAvailable: 3, Updated: 1, Failed: 2, ScanFailed: true}, result)
 	})
 
 	t.Run("should return a failed zero metric when result is nil", func(t *testing.T) {

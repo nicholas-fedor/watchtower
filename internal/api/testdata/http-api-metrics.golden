@@ -27,3 +27,5 @@ header: Content-Type: text/plain; version=0.0.4; charset=utf-8; escaping=undersc
 # TYPE watchtower_scans_skipped_total counter
 # HELP watchtower_scans_total Number of scans since the watchtower started
 # TYPE watchtower_scans_total counter
+# HELP watchtower_updates_available Number of containers with a new image identified during the last scan
+# TYPE watchtower_updates_available gauge

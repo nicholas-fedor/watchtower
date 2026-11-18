@@ -22,6 +22,8 @@ type Metric struct {
 	Failed    int `json:"failed"`
 	Restarted int `json:"restarted"`
 	Skipped   int `json:"skipped"`
+	// UpdatesAvailable counts containers with an identified new image.
+	UpdatesAvailable int `json:"updates_available,omitempty"`
 	// ScanFailed reports that the scan ended in an error. The counts are then
 	// those the scan reached before it failed.
 	ScanFailed bool `json:"scan_failed,omitempty"`
@@ -30,6 +32,7 @@ type Metric struct {
 // Metrics handles processing and exposing scan metrics.
 type Metrics struct {
 	scanned            prometheus.Gauge   // Gauge for scanned containers.
+	updatesAvailable   prometheus.Gauge   // Gauge for identified image updates.
 	updated            prometheus.Gauge   // Gauge for updated containers.
 	failed             prometheus.Gauge   // Gauge for failed containers.
 	restarted          prometheus.Gauge   // Gauge for restarted containers.
@@ -74,6 +77,10 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 		scanned: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "watchtower_containers_scanned",
 			Help: "Number of containers scanned for changes by watchtower during the last scan",
+		}),
+		updatesAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "watchtower_updates_available",
+			Help: "Number of containers with a new image identified during the last scan",
 		}),
 		updated: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "watchtower_containers_updated",
@@ -137,6 +144,7 @@ func NewWithRegistry(registry prometheus.Registerer) (*Metrics, error) {
 	// already holds is reused, so updates reach the collector it exposes.
 	gauges := []*prometheus.Gauge{
 		&metrics.scanned,
+		&metrics.updatesAvailable,
 		&metrics.updated,
 		&metrics.failed,
 		&metrics.restarted,
@@ -429,6 +437,7 @@ func (m *Metrics) HandleUpdate() {
 			}
 
 			m.scanned.Set(float64(change.Scanned))
+			m.updatesAvailable.Set(float64(change.UpdatesAvailable))
 			m.updated.Set(float64(change.Updated))
 			m.failed.Set(float64(change.Failed))
 			m.restarted.Set(float64(change.Restarted))
