@@ -83,3 +83,19 @@ func AllSpecs() []spec.FlagSpec {
 		git.Specs(),
 	)
 }
+
+// EnvKeys returns every environment variable the settings read. That is each
+// variable a flag binds and the cooldown platform variables, which no flag
+// binds.
+//
+// Returns:
+//   - []string: The variable names.
+func EnvKeys() []string {
+	keys := []string{cooldownPlatformOSEnv, cooldownPlatformArchEnv, cooldownPlatformVariantEnv}
+
+	for _, flagSpec := range AllSpecs() {
+		keys = append(keys, flagSpec.EnvKeys...)
+	}
+
+	return keys
+}

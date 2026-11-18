@@ -44,6 +44,16 @@ type flagValues struct {
 // diskSpacePercentBase is the divisor used to convert a 0-100 percentage into a fraction of max.
 const diskSpacePercentBase = 100
 
+// Environment variables that set the cooldown platform. No flag binds them.
+const (
+	// cooldownPlatformOSEnv sets the platform's operating system.
+	cooldownPlatformOSEnv = "WATCHTOWER_COOLDOWN_PLATFORM_OS"
+	// cooldownPlatformArchEnv sets the platform's CPU architecture.
+	cooldownPlatformArchEnv = "WATCHTOWER_COOLDOWN_PLATFORM_ARCH"
+	// cooldownPlatformVariantEnv sets the platform's CPU variant.
+	cooldownPlatformVariantEnv = "WATCHTOWER_COOLDOWN_PLATFORM_VARIANT"
+)
+
 var (
 	// errRollingRestartWithMonitorOnly indicates incompatible rolling-restart and monitor-only flags.
 	errRollingRestartWithMonitorOnly = errors.New(
@@ -619,9 +629,9 @@ func loadFilter(log *zerolog.Logger, values *flagValues, args []string) (filter.
 func loadRegistry(values *flagValues) registry.Registry {
 	return registry.Registry{
 		CooldownPlatform: registry.Platform{
-			OS:           os.Getenv("WATCHTOWER_COOLDOWN_PLATFORM_OS"),
-			Architecture: os.Getenv("WATCHTOWER_COOLDOWN_PLATFORM_ARCH"),
-			Variant:      os.Getenv("WATCHTOWER_COOLDOWN_PLATFORM_VARIANT"),
+			OS:           os.Getenv(cooldownPlatformOSEnv),
+			Architecture: os.Getenv(cooldownPlatformArchEnv),
+			Variant:      os.Getenv(cooldownPlatformVariantEnv),
 		},
 		TLSMinVersion: values.String("registry-tls-min-version"),
 		TLSSkip:       values.Bool("registry-tls-skip"),
