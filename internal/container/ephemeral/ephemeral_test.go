@@ -1049,11 +1049,20 @@ func TestCreateOrchestrator_logsForwardedTLSVerify(t *testing.T) {
 
 			require.NotNil(t, created.Config)
 
-			if tt.wantEnv == "" {
-				assert.False(t, hasPrefixedElement(created.Config.Env, "DOCKER_TLS_VERIFY="), "%v", created.Config.Env)
-			} else {
-				assert.Contains(t, created.Config.Env, tt.wantEnv)
+			// Every forwarded DOCKER_TLS_VERIFY entry is compared, so a duplicate
+			// or conflicting entry fails as well.
+			var wantEntries, gotEntries []string
+			if tt.wantEnv != "" {
+				wantEntries = []string{tt.wantEnv}
 			}
+
+			for _, entry := range created.Config.Env {
+				if key, _, _ := strings.Cut(entry, "="); key == "DOCKER_TLS_VERIFY" {
+					gotEntries = append(gotEntries, entry)
+				}
+			}
+
+			assert.Equal(t, wantEntries, gotEntries)
 
 			var got []string
 
