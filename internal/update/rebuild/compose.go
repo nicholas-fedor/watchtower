@@ -1,6 +1,7 @@
 package rebuild
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -415,45 +416,64 @@ func (s *Session) recordCompose(
 	progress *state.Progress,
 	log *zerolog.Logger,
 ) {
-	if !params.NoRestart && item.ID == "" {
+	if !params.NoRestart {
+		logComposeReplaced(log, c, item)
+	}
+
+	if progress != nil {
+		meta := reportGitImage(log, progress, c, item.ImageID, result, params)
+		provenance.LogChangelog(log, c, params.Policy, meta)
+	}
+
+	s.recordComposeApply(log, progress, c.ID(), item, result.Commit, params)
+}
+
+// recordComposeApply records what a Compose apply did to one tracked container.
+//
+// With restarts, the result container replaces the tracked one, which is
+// marked updated. Without restarts, Compose only builds and the result is the
+// tracked container itself. No replacement is recorded then.
+//
+// Parameters:
+//   - log: Process logger.
+//   - progress: Session progress, or nil.
+//   - containerID: ID of the tracked container.
+//   - item: Compose instance after apply.
+//   - commit: Commit the apply built, for a no-restart build without an image ID.
+//   - params: Update parameters.
+//
+// Returns:
+//   - none.
+func (s *Session) recordComposeApply(
+	log *zerolog.Logger,
+	progress *state.Progress,
+	containerID container.ContainerID,
+	item composeApply.Container,
+	commit string,
+	params updateParams.Params,
+) {
+	if params.NoRestart {
+		s.mu.Lock()
+		s.built[containerID] = cmp.Or(item.ImageID, gitImageID(commit))
+		s.mu.Unlock()
+
 		return
 	}
 
 	s.mu.Lock()
-	if params.NoRestart {
-		if item.ImageID != "" {
-			s.built[c.ID()] = item.ImageID
-		} else {
-			s.built[c.ID()] = container.ImageID("git:" + result.Commit)
-		}
-	} else {
-		s.applied[c.ID()] = struct{}{}
-		if item.ImageID != "" {
-			s.built[c.ID()] = item.ImageID
-		}
+	s.applied[containerID] = struct{}{}
+
+	if item.ImageID != "" {
+		s.built[containerID] = item.ImageID
 	}
 	s.mu.Unlock()
-
-	if !params.NoRestart {
-		logComposeReplaced(log, c, item)
-	}
 
 	if progress == nil {
 		return
 	}
 
-	meta := reportGitImage(log, progress, c, item.ImageID, result, params)
-	provenance.LogChangelog(log, c, params.Policy, meta)
-
-	if item.ID == "" {
-		return
-	}
-
-	progress.SetNewContainerID(log, c.ID(), item.ID)
-
-	if !params.NoRestart {
-		progress.MarkForUpdate(log, c.ID())
-	}
+	progress.SetNewContainerID(log, containerID, item.ID)
+	progress.MarkForUpdate(log, containerID)
 }
 
 // markComposeResultFailures records apply failures for result containers represented in session progress.
@@ -564,31 +584,12 @@ func (s *Session) recordComposeReplicas(
 			continue
 		}
 
-		s.mu.Lock()
-		if params.NoRestart {
-			if item.ImageID != "" {
-				s.built[status.ID()] = item.ImageID
-			} else {
-				s.built[status.ID()] = container.ImageID("git:" + representative.result.Commit)
-			}
-		} else {
-			s.applied[status.ID()] = struct{}{}
-			if item.ImageID != "" {
-				s.built[status.ID()] = item.ImageID
-			}
-		}
-		s.mu.Unlock()
-
 		if item.ImageID != "" {
 			progress.SetLatestImage(log, status.ID(), item.ImageID)
 		}
 
 		progress.SetReportMeta(log, status.ID(), meta)
-
-		if !params.NoRestart {
-			progress.SetNewContainerID(log, status.ID(), item.ID)
-			progress.MarkForUpdate(log, status.ID())
-		}
+		s.recordComposeApply(log, progress, status.ID(), item, representative.result.Commit, params)
 
 		matched[status.ID()] = struct{}{}
 	}

@@ -28,6 +28,10 @@ import (
 // Client applies a Compose project through docker/compose v5.
 type Client struct {
 	service api.Compose
+	// engine is the Docker API client the Compose service uses.
+	//
+	// It inspects the images a build-only apply tags.
+	engine dockerClient.APIClient
 	// docker holds the settings the Compose service connects with.
 	docker dockerConfig.Docker
 	mu     sync.Mutex
@@ -55,7 +59,10 @@ type Container struct {
 	ID container.ContainerID
 	// ImageID is the ID of the image the container runs, from compose images,
 	// or the container's image reference when that is already an image ID.
-	// It is empty when neither is known.
+	//
+	// After a build-only apply, it is the image the service's tag names. The
+	// container does not run that image yet. It is empty when the ID is not
+	// known.
 	ImageID container.ImageID
 }
 
@@ -153,7 +160,7 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 		return nil, err
 	}
 
-	svc, err := c.composeService()
+	svc, engine, err := c.composeService()
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +175,7 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 			return nil, fmt.Errorf("compose build: %w", err)
 		}
 
-		return listApplied(ctx, svc, project, req.Services)
+		return listBuilt(ctx, svc, engine, project, req.Services)
 	}
 
 	err = svc.Up(ctx, project, api.UpOptions{
@@ -323,22 +330,24 @@ func stampComposeIdentity(project *composeTypes.Project) (*composeTypes.Project,
 	return project, nil
 }
 
-// composeService returns the docker/compose service, creating it on first use.
+// composeService returns the docker/compose service and its Docker API client,
+// creating them on first use.
 //
 // Returns:
 //   - api.Compose: Compose service.
+//   - dockerClient.APIClient: The Docker API client the service uses.
 //   - error: Non-nil when the Docker CLI cannot be initialized.
-func (c *Client) composeService() (api.Compose, error) {
+func (c *Client) composeService() (api.Compose, dockerClient.APIClient, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if c.service != nil {
-		return c.service, nil
+		return c.service, c.engine, nil
 	}
 
 	dockerCLI, err := c.newDockerCLI()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	svc, err := compose.NewComposeService(
@@ -347,12 +356,15 @@ func (c *Client) composeService() (api.Compose, error) {
 		compose.WithStreams(io.Discard, io.Discard, bytes.NewReader(nil)),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("compose service: %w", err)
+		return nil, nil, fmt.Errorf("compose service: %w", err)
 	}
 
+	// newDockerCLI has initialized the Docker CLI, so Client returns its API
+	// client without connecting again.
 	c.service = svc
+	c.engine = dockerCLI.Client()
 
-	return svc, nil
+	return svc, c.engine, nil
 }
 
 // newDockerCLI returns a Docker CLI that connects with the client's Docker settings.
@@ -403,7 +415,7 @@ func (c *Client) newDockerCLI() (*command.DockerCli, error) {
 	return dockerCLI, nil
 }
 
-// listApplied returns running service containers after compose up or build.
+// listApplied returns the service containers after compose up.
 //
 // Parameters:
 //   - ctx: Cancellation and timeout.
@@ -420,13 +432,9 @@ func listApplied(
 	project *composeTypes.Project,
 	services []string,
 ) ([]Container, error) {
-	summaries, err := svc.Ps(ctx, project.Name, api.PsOptions{
-		Project:  project,
-		All:      true,
-		Services: services,
-	})
+	summaries, err := serviceContainers(ctx, svc, project, services)
 	if err != nil {
-		return nil, fmt.Errorf("compose ps: %w", err)
+		return nil, err
 	}
 
 	images, err := svc.Images(ctx, project.Name, api.ImagesOptions{Services: services})
@@ -448,6 +456,99 @@ func listApplied(
 	}
 
 	return out, nil
+}
+
+// listBuilt returns the service containers after compose build, each with the
+// image its service's tag names.
+//
+// A build moves the tag without recreating containers, so compose images
+// would report the image each container still runs. A tag that cannot be
+// inspected leaves the image ID of its service's containers empty.
+//
+// Parameters:
+//   - ctx: Cancellation and timeout.
+//   - svc: Compose service.
+//   - engine: Docker API client that inspects the built images.
+//   - project: Loaded project.
+//   - services: Service names that were built.
+//
+// Returns:
+//   - []Container: Service instances.
+//   - error: Non-nil when compose ps fails.
+func listBuilt(
+	ctx context.Context,
+	svc api.Compose,
+	engine dockerClient.APIClient,
+	project *composeTypes.Project,
+	services []string,
+) ([]Container, error) {
+	summaries, err := serviceContainers(ctx, svc, project, services)
+	if err != nil {
+		return nil, err
+	}
+
+	built := make(map[string]container.ImageID, len(services))
+
+	for _, name := range services {
+		service, ok := project.Services[name]
+		if !ok {
+			continue
+		}
+
+		image, err := engine.ImageInspect(ctx, api.GetImageNameOrDefault(service, project.Name))
+		if err != nil {
+			zerolog.Ctx(ctx).Debug().
+				Err(err).
+				Str("service", name).
+				Msg("Could not inspect the built Compose image. Its image ID is omitted")
+
+			continue
+		}
+
+		built[name] = container.ImageID(image.ID)
+	}
+
+	out := make([]Container, 0, len(summaries))
+
+	for _, summary := range summaries {
+		out = append(out, Container{
+			Service: summary.Service,
+			Name:    summary.Name,
+			ID:      container.ContainerID(summary.ID),
+			ImageID: built[summary.Service],
+		})
+	}
+
+	return out, nil
+}
+
+// serviceContainers returns every container of the services, running or not.
+//
+// Parameters:
+//   - ctx: Cancellation and timeout.
+//   - svc: Compose service.
+//   - project: Loaded project.
+//   - services: Service names to list.
+//
+// Returns:
+//   - []api.ContainerSummary: The compose ps rows.
+//   - error: Non-nil when compose ps fails.
+func serviceContainers(
+	ctx context.Context,
+	svc api.Compose,
+	project *composeTypes.Project,
+	services []string,
+) ([]api.ContainerSummary, error) {
+	summaries, err := svc.Ps(ctx, project.Name, api.PsOptions{
+		Project:  project,
+		All:      true,
+		Services: services,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("compose ps: %w", err)
+	}
+
+	return summaries, nil
 }
 
 // appliedImageID prefers the inspected image ID from compose images over the Ps name.

@@ -951,6 +951,64 @@ func TestSession_applyCompose(t *testing.T) {
 		assert.Empty(t, sess.ExcludeApplied([]*container.Container{stale, fresh}))
 	})
 
+	t.Run("records no replacement for a no-restart build in a mixed stale and fresh service", func(t *testing.T) {
+		t.Parallel()
+
+		dir := writeComposeProjectDir(t)
+		stale := gitAssociatedContainer("api-1", "web-1", "webstack-api:latest", map[string]string{
+			labels.ComposeDir:                 dir,
+			composeLabels.ComposeServiceLabel: "api",
+		})
+		fresh := gitAssociatedContainer("api-2", "web-2", "webstack-api:latest", map[string]string{
+			labels.ComposeDir:                 dir,
+			composeLabels.ComposeServiceLabel: "api",
+		})
+
+		// A build-only apply recreates nothing, so compose ps lists the
+		// existing containers under their own IDs.
+		applier := mockRebuild.NewMockApplier(t)
+		applier.EXPECT().
+			Apply(mock.Anything, mock.Anything).
+			Return([]composeApply.Container{
+				{Service: "api", Name: "/web-1", ID: stale.ID(), ImageID: "sha256:api"},
+				{Service: "api", Name: "/web-2", ID: fresh.ID(), ImageID: "sha256:api"},
+			}, nil).
+			Once()
+
+		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess.apply = applier
+		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
+			return nil
+		}
+
+		stale.SetStale(true)
+
+		result := git.CheckResult{Stale: true, Commit: "abc", Tag: "v1.2.3"}
+		sess.store(stale.ID(), result)
+
+		params := updateParams.Params{NoRestart: true, Git: gitConfig.Defaults{Enable: true}}
+		progress := &state.Progress{}
+		progress.AddScanned(newTestLogger(t), stale, container.ImageID("git:"+result.Commit), params)
+		progress.AddScanned(newTestLogger(t), fresh, fresh.ImageID(), params)
+
+		failed := map[container.ContainerID]error{}
+		docker := mockRebuild.NewMockImageBuilder(t)
+		sess.PrepareRebuilds(newTestLogger(t), t.Context(), docker, []*container.Container{stale}, params, progress, failed)
+
+		report := progress.Report(newTestLogger(t))
+
+		assert.Empty(t, failed)
+		assert.Empty(t, sess.applied)
+		assert.Equal(t, container.ImageID("sha256:api"), sess.built[stale.ID()])
+		assert.Equal(t, container.ImageID("sha256:api"), sess.built[fresh.ID()])
+		assert.Empty(t, report.Updated())
+		require.Len(t, report.Scanned(), 2)
+
+		for _, status := range report.Scanned() {
+			assert.Empty(t, status.NewContainerID(), status.Name())
+		}
+	})
+
 	t.Run("accepts additional Compose replicas absent from filtered progress", func(t *testing.T) {
 		t.Parallel()
 
@@ -1089,6 +1147,8 @@ func TestSession_recordCompose(t *testing.T) {
 		"webstack-api:latest": {Repo: "https://github.com/org/app.git", Ref: "release"},
 	}
 
+	// A build-only apply recreates nothing. The no-restart cases get the source
+	// container's own ID because compose ps lists it under that ID.
 	tests := []struct {
 		name      string
 		source    func() *container.Container
@@ -1115,7 +1175,7 @@ func TestSession_recordCompose(t *testing.T) {
 			name:      "label association, no restart",
 			source:    labeled,
 			noRestart: true,
-			item:      composeApply.Container{Service: "api"},
+			item:      composeApply.Container{Service: "api", ID: "api"},
 			want: want{
 				gitRepo:   "https://git.example.com/org/app.git",
 				gitRef:    "main",
@@ -1143,7 +1203,7 @@ func TestSession_recordCompose(t *testing.T) {
 			name:      "image mapping, no restart",
 			source:    mapped,
 			noRestart: true,
-			item:      composeApply.Container{Service: "api", ImageID: "sha256:api"},
+			item:      composeApply.Container{Service: "api", ID: "api", ImageID: "sha256:api"},
 			want: want{
 				gitRepo:   "https://github.com/org/app.git",
 				gitRef:    "release",
