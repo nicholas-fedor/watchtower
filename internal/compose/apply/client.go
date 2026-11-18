@@ -184,8 +184,7 @@ func (c *Client) Apply(ctx context.Context, req Request) ([]Container, error) {
 			Inherit:              true,
 		},
 		Start: api.StartOptions{
-			Project: project,
-			Wait:    true,
+			Wait: true,
 		},
 	})
 	if err != nil {

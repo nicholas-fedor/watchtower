@@ -317,8 +317,8 @@ func TestExportConnection(t *testing.T) {
 	}
 }
 
-// TestClientApplyScopesStartProject verifies that applying a service scopes the project to that service and its dependencies.
-func TestClientApplyScopesStartProject(t *testing.T) {
+// TestClientApplyScopesProject verifies that applying a service scopes the project to that service and its dependencies.
+func TestClientApplyScopesProject(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -365,7 +365,6 @@ services:
 	}}, containers)
 
 	require.NotNil(t, upProject)
-	assert.Same(t, upProject, upOptions.Start.Project)
 	assert.ElementsMatch(t, []string{"app", "db"}, upProject.ServiceNames())
 	assert.NotContains(t, upProject.ServiceNames(), "cache")
 	assert.Equal(t, []string{"app"}, upOptions.Create.Services)
@@ -491,7 +490,7 @@ func TestClientApplyStampsComposeIdentity(t *testing.T) {
 		require.NoError(t, err)
 
 		require.NotNil(t, upProject)
-		assert.Same(t, upProject, upOptions.Start.Project)
+		assert.True(t, upOptions.Start.Wait)
 		assert.Nil(t, upOptions.Start.Attach)
 		assert.Equal(t, api.RecreateForce, upOptions.Create.Recreate)
 		assertComposeIdentity(t, upProject, dir)
