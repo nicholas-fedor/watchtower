@@ -179,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Explain why compose-go only updates with docker/compose by @nicholas-fedor in [#3904](https://github.com/nicholas-fedor/watchtower/pull/3904)
 - Update module github.com/nicholas-fedor/shoutrrr to v0.25.0 by @renovate[bot] in [#3890](https://github.com/nicholas-fedor/watchtower/pull/3890)
 - Update module github.com/go-openapi/jsonpointer to v1.0.3 by @renovate[bot] in [#3886](https://github.com/nicholas-fedor/watchtower/pull/3886)
 - Update golang.org/x/exp digest to 7a49493 by @renovate[bot] in [#3885](https://github.com/nicholas-fedor/watchtower/pull/3885)
