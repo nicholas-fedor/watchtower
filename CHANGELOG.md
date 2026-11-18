@@ -82,6 +82,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Drop the start project that compose up ignores by @nicholas-fedor in [#3902](https://github.com/nicholas-fedor/watchtower/pull/3902)
 - Pass docker connection settings to the client by @nicholas-fedor in [#3842](https://github.com/nicholas-fedor/watchtower/pull/3842)
 - Read boolean and string settings from the flags by @nicholas-fedor in [#3829](https://github.com/nicholas-fedor/watchtower/pull/3829)
 - Read list and duration settings from the flags by @nicholas-fedor in [#3827](https://github.com/nicholas-fedor/watchtower/pull/3827)
