@@ -3566,51 +3566,56 @@ A container is monitored only if it passes every filter in the chain. The filter
 <tbody>
 <tr>
 <td>1</td>
+<td>Engine job run exclusion</td>
+<td>Containers that Docker Engine runs for a <a href="https://docs.docker.com/compose/how-tos/jobs/" rel="noopener noreferrer" target="_blank">Compose job</a> carry the <code>com.docker.job.id</code> label and are always excluded, since the engine manages them.</td>
+</tr>
+<tr>
+<td>2</td>
 <td>Old Watchtower container exclusion</td>
 <td>Watchtower containers renamed with a <code>watchtower-old-</code> prefix during self-updates are always excluded.</td>
 </tr>
 <tr>
-<td>2</td>
+<td>3</td>
 <td><a href="#enabledisable_labels">Disabled label check</a></td>
 <td>Containers with the Docker label <code>com.centurylinklabs.watchtower.enable=false</code> are excluded.</td>
 </tr>
 <tr>
-<td>3</td>
+<td>4</td>
 <td><a href="#monitoring_scopes">Scope filter</a></td>
 <td>Only containers matching the configured scope are included (default: <code>"none"</code>).</td>
 </tr>
 <tr>
-<td>4</td>
+<td>5</td>
 <td><a href="#enabledisable_labels">Enable label filter</a></td>
 <td>If <a href="../../configuration/container-selection/#enable_label_filter">label enable</a> is set, only containers with the enable label present are included.</td>
 </tr>
 <tr>
-<td>5</td>
+<td>6</td>
 <td><a href="#disable_containers_by_label">Disabled containers by label</a></td>
 <td>Containers matching any <a href="../../configuration/container-selection/#disable_containers_by_label">disabled label pair</a> are excluded.</td>
 </tr>
 <tr>
-<td>6</td>
+<td>7</td>
 <td><a href="#enable_containers_by_label">Enabled containers by label</a></td>
 <td>If set, only containers matching at least one <a href="../../configuration/container-selection/#enable_containers_by_label">enabled label pair</a> are included.</td>
 </tr>
 <tr>
-<td>7</td>
+<td>8</td>
 <td><a href="#exclude_specific_images">Image skip patterns</a></td>
 <td>Containers whose image matches a <a href="../../configuration/container-selection/#skip_specific_images">skip pattern</a> are excluded.</td>
 </tr>
 <tr>
-<td>8</td>
+<td>9</td>
 <td><a href="#monitor_specific_images">Monitored image name patterns</a></td>
 <td>If set, only containers whose image matches a <a href="../../configuration/container-selection/#monitor_specific_images">monitored pattern</a> are included.</td>
 </tr>
 <tr>
-<td>9</td>
+<td>10</td>
 <td><a href="#exclude_specific_containers">Disabled container names</a></td>
 <td>Containers whose name matches a <a href="../../configuration/container-selection/#disable_specific_containers">disable pattern</a> are excluded.</td>
 </tr>
 <tr>
-<td>10</td>
+<td>11</td>
 <td><a href="#container_name_filtering">Container name arguments</a></td>
 <td>If positional name arguments are provided, only containers matching at least one are included.</td>
 </tr>
@@ -4577,7 +4582,7 @@ Each instance manages only the containers within its scope.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 13, 2026 01:06:00 UTC"><span class="timeago" datetime="2026-11-13T01:06:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 13, 2026 01:06:00 UTC">2026-11-13</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 18, 2026 00:11:27 UTC"><span class="timeago" datetime="2026-11-18T00:11:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 18, 2026 00:11:27 UTC">2026-11-18</span>
   </span>
 
     
