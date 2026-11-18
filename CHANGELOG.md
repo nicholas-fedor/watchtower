@@ -137,6 +137,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Document compose jobs and backups alongside watchtower by @nicholas-fedor in [#3896](https://github.com/nicholas-fedor/watchtower/pull/3896)
 - Correct the no-restart notes for self-updates by @nicholas-fedor in [#3763](https://github.com/nicholas-fedor/watchtower/pull/3763)
 - Correct the legacy smtp relay notes by @nicholas-fedor in [#3747](https://github.com/nicholas-fedor/watchtower/pull/3747)
 - Use placeholders for paths and hosts in examples by @nicholas-fedor in [#3745](https://github.com/nicholas-fedor/watchtower/pull/3745)
