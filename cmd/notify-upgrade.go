@@ -124,10 +124,9 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 	case <-timer.C:
 		log.Info().Msg("Timed out")
 	case <-ctx.Done():
+		log.Info().Msg("Stopping")
 		// The cause names the signal that stopped the process.
-		log.Info().
-			Err(context.Cause(ctx)).
-			Msg("Stopping")
+		log.Debug().Err(context.Cause(ctx)).Msg("Stop requested")
 	}
 
 	upgrade.RemoveEnvFile(log, fileName)

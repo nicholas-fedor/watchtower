@@ -295,7 +295,8 @@ func Execute(ctx context.Context, log *zerolog.Logger) {
 //
 // A command that a stop signal ended exits with code 0, as a run does when a
 // stop ends it. Its error is logged only at debug, and its restarts are left
-// alone.
+// alone. An error that does not come from the stop is reported as above, even
+// when a stop signal arrives at the same time.
 //
 // Closing the notifier sends every line it still holds, the fatal line
 // included. Lines logged after the close are dropped, such as those of an HTTP
@@ -315,7 +316,7 @@ func (p *process) exit(ctx context.Context, cmd *cobra.Command, err error) {
 
 	switch {
 	case err == nil:
-	case ctx.Err() != nil:
+	case stoppedBy(ctx, err):
 		// The error follows from the stop, so it is not reported as a failure.
 		p.log.Debug().Err(err).Msg("Stopped by a signal")
 	case ok && exitErr.msg == "":
@@ -346,6 +347,25 @@ func (p *process) exit(ctx context.Context, cmd *cobra.Command, err error) {
 	if err != nil {
 		os.Exit(code)
 	}
+}
+
+// stoppedBy reports whether err comes from a stop signal that canceled ctx.
+//
+// Docker calls fail with [context.Canceled] once ctx is canceled. Watchtower's
+// own steps wrap the cause of the cancellation, which names the signal.
+//
+// Parameters:
+//   - ctx: The process context, which a stop signal cancels.
+//   - err: The error to classify.
+//
+// Returns:
+//   - bool: True when ctx is canceled and err comes from that cancellation.
+func stoppedBy(ctx context.Context, err error) bool {
+	if ctx.Err() == nil {
+		return false
+	}
+
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.Cause(ctx))
 }
 
 // preRun prepares the environment and configuration before the main command execution begins.

@@ -58,8 +58,14 @@ const runStopTimeout = 10 * time.Second
 // apiToken is the HTTP API token the run tests serve the API with.
 const apiToken = "test-token"
 
-// errRunTestDocker is returned by the Docker client in the run tests.
-var errRunTestDocker = errors.New("docker daemon error")
+// Errors used by the run tests.
+var (
+	// errRunTestDocker is returned by the Docker client in the run tests.
+	errRunTestDocker = errors.New("docker daemon error")
+	// errRunTestStopSignal is the cause a stop signal gives the process
+	// context.
+	errRunTestStopSignal = errors.New("terminated signal received")
+)
 
 // withFilter matches the filter argument of a filtered ListContainers call.
 // The mock records an unfiltered call with the context alone, and mock.Anything

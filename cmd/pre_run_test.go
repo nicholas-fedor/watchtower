@@ -735,6 +735,14 @@ func TestPreRun_Exit(t *testing.T) {
 			unwantedOutput: []string{"SetRestartPolicy", "Failed to initialize Docker client", logging.RestartsKept},
 		},
 		{
+			// A failure that does not come from the stop is reported, even when
+			// a stop signal arrives at the same time.
+			helperCase:     "unrelated-failure-during-stop",
+			wantExitCode:   1,
+			wantOutput:     []string{"Failed to initialize Docker client"},
+			unwantedOutput: []string{"SetRestartPolicy"},
+		},
+		{
 			// A stop during the inspect of Watchtower's own container ends
 			// startup before the failed inspect is reported, so no scope
 			// label failure is logged.
@@ -950,6 +958,10 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		execute = true
 	case "stopped-while-waiting-for-docker":
 		stopProcess()
+	case "unrelated-failure-during-stop":
+		stopProcess()
+
+		clientErr = errRunTestDocker
 	case "stopped-while-inspecting-own-container":
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 

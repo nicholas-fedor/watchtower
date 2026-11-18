@@ -758,3 +758,38 @@ func currentWatchtowerWithoutRestarts() *container.Container {
 		nil,
 	)
 }
+
+// TestStoppedBy verifies which errors count as coming from a stop signal: only
+// a cancellation, from a Docker call or wrapping the stop's cause, once the
+// process context is canceled.
+func TestStoppedBy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// stopped cancels the process context with a stop signal's cause.
+		stopped bool
+		err     error
+		want    bool
+	}{
+		{name: "Docker call canceled by the stop", stopped: true, err: fmt.Errorf("list: %w", context.Canceled), want: true},
+		{name: "step wrapping the stop's cause", stopped: true, err: fmt.Errorf("look up: %w", errRunTestStopSignal), want: true},
+		{name: "unrelated failure during the stop", stopped: true, err: errRunTestDocker, want: false},
+		{name: "cancellation without a stop", stopped: false, err: context.Canceled, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, stop := context.WithCancelCause(t.Context())
+			defer stop(nil)
+
+			if tt.stopped {
+				stop(errRunTestStopSignal)
+			}
+
+			assert.Equal(t, tt.want, stoppedBy(ctx, tt.err))
+		})
+	}
+}
