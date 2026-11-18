@@ -179,6 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Add tasks that tag the next release by @nicholas-fedor in [#3909](https://github.com/nicholas-fedor/watchtower/pull/3909)
 - Update module github.com/mattn/go-shellwords to v1.0.17 by @renovate[bot] in [#3906](https://github.com/nicholas-fedor/watchtower/pull/3906)
 - Update step-security/harden-runner action to v2.23.0 by @renovate[bot] in [#3907](https://github.com/nicholas-fedor/watchtower/pull/3907)
 - Explain why compose-go only updates with docker/compose by @nicholas-fedor in [#3904](https://github.com/nicholas-fedor/watchtower/pull/3904)
