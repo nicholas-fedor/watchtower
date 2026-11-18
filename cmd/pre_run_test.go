@@ -726,11 +726,19 @@ func TestPreRun_Exit(t *testing.T) {
 			unwantedOutput: []string{"newClient", "SetRestartPolicy", logging.RestartsKept},
 		},
 		{
-			// RunOrchestrator always ends the process, so the restart policy
-			// fallback after it in preRun does not run.
-			helperCase:   "orchestrator-without-settings",
-			wantExitCode: 1,
-			wantOutput:   []string{"Failed to read orchestrator environment variables"},
+			// The orchestrator reports its own failures. Its container is
+			// removed when it exits, so its restart policy is left alone.
+			helperCase:     "orchestrator-without-settings",
+			wantExitCode:   1,
+			wantOnce:       []string{"Failed to read orchestrator environment variables"},
+			unwantedOutput: []string{"SetRestartPolicy", "Failed to execute root command", logging.RestartsKept},
+		},
+		{
+			// A completed handoff ends the orchestrator before the rest of
+			// startup runs.
+			helperCase:     "orchestrator-handoff-completes",
+			wantExitCode:   0,
+			unwantedOutput: []string{"SetRestartPolicy", "Orchestration failed"},
 		},
 		{
 			helperCase:   "invalid-restart-of-old-instance",
@@ -916,6 +924,32 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
 		detection = selfDetection{}
+	case "orchestrator-handoff-completes":
+		args = []string{"--self-update-orchestrator"}
+		env = map[string]string{
+			"WT_ORCHESTRATOR_OLD_ID":        string(selfID),
+			"WT_ORCHESTRATOR_NEW_IMAGE":     "nickfedor/watchtower:latest",
+			"WT_ORCHESTRATOR_ORIGINAL_NAME": "watchtower",
+		}
+
+		old := selfContainer("/watchtower", "")
+		replacementID := container.ContainerID(strings.Repeat("0e", 32))
+		replacement := container.NewContainer(nil,
+			&dockerContainer.InspectResponse{
+				ID:     string(replacementID),
+				Name:   "/watchtower",
+				State:  &dockerContainer.State{Running: true},
+				Config: &dockerContainer.Config{Labels: map[string]string{watchtowerLabelKey: "true"}},
+			},
+			nil,
+		)
+
+		mockClient.EXPECT().GetContainer(mock.Anything, selfID).Return(old, nil).Once()
+		mockClient.EXPECT().StopContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
+		mockClient.EXPECT().RenameContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
+		mockClient.EXPECT().StartContainer(mock.Anything, old).Return(replacementID, nil).Once()
+		mockClient.EXPECT().GetContainer(mock.Anything, replacementID).Return(replacement, nil).Once()
+		mockClient.EXPECT().RemoveContainer(mock.Anything, old).Return(nil).Once()
 	case "invalid-restart-of-old-instance", "invalid-restart-of-old-instance-in-run-once",
 		"invalid-restart-of-old-instance-restarts-kept":
 		old := selfContainer("/watchtower-old-cccccccccccc", "")
@@ -988,7 +1022,13 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 		return mockClient, nil
 	}
 
-	for _, key := range []string{"WT_ORCHESTRATOR_OLD_ID", "WT_ORCHESTRATOR_NEW_IMAGE", "WT_ORCHESTRATOR_ORIGINAL_NAME"} {
+	for _, key := range []string{
+		"WT_ORCHESTRATOR_OLD_ID",
+		"WT_ORCHESTRATOR_NEW_IMAGE",
+		"WT_ORCHESTRATOR_ORIGINAL_NAME",
+		"WT_ORCHESTRATOR_CONTAINER_CHAIN",
+		"WT_ORCHESTRATOR_CLEANUP",
+	} {
 		t.Setenv(key, "")
 	}
 

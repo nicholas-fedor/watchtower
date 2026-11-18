@@ -211,11 +211,16 @@ func StartOrchestrator(log *zerolog.Logger, ctx context.Context,
 // Stop before create releases published host ports. Rename keeps the stopped
 // predecessor for recovery if create or start fails (restore name and start).
 //
+// RunOrchestrator logs each failure at error level before returning it.
+//
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
-func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffClient) {
+//
+// Returns:
+//   - error: Non-nil when the environment variables are invalid or the handoff fails.
+func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffClient) error {
 	clogVal := log.With().
 		Str("mode", "orchestrator").
 		Logger()
@@ -226,9 +231,11 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 	// Read environment variables.
 	oldID, newImage, originalName, containerChain, cleanup, err := readOrchestratorEnv()
 	if err != nil {
-		clog.Fatal().
+		clog.Error().
 			Err(err).
 			Msg("Failed to read orchestrator environment variables")
+
+		return err
 	}
 
 	clog.Debug().
@@ -244,6 +251,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 		ctx,
 		orchestratorTimeout,
 	)
+	defer orchCancel()
 
 	// Execute the orchestration sequence.
 	err = orchestrateSelfUpdate(clog,
@@ -255,11 +263,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 		containerChain,
 		cleanup,
 	)
-	// Determine exit code and log result.
-	exitCode := 0
 	if err != nil {
-		exitCode = 1
-
 		// The steps log their failures at debug. This line reports the failure.
 		clog.Error().
 			Err(err).
@@ -267,13 +271,13 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 			Str("new_image", newImage).
 			Str("original_name", originalName).
 			Msg("Orchestration failed")
-	} else {
-		clog.Debug().Msg("Self-update orchestration completed successfully")
+
+		return err
 	}
 
-	// Explicitly cancel before exit since deferred calls do not run on os.Exit.
-	orchCancel()
-	os.Exit(exitCode)
+	clog.Debug().Msg("Self-update orchestration completed successfully")
+
+	return nil
 }
 
 // readOrchestratorEnv reads and validates the environment variables required
