@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Print porcelain output only for session reports by @nicholas-fedor in [#3921](https://github.com/nicholas-fedor/watchtower/pull/3921)
 - Log the DOCKER_TLS_VERIFY value the orchestrator receives by @nicholas-fedor in [#3917](https://github.com/nicholas-fedor/watchtower/pull/3917)
 - Wait only for the part of a rate-limit token not yet earned by @nicholas-fedor in [#3915](https://github.com/nicholas-fedor/watchtower/pull/3915)
 - Ignore advertised rate limits slower than one request per 30 seconds by @nicholas-fedor in [#3913](https://github.com/nicholas-fedor/watchtower/pull/3913)
