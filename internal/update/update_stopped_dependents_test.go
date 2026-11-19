@@ -13,6 +13,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
@@ -151,6 +152,19 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 
 		testData, _ := stoppedDependentsTestData(true)
 		testData.ListStoppedError = errors.New("list failed")
+		client := mockUpdate.CreateFakeClient(testData, false, false)
+
+		_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"vpn", "app"}, testData.CreateOrder)
+	})
+
+	t.Run("leaves a stopped Watchtower container alone", func(t *testing.T) {
+		t.Parallel()
+
+		testData, off := stoppedDependentsTestData(true)
+		off.ContainerInfo().Config.Labels = map[string]string{labels.Watchtower: "true"}
 		client := mockUpdate.CreateFakeClient(testData, false, false)
 
 		_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())

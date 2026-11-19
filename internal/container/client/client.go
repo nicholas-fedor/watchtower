@@ -581,6 +581,10 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 // be recreated with that container to keep working. Only these containers are
 // inspected, and a container that joins it names it while it exists.
 //
+// Podman before version 6 reports "host" as the network mode of every listed
+// container, so on Podman every stopped container is inspected and those that
+// join any container's network are returned.
+//
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - networkContainers: IDs of the containers whose network the returned
@@ -594,10 +598,6 @@ func (c *Client) ListStoppedNetworkDependents(
 	ctx context.Context,
 	networkContainers []container.ContainerID,
 ) ([]*container.Container, error) {
-	if len(networkContainers) == 0 {
-		return nil, nil
-	}
-
 	modes := make(map[string]struct{}, len(networkContainers))
 	for _, id := range networkContainers {
 		modes["container:"+string(id)] = struct{}{}
@@ -614,7 +614,20 @@ func (c *Client) ListStoppedNetworkDependents(
 		return ok
 	}
 
-	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, joinsNetwork, nil)
+	if !c.isPodmanRuntime(ctx) {
+		return inspectListedContainers(c.logger(), ctx, c.api, listOptions, joinsNetwork, nil)
+	}
+
+	stopped, err := inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return slices.DeleteFunc(stopped, func(stoppedContainer *container.Container) bool {
+		hostConfig := stoppedContainer.ContainerInfo().HostConfig
+
+		return hostConfig == nil || !hostConfig.NetworkMode.IsContainer()
+	}), nil
 }
 
 // GetContainer fetches detailed information about a specific container by its ID.

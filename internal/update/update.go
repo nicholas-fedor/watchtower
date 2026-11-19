@@ -395,7 +395,13 @@ func listStoppedNetworkDependents(
 	config updateParams.Params,
 	listed, monitored []*container.Container,
 ) []*container.Container {
-	if config.ReviveStopped || len(monitored) == 0 {
+	if len(monitored) == 0 {
+		return nil
+	}
+
+	if config.ReviveStopped {
+		log.Debug().Msg("Not listing stopped containers that join another container's network, because revive-stopped would start them")
+
 		return nil
 	}
 
