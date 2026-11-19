@@ -32,10 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- Send webhook test notifications through their own transport by @nicholas-fedor in [#3953](https://github.com/nicholas-fedor/watchtower/pull/3953)
 - Isolate tests from settings in the shell environment by @nicholas-fedor in [#3919](https://github.com/nicholas-fedor/watchtower/pull/3919)
+
+### Reverted
+
+- Restore github.com/docker/secrets-engine/x v0.8.5 by @nicholas-fedor in [#3954](https://github.com/nicholas-fedor/watchtower/pull/3954)
 
 ### Chores
 
+- Merge automerged updates only after every check passes by @nicholas-fedor in [#3957](https://github.com/nicholas-fedor/watchtower/pull/3957)
 - Update module github.com/docker/secrets-engine/x to v0.9.0 by @renovate[bot] in [#3951](https://github.com/nicholas-fedor/watchtower/pull/3951)
 - Update ossf/scorecard-action action to v2.6.0 by @renovate[bot] in [#3947](https://github.com/nicholas-fedor/watchtower/pull/3947)
 - Update google.golang.org/genproto/googleapis/rpc digest to c8830f6 by @renovate[bot] in [#3941](https://github.com/nicholas-fedor/watchtower/pull/3941)
