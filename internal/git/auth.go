@@ -49,7 +49,7 @@ func (c *Client) BuildAuth(remote string) (string, string) {
 	}
 
 	if c.opts.Token != "" {
-		return tokenUsername(remote, c.opts.Hosts), c.opts.Token
+		return tokenUsername(remote), c.opts.Token
 	}
 
 	if c.opts.Password != "" {
@@ -89,7 +89,7 @@ func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
 		// process credentials.
 	case c.opts.Token != "":
 		return &gitHTTP.BasicAuth{
-			Username: tokenUsername(repo, c.opts.Hosts),
+			Username: tokenUsername(repo),
 			Password: c.opts.Token,
 		}, nil
 	case c.opts.Username != "" || c.opts.Password != "":
@@ -176,17 +176,16 @@ func sshRemote(repo string) bool {
 //
 // Parameters:
 //   - repo: Clone URL.
-//   - extra: Extra hostname to product mappings.
 //
 // Returns:
 //   - string: Product-specific username, or git when the host is unknown.
-func tokenUsername(repo string, extra map[string]string) string {
+func tokenUsername(repo string) string {
 	host, _, _, ok := splitRepo(repo)
 	if !ok {
 		return tokenUserGit
 	}
 
-	switch provider.ResolveHostKind(host, extra) {
+	switch provider.ResolveHostKind(host) {
 	case provider.GitHub:
 		return tokenUserGitHub
 	case provider.GitLab:

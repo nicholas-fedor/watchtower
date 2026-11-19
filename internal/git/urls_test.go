@@ -12,8 +12,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 func TestApplyAuth(t *testing.T) {
@@ -87,10 +85,7 @@ func TestApplyAuth(t *testing.T) {
 		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://evil.example/api/v1/version", nil)
 		require.NoError(t, err)
 
-		(&Client{opts: Options{
-			Token: "secret",
-			Hosts: map[string]string{"git.example.com": provider.Gitea},
-		}}).applyAuth(req, "git.example.com")
+		(&Client{opts: Options{Token: "secret"}}).applyAuth(req, "git.example.com")
 		assert.Empty(t, req.Header.Get("Authorization"))
 	})
 
@@ -123,19 +118,12 @@ func TestApplyAuthProviderSchemes(t *testing.T) {
 		name      string
 		cloneHost string
 		path      string
-		hosts     map[string]string
 		want      string
 	}{
 		{name: "github", cloneHost: "github.com", path: "/api", want: "Bearer tok"},
 		{name: "gitlab", cloneHost: "gitlab.com", path: "/api", want: "Bearer tok"},
 		{name: "gitea", cloneHost: "codeberg.org", path: "/api", want: "token tok"},
-		{
-			name:      "self-hosted gitea",
-			cloneHost: "git.example.com",
-			path:      "/api",
-			hosts:     map[string]string{"git.example.com": provider.Gitea},
-			want:      "token tok",
-		},
+		{name: "unclassified host uses bearer", cloneHost: "git.example.com", path: "/api/v4/version", want: "Bearer tok"},
 		{name: "gitea api path", cloneHost: "git.example.com", path: "/api/v1/version", want: "token tok"},
 	}
 
@@ -146,7 +134,7 @@ func TestApplyAuthProviderSchemes(t *testing.T) {
 			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, "https://"+tt.cloneHost+tt.path, nil)
 			require.NoError(t, err)
 
-			(&Client{opts: Options{Token: "tok", Hosts: tt.hosts}}).applyAuth(req, tt.cloneHost)
+			(&Client{opts: Options{Token: "tok"}}).applyAuth(req, tt.cloneHost)
 			assert.Equal(t, tt.want, req.Header.Get("Authorization"))
 		})
 	}
@@ -155,28 +143,24 @@ func TestApplyAuthProviderSchemes(t *testing.T) {
 func TestOriginOf(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nil client defaults to https host", func(t *testing.T) {
+	t.Run("https host", func(t *testing.T) {
 		t.Parallel()
 
-		var client *Client
-
-		got := client.originOf("Git.Example.COM")
+		got := originOf("Git.Example.COM")
 		assert.Equal(t, "https", got.Scheme)
 		assert.Equal(t, "git.example.com", got.Host)
 	})
 
-	t.Run("stored origin", func(t *testing.T) {
+	t.Run("bracketed host", func(t *testing.T) {
 		t.Parallel()
 
-		stored := url.URL{Scheme: "https", Host: "git.example.com:8443", Path: "/gitlab"}
-		client := &Client{origins: map[string]url.URL{"git.example.com": stored}}
-		assert.Equal(t, stored, client.originOf("[Git.Example.COM]"))
+		assert.Equal(t, "git.example.com", originOf("[Git.Example.COM]").Host)
 	})
 
-	t.Run("ipv6 default", func(t *testing.T) {
+	t.Run("ipv6 host", func(t *testing.T) {
 		t.Parallel()
 
-		got := (&Client{}).originOf("2001:db8::1")
+		got := originOf("2001:db8::1")
 		assert.Equal(t, "https", got.Scheme)
 		assert.Equal(t, "[2001:db8::1]", got.Host)
 	})
@@ -195,24 +179,22 @@ func TestGithubAPI(t *testing.T) {
 	t.Run("github.com uses api.github.com", func(t *testing.T) {
 		t.Parallel()
 
-		got := (&Client{}).githubAPIAt(url.URL{}, "GitHub.com", "repos", "org", "app")
+		got := githubAPIAt(originOf("GitHub.com"), "repos", "org", "app")
 		assert.Equal(t, "https://api.github.com/repos/org/app", got.String())
 	})
 
 	t.Run("enterprise uses origin", func(t *testing.T) {
 		t.Parallel()
 
-		client := &Client{origins: map[string]url.URL{
-			"github.company.com": {Scheme: "https", Host: "github.company.com", Path: "/ghe"},
-		}}
-		got := client.githubAPIAt(url.URL{}, "github.company.com", "repos", "org", "app")
+		origin := url.URL{Scheme: "https", Host: "github.company.com", Path: "/ghe"}
+		got := githubAPIAt(origin, "repos", "org", "app")
 		assert.Equal(t, "https://github.company.com/ghe/api/v3/repos/org/app", got.String())
 	})
 
 	t.Run("enterprise default origin", func(t *testing.T) {
 		t.Parallel()
 
-		got := (&Client{}).githubAPIAt(url.URL{}, "github.company.com", "user")
+		got := githubAPIAt(originOf("github.company.com"), "user")
 		assert.Equal(t, "https://github.company.com/api/v3/user", got.String())
 	})
 }
@@ -220,22 +202,20 @@ func TestGithubAPI(t *testing.T) {
 func TestGitlabAPI(t *testing.T) {
 	t.Parallel()
 
-	client := &Client{origins: map[string]url.URL{
-		"gitlab.internal": {Scheme: "https", Host: "gitlab.internal:8443", Path: "/gitlab"},
-	}}
-	assert.Equal(t, "https://gitlab.internal:8443/gitlab/api/v4/projects",
-		client.gitlabAPIAt(url.URL{}, "gitlab.internal", "projects").String())
-	assert.Equal(t, "https://gitlab.com/api/v4/version",
-		(&Client{}).gitlabAPIAt(url.URL{}, "gitlab.com", "version").String())
+	origin := url.URL{Scheme: "https", Host: "gitlab.internal:8443", Path: "/gitlab"}
+	assert.Equal(t, "https://gitlab.internal:8443/gitlab/api/v4",
+		gitlabAPIAt(origin).String())
+	assert.Equal(t, "https://gitlab.com/api/v4",
+		gitlabAPIAt(originOf("gitlab.com")).String())
 }
 
 func TestGiteaAPI(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t, "https://git.example.com/api/v1/version",
-		(&Client{}).giteaAPIAt(url.URL{}, "git.example.com", "version").String())
+		giteaAPIAt(originOf("git.example.com"), "version").String())
 	assert.Equal(t, "https://codeberg.org/api/v1/repos/org/app",
-		(&Client{}).giteaAPIAt(url.URL{}, "codeberg.org", "repos", "org", "app").String())
+		giteaAPIAt(originOf("codeberg.org"), "repos", "org", "app").String())
 }
 
 func TestRejectCrossHostRedirect(t *testing.T) {

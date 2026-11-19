@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -24,7 +23,6 @@ import (
 
 // Options configures a Git watcher client. Credentials stay here, not on [gitConfig.Defaults].
 type Options struct {
-	Hosts           map[string]string
 	Token           string
 	Username        string
 	Password        string
@@ -63,8 +61,6 @@ type Client struct {
 	log *zerolog.Logger
 	// http sends provider API requests, such as tag lists and host probes.
 	http *http.Client
-	// origins maps a hostname to the HTTP API origin found for it.
-	origins map[string]url.URL
 	// seen holds, per repository, ref, and policy, the remote tip last
 	// observed without a rebuild.
 	seen map[string]seenStamp
@@ -136,7 +132,7 @@ const (
 //
 // Parameters:
 //   - log: Process logger. A nop logger is used when nil.
-//   - opts: Auth, timeout, and optional extra host→provider mappings.
+//   - opts: Credentials, TLS settings, and timeout.
 //
 // Returns:
 //   - *Client: Ready client. Safe to hold when no container is watched.
@@ -151,10 +147,9 @@ func New(log *zerolog.Logger, opts Options) *Client {
 	}
 
 	client := &Client{
-		log:     log,
-		opts:    opts,
-		http:    newGitHTTPClient(timeout, opts.InsecureSkipTLS, opts.CABundle),
-		origins: make(map[string]url.URL),
+		log:  log,
+		opts: opts,
+		http: newGitHTTPClient(timeout, opts.InsecureSkipTLS, opts.CABundle),
 	}
 	client.lister = gitLister{client: client}
 

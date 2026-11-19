@@ -16,61 +16,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
-func TestClassifyHosts(t *testing.T) {
-	t.Parallel()
-
-	t.Run("skips empty hostname", func(t *testing.T) {
-		t.Parallel()
-
-		client := newDetectClient(t, http.NewServeMux())
-		got := client.ClassifyHosts(t.Context(), []url.URL{{Scheme: "https", Path: "/gitlab"}})
-		assert.Empty(t, got)
-		assert.Empty(t, client.origins)
-	})
-
-	t.Run("stores origin and skips built-in hosts", func(t *testing.T) {
-		t.Parallel()
-
-		nop := zerolog.Nop()
-		client := &Client{log: &nop, origins: nil}
-
-		origin := httpsOrigin("github.com")
-		got := client.ClassifyHosts(t.Context(), []url.URL{origin})
-		assert.NotContains(t, got, "github.com")
-		require.Contains(t, client.origins, "github.com")
-		assert.Equal(t, origin, client.origins["github.com"])
-	})
-
-	t.Run("keeps existing host mapping", func(t *testing.T) {
-		t.Parallel()
-
-		mux := http.NewServeMux()
-		mux.HandleFunc("/api/v3", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("X-Github-Request-Id", "abc")
-			w.WriteHeader(http.StatusOK)
-		})
-
-		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{
-			"git.example.com": provider.Gitea,
-			"other.example":   provider.GitLab,
-		}
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("git.example.com")})
-		assert.Equal(t, provider.Gitea, got["git.example.com"])
-		assert.Equal(t, provider.GitLab, got["other.example"])
-	})
-
-	t.Run("unclassified when no fingerprint matches", func(t *testing.T) {
-		t.Parallel()
-
-		client := newDetectClient(t, http.NewServeMux())
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("git.unknown.example")})
-		assert.Empty(t, got["git.unknown.example"])
-		assert.Equal(t, got, client.opts.Hosts)
-	})
-}
-
 func TestDetectKind(t *testing.T) {
 	t.Parallel()
 
@@ -83,7 +28,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, provider.Gitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
+		assert.Equal(t, provider.Gitea, client.detectKind(t.Context(), originOf("git.example.com"), ""))
 	})
 
 	t.Run("gitlab metadata", func(t *testing.T) {
@@ -95,7 +40,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
+		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), originOf("gitlab.internal"), ""))
 	})
 
 	t.Run("gitlab version path after metadata 404", func(t *testing.T) {
@@ -107,7 +52,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), httpsOrigin("gitlab.internal"), ""))
+		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), originOf("gitlab.internal"), ""))
 	})
 
 	t.Run("github headers", func(t *testing.T) {
@@ -120,7 +65,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, provider.GitHub, client.detectKind(t.Context(), httpsOrigin("github.company.com"), ""))
+		assert.Equal(t, provider.GitHub, client.detectKind(t.Context(), originOf("github.company.com"), ""))
 	})
 
 	t.Run("401 with matching body still classifies", func(t *testing.T) {
@@ -133,7 +78,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Equal(t, provider.Gitea, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
+		assert.Equal(t, provider.Gitea, client.detectKind(t.Context(), originOf("git.example.com"), ""))
 	})
 
 	t.Run("unusable status is skipped", func(t *testing.T) {
@@ -146,7 +91,7 @@ func TestDetectKind(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		assert.Empty(t, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
+		assert.Empty(t, client.detectKind(t.Context(), originOf("git.example.com"), ""))
 	})
 
 	t.Run("probe error continues", func(t *testing.T) {
@@ -158,7 +103,20 @@ func TestDetectKind(t *testing.T) {
 			return nil, errors.New("dial failed")
 		})}
 
-		assert.Empty(t, client.detectKind(t.Context(), httpsOrigin("git.example.com"), ""))
+		assert.Empty(t, client.detectKind(t.Context(), originOf("git.example.com"), ""))
+	})
+
+	t.Run("origin path prefix", func(t *testing.T) {
+		t.Parallel()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/gitlab/api/v4/metadata", func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"version":"16.8.1","revision":"abc"}`))
+		})
+
+		client := newDetectClient(t, mux)
+		origin := url.URL{Scheme: "https", Host: "git.example.com", Path: "/gitlab"}
+		assert.Equal(t, provider.GitLab, client.detectKind(t.Context(), origin, ""))
 	})
 
 	t.Run("cancelled context", func(t *testing.T) {
@@ -168,7 +126,7 @@ func TestDetectKind(t *testing.T) {
 		cancel()
 
 		client := newDetectClient(t, http.NewServeMux())
-		assert.Empty(t, client.detectKind(ctx, httpsOrigin("git.example.com"), ""))
+		assert.Empty(t, client.detectKind(ctx, originOf("git.example.com"), ""))
 	})
 }
 

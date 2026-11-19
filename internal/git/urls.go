@@ -35,7 +35,7 @@ func (c *Client) applyAuth(req *http.Request, cloneHost string) {
 	if c.opts.Token != "" {
 		scheme := "Bearer"
 
-		kind := provider.ResolveHostKind(cloneHost, c.opts.Hosts)
+		kind := provider.ResolveHostKind(cloneHost)
 		if kind == "" && isGiteaAPIPath(req.URL.Path) {
 			kind = provider.Gitea
 		}
@@ -262,22 +262,16 @@ func credentialHostAllowed(requestHost, cloneHost string) bool {
 	return cloneHost == "github.com" && requestHost == "api.github.com"
 }
 
-// originOf returns the classified HTTP origin for host.
+// originOf returns the HTTPS origin of host, used as its API origin when no
+// git-host label names one.
 //
 // Parameters:
 //   - host: Hostname, optionally with brackets.
 //
 // Returns:
-//   - url.URL: Stored origin, or https://host.
-func (c *Client) originOf(host string) url.URL {
-	host = toHostname(host)
-	if c != nil && c.origins != nil {
-		if origin, ok := c.origins[host]; ok {
-			return origin
-		}
-	}
-
-	return url.URL{Scheme: "https", Host: httpHost(host)}
+//   - url.URL: https://host.
+func originOf(host string) url.URL {
+	return url.URL{Scheme: "https", Host: httpHost(toHostname(host))}
 }
 
 // httpHost returns hostname, bracketed when it is IPv6.
@@ -295,59 +289,48 @@ func httpHost(hostname string) string {
 	return hostname
 }
 
-// githubAPIAt builds a GitHub REST URL from an explicit API origin.
+// githubAPIAt builds a GitHub REST URL from an API origin.
+//
+// github.com serves its API from api.github.com. Any other origin is a GitHub
+// Enterprise Server, which serves it under /api/v3.
 //
 // Parameters:
 //   - origin: HTTP API origin from a git-host label, or originOf(host).
-//   - host: Clone hostname. github.com always uses api.github.com.
 //   - segments: Path segments after the API root.
 //
 // Returns:
 //   - *url.URL: Absolute API URL.
-func (c *Client) githubAPIAt(origin url.URL, host string, segments ...string) *url.URL {
-	if strings.EqualFold(toHostname(host), "github.com") &&
-		(origin.Host == "" || strings.EqualFold(origin.Hostname(), "github.com")) {
+func githubAPIAt(origin url.URL, segments ...string) *url.URL {
+	if toHostname(origin.Hostname()) == "github.com" {
 		return (&url.URL{Scheme: "https", Host: "api.github.com"}).JoinPath(segments...)
-	}
-
-	if origin.Host == "" {
-		origin = c.originOf(host)
 	}
 
 	return origin.JoinPath(append([]string{"api", "v3"}, segments...)...)
 }
 
-// gitlabAPIAt builds a GitLab REST URL from an explicit API origin.
+// gitlabAPIAt returns the GitLab REST API root for an API origin.
+//
+// Callers append each path segment escaped, because a GitLab project path
+// such as group/app is a single segment.
 //
 // Parameters:
 //   - origin: HTTP API origin from a git-host label, or originOf(host).
-//   - host: Clone hostname, used when origin is empty.
-//   - segments: Path segments after the API root.
 //
 // Returns:
-//   - *url.URL: Absolute API URL.
-func (c *Client) gitlabAPIAt(origin url.URL, host string, segments ...string) *url.URL {
-	if origin.Host == "" {
-		origin = c.originOf(host)
-	}
-
-	return origin.JoinPath(append([]string{"api", "v4"}, segments...)...)
+//   - *url.URL: Absolute API root URL.
+func gitlabAPIAt(origin url.URL) *url.URL {
+	return origin.JoinPath("api", "v4")
 }
 
-// giteaAPIAt builds a Gitea or Forgejo REST URL from an explicit API origin.
+// giteaAPIAt builds a Gitea or Forgejo REST URL from an API origin.
 //
 // Parameters:
 //   - origin: HTTP API origin from a git-host label, or originOf(host).
-//   - host: Clone hostname, used when origin is empty.
 //   - segments: Path segments after the API root.
 //
 // Returns:
 //   - *url.URL: Absolute API URL.
-func (c *Client) giteaAPIAt(origin url.URL, host string, segments ...string) *url.URL {
-	if origin.Host == "" {
-		origin = c.originOf(host)
-	}
-
+func giteaAPIAt(origin url.URL, segments ...string) *url.URL {
 	return origin.JoinPath(append([]string{"api", "v1"}, segments...)...)
 }
 

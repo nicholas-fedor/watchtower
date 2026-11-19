@@ -99,7 +99,7 @@ func derivedReleasesURL(repo, apiOrigin, tag string) string {
 		return ""
 	}
 
-	cloneKind := provider.ResolveHostKind(host, nil)
+	cloneKind := provider.ResolveHostKind(host)
 	kind := cloneKind
 	base := "https://" + host
 

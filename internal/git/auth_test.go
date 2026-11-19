@@ -16,8 +16,6 @@ import (
 
 	gitHTTP "github.com/go-git/go-git/v5/plumbing/transport/http"
 	gitSSH "github.com/go-git/go-git/v5/plumbing/transport/ssh"
-
-	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 // TestClient_Auth verifies which go-git auth method each remote receives.
@@ -34,10 +32,9 @@ func TestClient_Auth(t *testing.T) {
 			Username:   "user",
 			Password:   "pw",
 			SSHKeyPath: filepath.Join(t.TempDir(), "missing"),
-			Hosts:      map[string]string{"git.example.com": provider.Gitea},
 		}}
 
-		got, err := client.Auth("https://git.example.com/org/app.git")
+		got, err := client.Auth("https://codeberg.org/org/app.git")
 		require.NoError(t, err)
 
 		basic, ok := got.(*gitHTTP.BasicAuth)
@@ -367,12 +364,9 @@ func TestBuildAuth(t *testing.T) {
 			token:    "tok",
 		},
 		{
-			name: "token on extra gitea host",
-			client: &Client{opts: Options{
-				Token: "tok",
-				Hosts: map[string]string{"git.example.com": provider.Gitea},
-			}},
-			remote:   "https://git.example.com/org/app.git",
+			name:     "token on codeberg uses the gitea username",
+			client:   &Client{opts: Options{Token: "tok"}},
+			remote:   "https://codeberg.org/org/app.git",
 			username: tokenUserGitea,
 			token:    "tok",
 		},
@@ -477,41 +471,15 @@ func TestTokenUsername(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name  string
-		repo  string
-		extra map[string]string
-		want  string
+		name string
+		repo string
+		want string
 	}{
 		{name: "github.com", repo: "https://github.com/org/app.git", want: tokenUserGitHub},
 		{name: "gitlab.com", repo: "https://gitlab.com/org/app.git", want: tokenUserGitLab},
 		{name: "codeberg.org", repo: "https://codeberg.org/org/app.git", want: tokenUserGitea},
-		{
-			name:  "extra gitea host",
-			repo:  "https://git.example.com/org/app.git",
-			extra: map[string]string{"git.example.com": provider.Gitea},
-			want:  tokenUserGitea,
-		},
-		{
-			name:  "extra gitlab host",
-			repo:  "https://gitlab.internal/group/app.git",
-			extra: map[string]string{"gitlab.internal": provider.GitLab},
-			want:  tokenUserGitLab,
-		},
-		{
-			name:  "extra github host",
-			repo:  "https://github.company.com/org/app.git",
-			extra: map[string]string{"github.company.com": provider.GitHub},
-			want:  tokenUserGitHub,
-		},
-		{
-			name:  "forgejo maps to gitea username",
-			repo:  "https://forgejo.example.com/org/app.git",
-			extra: map[string]string{"forgejo.example.com": provider.Forgejo},
-			want:  tokenUserGitea,
-		},
 		{name: "ssh github url", repo: "git@github.com:org/app.git", want: tokenUserGitHub},
 		{name: "unknown host", repo: "https://git.unknown.example/org/app.git", want: tokenUserGit},
-		{name: "empty extra map", repo: "https://git.example.com/org/app.git", extra: map[string]string{}, want: tokenUserGit},
 		{name: "unparseable repo", repo: "not-a-repo", want: tokenUserGit},
 		{name: "empty repo", repo: "", want: tokenUserGit},
 		{name: "host only", repo: "https://github.com", want: tokenUserGit},
@@ -521,7 +489,7 @@ func TestTokenUsername(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			assert.Equal(t, tt.want, tokenUsername(tt.repo, tt.extra))
+			assert.Equal(t, tt.want, tokenUsername(tt.repo))
 		})
 	}
 }
