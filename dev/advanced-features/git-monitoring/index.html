@@ -5389,7 +5389,7 @@ When a later apply omits an optional field, for example no tag or no dockerfile,
 </div>
 <h2 id="authentication">Authentication<a class="headerlink" href="#authentication" title="Permanent link">&para;</a></h2>
 <h3 id="https_and_http">HTTPS and HTTP<a class="headerlink" href="#https_and_http" title="Permanent link">&para;</a></h3>
-<p>Use a token or a username and password when the clone URL starts with <code>https://</code> or <code>http://</code>.</p>
+<p>Use a token or a username and password when the clone URL starts with <code>https://</code>.</p>
 <p>Watchtower tries the configured credentials in this order and stops at the first match:</p>
 <ol>
 <li><a href="../../configuration/git-monitoring/#git_auth_token">Git Auth Token</a></li>
@@ -5400,13 +5400,17 @@ When a later apply omits an optional field, for example no tag or no dockerfile,
 The daemon is given those credentials inside an <code>https://</code> clone URL.
 It is not given an SSH key.
 A private repository on this path needs an <code>https://</code> URL and either a token or a username and password.</p>
-<p>A plain <code>http://</code> URL is not given those credentials for the build.
+<p>A plain <code>http://</code> clone URL never receives the token, username, or password.
+Watchtower reads it without them for ref checks and checkouts.
+The Docker daemon also builds it without them.
 Use HTTPS for a private repository.</p>
 <h3 id="ssh">SSH<a class="headerlink" href="#ssh" title="Permanent link">&para;</a></h3>
 <p>Use an SSH key when the clone URL is <code>ssh://</code> or <code>git@host:path</code>.</p>
 <p>Mount the private key and set <a href="../../configuration/git-monitoring/#git_ssh_key_path">Git SSH Key Path</a>.
 Also mount a <code>known_hosts</code> file and set <a href="../../configuration/git-monitoring/#git_ssh_known_hosts">Git SSH Known Hosts</a>.
 The Watchtower image has no host keys of its own, so the connection fails when that file is missing.</p>
+<p>Without <a href="../../configuration/git-monitoring/#git_ssh_key_path">Git SSH Key Path</a>, the connection falls back to an SSH agent named by the <code>SSH_AUTH_SOCK</code> environment variable.
+The Watchtower image runs no SSH agent, so an SSH remote needs the key unless you mount an agent socket and set that variable.</p>
 <p>The HTTPS token and password are not sent on the SSH connection.
 They can still be used for the HTTP API when <a href="#hosts">Hosts</a> names the same hostname as the clone URL.</p>
 <p>SSH lists refs, and it checks out a <a href="#local_path_context">local path context</a> whose origin is SSH.
@@ -5746,7 +5750,7 @@ The first session after Watchtower restarts builds the current commit once more.
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 17, 2026 23:13:19 UTC"><span class="timeago" datetime="2026-11-17T23:13:19+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 17, 2026 23:13:19 UTC">2026-11-17</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 19, 2026 02:30:55 UTC"><span class="timeago" datetime="2026-11-19T02:30:55+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 19, 2026 02:30:55 UTC">2026-11-19</span>
   </span>
 
     
