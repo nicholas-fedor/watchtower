@@ -18,23 +18,6 @@ const (
 	tokenUserGit    = "git"
 )
 
-// Auth returns the process-wide go-git auth method for repo.
-//
-// Parameters:
-//   - repo: Clone or origin URL.
-//
-// Returns:
-//   - transport.AuthMethod: Auth for go-git, or nil for anonymous access.
-//   - error: Non-nil when an SSH key or known_hosts file cannot be loaded.
-func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
-	if c == nil {
-		//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
-		return nil, nil
-	}
-
-	return c.authMethod(repo)
-}
-
 // TLSSettings returns the process-wide Git HTTPS TLS settings.
 //
 // Returns:
@@ -80,63 +63,55 @@ func (c *Client) BuildAuth(repo string) (string, string) {
 	return tokenUserGit, ""
 }
 
-// authMethod returns the auth method that matches the remote URL scheme.
+// Auth returns the process-wide go-git auth method for repo, which matches
+// the remote URL scheme.
 //
-// HTTPS uses token, then username/password, then none, and only for a
-// trusted host. Plaintext HTTP is anonymous. SSH and scp-like remotes use
-// the SSH key only for a trusted host, then none. A token is never returned
-// as HTTP BasicAuth for an SSH origin.
+// A nil client and an untrusted host get no process credentials. SSH and
+// scp-like remotes use only the SSH key, when one is set. HTTPS uses the token,
+// then the username and password. Plaintext HTTP never receives credentials.
+// Every other case gets no process credentials.
 //
 // Parameters:
 //   - repo: Clone or origin URL used to pick the scheme and token username.
 //
 // Returns:
-//   - transport.AuthMethod: Auth for go-git, or nil for anonymous access.
+//   - transport.AuthMethod: Auth for go-git, or nil without process credentials.
 //   - error: Non-nil when an SSH key or known_hosts file cannot be loaded.
-func (c *Client) authMethod(repo string) (transport.AuthMethod, error) {
-	if !c.credentialHostTrusted(repo) {
-		//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
-		return nil, nil
-	}
-
-	if sshRemote(repo) {
+func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
+	switch {
+	case c == nil || !c.credentialHostTrusted(repo):
+		// A missing client or an untrusted host gets no process credentials.
+	case sshRemote(repo) && c.opts.SSHKeyPath != "":
 		return c.sshAuth()
-	}
-
-	if !httpsRemote(repo) {
-		//nolint:nilnil // Plaintext HTTP is not given process credentials.
-		return nil, nil
-	}
-
-	if c.opts.Token != "" {
+	case !httpsRemote(repo):
+		// SSH without a key and plaintext HTTP get no process credentials.
+	case c.opts.Token != "":
 		return &gitHTTP.BasicAuth{
 			Username: tokenUsername(repo, c.opts.Hosts),
 			Password: c.opts.Token,
 		}, nil
-	}
-
-	if c.opts.Username != "" || c.opts.Password != "" {
+	case c.opts.Username != "" || c.opts.Password != "":
 		return &gitHTTP.BasicAuth{
 			Username: c.opts.Username,
 			Password: c.opts.Password,
 		}, nil
+	default:
+		// No HTTPS credentials are configured.
 	}
 
-	//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
+	// With a nil AuthMethod, go-git uses credentials written into an HTTP
+	// clone URL and the SSH agent for an SSH remote. A non-nil value would
+	// replace them.
+	//nolint:nilnil // A nil AuthMethod carries no process credentials.
 	return nil, nil
 }
 
-// sshAuth loads the configured SSH key, or returns nil when none is set.
+// sshAuth loads the configured SSH key.
 //
 // Returns:
-//   - transport.AuthMethod: PublicKeys auth, or nil when no key path is set.
+//   - transport.AuthMethod: PublicKeys auth for the key.
 //   - error: Non-nil when the key or known_hosts file cannot be loaded.
 func (c *Client) sshAuth() (transport.AuthMethod, error) {
-	if c.opts.SSHKeyPath == "" {
-		//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
-		return nil, nil
-	}
-
 	publicKeys, err := gitSSH.NewPublicKeysFromFile(tokenUserGit, c.opts.SSHKeyPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("load ssh key: %w", err)

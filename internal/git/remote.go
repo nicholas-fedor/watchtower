@@ -27,7 +27,7 @@ type gitLister struct {
 //   - []RemoteRef: Names and hashes, including peeled tags.
 //   - error: Classified transport error on failure.
 func (l gitLister) List(ctx context.Context, repo string) ([]RemoteRef, error) {
-	auth, err := l.client.authMethod(repo)
+	auth, err := l.client.Auth(repo)
 	if err != nil {
 		return nil, err
 	}

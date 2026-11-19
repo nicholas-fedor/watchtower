@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-git/go-git/v5/plumbing/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/ssh"
@@ -19,7 +20,9 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
-func TestAuthMethod(t *testing.T) {
+// TestClient_Auth verifies which go-git auth method each remote receives.
+// Credentials go only to trusted hosts over SSH or HTTPS.
+func TestClient_Auth(t *testing.T) {
 	t.Parallel()
 
 	t.Run("token wins over basic and ssh", func(t *testing.T) {
@@ -33,7 +36,7 @@ func TestAuthMethod(t *testing.T) {
 			Hosts:      map[string]string{"git.example.com": provider.Gitea},
 		}}
 
-		got, err := client.authMethod("https://git.example.com/org/app.git")
+		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
 		basic, ok := got.(*gitHTTP.BasicAuth)
@@ -46,7 +49,7 @@ func TestAuthMethod(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{Token: "ghp_xxx"}}
-		got, err := client.authMethod("https://github.com/org/app.git")
+		got, err := client.Auth("https://github.com/org/app.git")
 		require.NoError(t, err)
 
 		basic, ok := got.(*gitHTTP.BasicAuth)
@@ -63,7 +66,7 @@ func TestAuthMethod(t *testing.T) {
 			Password: "pw",
 			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
-		got, err := client.authMethod("https://git.example.com/org/app.git")
+		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
 		basic, ok := got.(*gitHTTP.BasicAuth)
@@ -79,7 +82,7 @@ func TestAuthMethod(t *testing.T) {
 			Username: "octocat",
 			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
-		got, err := client.authMethod("https://git.example.com/org/app.git")
+		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
 		basic, ok := got.(*gitHTTP.BasicAuth)
@@ -95,7 +98,7 @@ func TestAuthMethod(t *testing.T) {
 			Password: "pw",
 			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
-		got, err := client.authMethod("https://git.example.com/org/app.git")
+		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
 
 		basic, ok := got.(*gitHTTP.BasicAuth)
@@ -108,9 +111,9 @@ func TestAuthMethod(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{Token: "tok", Username: "octocat", Password: "pw"}}
-		got, err := client.authMethod("https://evil.example/org/app.git")
+		got, err := client.Auth("https://evil.example/org/app.git")
 		require.NoError(t, err)
-		assert.Nil(t, got)
+		assertAnonymous(t, got)
 	})
 
 	t.Run("plaintext http is anonymous", func(t *testing.T) {
@@ -121,24 +124,32 @@ func TestAuthMethod(t *testing.T) {
 			Password: "pw",
 			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
-		got, err := client.authMethod("http://git.example.com/org/app.git")
+		got, err := client.Auth("http://git.example.com/org/app.git")
 		require.NoError(t, err)
-		assert.Nil(t, got)
+		assertAnonymous(t, got)
+	})
+
+	t.Run("nil client is anonymous", func(t *testing.T) {
+		t.Parallel()
+
+		got, err := (*Client)(nil).Auth("https://github.com/org/app.git")
+		require.NoError(t, err)
+		assertAnonymous(t, got)
 	})
 
 	t.Run("anonymous when no credentials", func(t *testing.T) {
 		t.Parallel()
 
-		got, err := (&Client{}).authMethod("https://github.com/org/app.git")
+		got, err := (&Client{}).Auth("https://github.com/org/app.git")
 		require.NoError(t, err)
-		assert.Nil(t, got)
+		assertAnonymous(t, got)
 	})
 
 	t.Run("missing ssh key", func(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{SSHKeyPath: filepath.Join(t.TempDir(), "missing")}}
-		_, err := client.authMethod("git@github.com:org/app.git")
+		_, err := client.Auth("git@github.com:org/app.git")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "load ssh key:")
 	})
@@ -147,7 +158,7 @@ func TestAuthMethod(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{SSHKeyPath: writeEd25519Key(t)}}
-		got, err := client.authMethod("git@github.com:org/app.git")
+		got, err := client.Auth("git@github.com:org/app.git")
 		require.NoError(t, err)
 
 		keys, ok := got.(*gitSSH.PublicKeys)
@@ -163,7 +174,7 @@ func TestAuthMethod(t *testing.T) {
 			SSHKeyPath:    writeEd25519Key(t),
 			SSHKnownHosts: writeKnownHosts(t, "github.com"),
 		}}
-		got, err := client.authMethod("git@github.com:org/app.git")
+		got, err := client.Auth("git@github.com:org/app.git")
 		require.NoError(t, err)
 
 		keys, ok := got.(*gitSSH.PublicKeys)
@@ -209,41 +220,29 @@ func TestAuthMethod(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{Token: "tok", Password: "pw"}}
-		got, err := client.Auth("git@github.com:org/app.git")
-		require.NoError(t, err)
-		assert.Nil(t, got)
-		_, isBasic := got.(*gitHTTP.BasicAuth)
-		assert.False(t, isBasic)
+		for _, origin := range []string{"git@github.com:org/app.git", "ssh://git@github.com/org/app.git"} {
+			got, err := client.Auth(origin)
+			require.NoError(t, err)
+			assertAnonymous(t, got)
+		}
 	})
 
-	t.Run("Auth delegates to authMethod", func(t *testing.T) {
+	t.Run("ssh key on an untrusted host is anonymous", func(t *testing.T) {
 		t.Parallel()
 
-		client := &Client{opts: Options{Token: "tok"}}
+		client := &Client{opts: Options{SSHKeyPath: writeEd25519Key(t)}}
+		got, err := client.Auth("git@evil.example:org/app.git")
+		require.NoError(t, err)
+		assertAnonymous(t, got)
+	})
+
+	t.Run("https with only an ssh key is anonymous", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{opts: Options{SSHKeyPath: writeEd25519Key(t)}}
 		got, err := client.Auth("https://github.com/org/app.git")
 		require.NoError(t, err)
-
-		basic, ok := got.(*gitHTTP.BasicAuth)
-		require.True(t, ok)
-		assert.Equal(t, "tok", basic.Password)
-
-		got, err = (*Client)(nil).Auth("https://github.com/org/app.git")
-		require.NoError(t, err)
-		assert.Nil(t, got)
-	})
-
-	t.Run("TLSSettings", func(t *testing.T) {
-		t.Parallel()
-
-		bundle := []byte("-----BEGIN CERTIFICATE-----\n")
-		client := &Client{opts: Options{CABundle: bundle, InsecureSkipTLS: true}}
-		got, insecure := client.TLSSettings()
-		assert.Equal(t, bundle, got)
-		assert.True(t, insecure)
-
-		got, insecure = (*Client)(nil).TLSSettings()
-		assert.Nil(t, got)
-		assert.False(t, insecure)
+		assertAnonymous(t, got)
 	})
 
 	t.Run("missing known hosts", func(t *testing.T) {
@@ -253,10 +252,26 @@ func TestAuthMethod(t *testing.T) {
 			SSHKeyPath:    writeEd25519Key(t),
 			SSHKnownHosts: filepath.Join(t.TempDir(), "missing_hosts"),
 		}}
-		_, err := client.authMethod("git@github.com:org/app.git")
+		_, err := client.Auth("git@github.com:org/app.git")
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "load ssh known_hosts:")
 	})
+}
+
+// TestClient_TLSSettings verifies that the client returns its CA bundle and
+// skip-verify setting, and that a nil client returns neither.
+func TestClient_TLSSettings(t *testing.T) {
+	t.Parallel()
+
+	bundle := []byte("-----BEGIN CERTIFICATE-----\n")
+	client := &Client{opts: Options{CABundle: bundle, InsecureSkipTLS: true}}
+	got, insecure := client.TLSSettings()
+	assert.Equal(t, bundle, got)
+	assert.True(t, insecure)
+
+	got, insecure = (*Client)(nil).TLSSettings()
+	assert.Nil(t, got)
+	assert.False(t, insecure)
 }
 
 func TestBuildAuth(t *testing.T) {
@@ -406,6 +421,24 @@ func TestTokenUsername(t *testing.T) {
 
 			assert.Equal(t, tt.want, tokenUsername(tt.repo, tt.extra))
 		})
+	}
+}
+
+// assertAnonymous checks that got is a nil AuthMethod, which carries no
+// process credentials.
+//
+// An interface holding a nil pointer is not nil, so got is compared with nil
+// directly rather than through assert.Nil. go-git would use such a value in
+// place of credentials written into the clone URL.
+//
+// Parameters:
+//   - t: Test handle.
+//   - got: The auth method Auth returned.
+func assertAnonymous(t *testing.T, got transport.AuthMethod) {
+	t.Helper()
+
+	if got != nil {
+		t.Errorf("Auth returned %#v, want a nil AuthMethod", got)
 	}
 }
 

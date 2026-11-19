@@ -447,7 +447,7 @@ func TestCheckoutAuthForUsesOriginURL(t *testing.T) {
 		AuthFor: func(repoURL string) (transport.AuthMethod, error) {
 			seen = repoURL
 
-			//nolint:nilnil // Anonymous Git access is a nil AuthMethod, not an error.
+			//nolint:nilnil // A nil AuthMethod is go-git's anonymous access.
 			return nil, nil
 		},
 	})
@@ -537,19 +537,10 @@ func TestCheckoutAuthErrorWithoutLocalCommit(t *testing.T) {
 	assert.ErrorContains(t, err, "project auth:")
 }
 
-func TestOriginFetchAuth(t *testing.T) {
-	t.Parallel()
-
-	basic := &gitHTTP.BasicAuth{Username: "git", Password: "tok"}
-
-	assert.Nil(t, originFetchAuth("git@github.com:org/app.git", basic))
-	assert.Nil(t, originFetchAuth("ssh://git@github.com/org/app.git", basic))
-	assert.Equal(t, basic, originFetchAuth("https://github.com/org/app.git", basic))
-	assert.Equal(t, basic, originFetchAuth("http://git.example.com/org/app.git", basic))
-	assert.Nil(t, originFetchAuth("git@github.com:org/app.git", nil))
-}
-
-func TestOriginFetchOptionsDropsHTTPAuthOnSSHOrigin(t *testing.T) {
+// TestOriginFetchOptions verifies that the fetch options carry the remote
+// settings and the credentials AuthFor returns for the origin URL. Without an
+// origin or an AuthFor, the fetch is anonymous.
+func TestOriginFetchOptions(t *testing.T) {
 	t.Parallel()
 
 	basic := &gitHTTP.BasicAuth{Username: "git", Password: "tok"}
@@ -557,19 +548,24 @@ func TestOriginFetchOptionsDropsHTTPAuthOnSSHOrigin(t *testing.T) {
 		AuthFor: func(string) (transport.AuthMethod, error) {
 			return basic, nil
 		},
+		CABundle:        []byte("bundle"),
+		InsecureSkipTLS: true,
 	}
 
-	got, err := originFetchOptions("git@github.com:org/app.git", opts)
+	got, err := originFetchOptions("https://github.com/org/app.git", opts)
 	require.NoError(t, err)
-	assert.Nil(t, got.Auth)
-
-	got, err = originFetchOptions("ssh://git@github.com/org/app.git", opts)
-	require.NoError(t, err)
-	assert.Nil(t, got.Auth)
-
-	got, err = originFetchOptions("https://github.com/org/app.git", opts)
-	require.NoError(t, err)
+	assert.Equal(t, "origin", got.RemoteName)
 	assert.Equal(t, basic, got.Auth)
+	assert.Equal(t, []byte("bundle"), got.CABundle)
+	assert.True(t, got.InsecureSkipTLS)
+
+	got, err = originFetchOptions("", opts)
+	require.NoError(t, err)
+	assert.Nil(t, got.Auth)
+
+	got, err = originFetchOptions("https://github.com/org/app.git", CheckoutOptions{})
+	require.NoError(t, err)
+	assert.Nil(t, got.Auth)
 }
 
 func TestCheckoutShortSHA(t *testing.T) {
