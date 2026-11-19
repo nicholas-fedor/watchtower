@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"testing"
 	"testing/fstest"
@@ -49,26 +48,21 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	return new(zerolog.New(w))
 }
 
+// TestAwaitDockerClient verifies that the wait before the first container
+// listing pauses the process once, for one second.
 func TestAwaitDockerClient(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		// This function just sleeps for 1 second, so we test that it doesn't panic
-		// and completes within a reasonable time
-		start := time.Now()
+	t.Parallel()
 
-		log := logging.New(io.Discard, logging.InfoLevel)
-		awaitDockerClient(log)
+	var slept []time.Duration
 
-		elapsed := time.Since(start)
+	proc := &process{
+		log:   newTestLogger(t),
+		sleep: func(d time.Duration) { slept = append(slept, d) },
+	}
 
-		// Should take at least 900ms but not more than 3 seconds (to account for CI timing variations)
-		assert.GreaterOrEqual(
-			t,
-			elapsed,
-			900*time.Millisecond,
-			"Should sleep for at least 900 milliseconds",
-		)
-		assert.Less(t, elapsed, 3*time.Second, "Should not sleep for more than 3 seconds")
-	})
+	proc.awaitDockerClient()
+
+	assert.Equal(t, []time.Duration{time.Second}, slept)
 }
 
 func TestLifecycleFlags(t *testing.T) {
@@ -190,21 +184,21 @@ func TestValidateRollingRestartDependenciesAcceptsCancelableContext(t *testing.T
 	})
 }
 
-// TestNewClient_FailureLeavesNoClient verifies that newClient returns a nil
-// client when the Docker client cannot be created. preRun and the exit path
-// compare the client with nil, which an interface holding a nil pointer would
-// not equal.
-func TestNewClient_FailureLeavesNoClient(t *testing.T) {
+// TestNewDockerClient_FailureLeavesNoClient verifies that newDockerClient
+// returns a nil client when the Docker client cannot be created. preRun and
+// the exit path compare the client with nil, which an interface holding a nil
+// pointer would not equal.
+func TestNewDockerClient_FailureLeavesNoClient(t *testing.T) {
 	t.Parallel()
 
-	got, err := newClient(t.Context(), newTestLogger(t), containerClient.ClientOptions{
+	got, err := newDockerClient(t.Context(), newTestLogger(t), containerClient.ClientOptions{
 		Docker: dockerConfig.Docker{Host: "tcp://[::1"},
 	})
 	require.Error(t, err)
 	// assert.Nil counts an interface holding a nil pointer as nil, so the
 	// interface is compared with nil directly.
 	if got != nil {
-		t.Errorf("newClient returned a non-nil client with its error: %#v", got)
+		t.Errorf("newDockerClient returned a non-nil client with its error: %#v", got)
 	}
 }
 
@@ -423,7 +417,7 @@ func TestCommands_ErrorOutput(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			root := newExecuteCommand(t, &process{log: new(zerolog.Nop())}, tt.args...)
+			root := newExecuteCommand(t, newTestProcess(fstest.MapFS{}), tt.args...)
 
 			var out bytes.Buffer
 
@@ -452,6 +446,8 @@ func TestCommands_ErrorOutput(t *testing.T) {
 // on most kernels and parent PID 1 on OpenVZ, where PID 1 still does not list
 // them among its children. A host binary can have an init system as its parent.
 func TestIsContainerMainProcess(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name        string
 		pid         int
@@ -475,7 +471,7 @@ func TestIsContainerMainProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			setProcessFuncs(t)
+			t.Parallel()
 
 			fsys := fstest.MapFS{}
 			if tt.inContainer {
@@ -486,12 +482,13 @@ func TestIsContainerMainProcess(t *testing.T) {
 				fsys["proc/1/task/1/children"] = &fstest.MapFile{Data: []byte(*tt.children)}
 			}
 
-			setProcessFs(t, fsys)
+			proc := &process{
+				fsys: fsys,
+				pid:  func() int { return tt.pid },
+				ppid: func() int { return tt.ppid },
+			}
 
-			processID = func() int { return tt.pid }
-			parentProcessID = func() int { return tt.ppid }
-
-			assert.Equal(t, tt.want, isContainerMainProcess())
+			assert.Equal(t, tt.want, proc.isContainerMainProcess())
 		})
 	}
 }
@@ -664,9 +661,10 @@ func TestRootCommand_ReviveStoppedFlagParsing(t *testing.T) {
 // Watchtower's own container to "no" and reports an error only when that
 // fails, since the runtime may then start Watchtower again. A container whose
 // policy is already "no" needs no update. A process other than the container's
-// main process leaves the policy alone. It changes package state, so it does
-// not run in parallel.
+// main process leaves the policy alone.
 func TestDisableRestarts(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		// current is the inspected Watchtower container, or nil when it was
@@ -698,6 +696,8 @@ func TestDisableRestarts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
 			mockClient := mockCmd.NewMockDockerClient(t)
 			if tt.wantUpdate {
 				mockClient.EXPECT().SetRestartPolicy(mock.Anything, container.ContainerID("c0c0"),
@@ -711,13 +711,12 @@ func TestDisableRestarts(t *testing.T) {
 			}
 
 			proc := newRunProcess(t, runTestState{client: mockClient, current: tt.current, currentID: currentID})
-			setProcessFs(t, fstest.MapFS{
+			proc.fsys = fstest.MapFS{
 				".dockerenv":             &fstest.MapFile{},
 				"proc/1/task/1/children": &fstest.MapFile{Data: []byte("7")},
-			})
-
-			processID = func() int { return tt.pid }
-			parentProcessID = func() int { return tt.ppid }
+			}
+			proc.pid = func() int { return tt.pid }
+			proc.ppid = func() int { return tt.ppid }
 
 			processCtx, cancel := context.WithCancel(t.Context())
 			defer cancel()

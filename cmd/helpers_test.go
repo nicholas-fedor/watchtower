@@ -1,9 +1,12 @@
 package cmd
 
 import (
+	"io/fs"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +28,21 @@ func isolateStartupEnv(t *testing.T) {
 
 	if !found {
 		require.NoError(t, os.Unsetenv("DOCKER_TLS"))
+	}
+}
+
+// newTestProcess returns a process that logs nothing and reads the container
+// marker and /proc files from fsys.
+//
+// It runs as PID 1 with parent PID 0, so it counts as the main process of a
+// container. Its sleeps return at once.
+func newTestProcess(fsys fs.FS) *process {
+	return &process{
+		log:   new(zerolog.Nop()),
+		fsys:  fsys,
+		sleep: func(time.Duration) {},
+		pid:   func() int { return 1 },
+		ppid:  func() int { return 0 },
 	}
 }
 

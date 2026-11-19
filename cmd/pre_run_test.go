@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"os/exec"
 	"slices"
@@ -58,39 +57,22 @@ func cgroupWithSelf() string {
 	return "12:memory:/docker/" + string(selfID) + "\n"
 }
 
-// newPreRunProcess returns a process that holds only a logger, as Execute
-// creates it for preRun.
+// newPreRunProcess returns a test process for preRun, holding only what
+// Execute sets before preRun runs.
 //
-// It prepares the package state preRun reads and restores it when the test
-// ends. newClient returns client, and self container ID detection reads only
-// detection. The Docker variables preRun reads and sets are cleared and
-// restored.
+// Its client factory returns client, and self container ID detection reads
+// only detection. The Docker variables preRun reads and sets are cleared and
+// restored when the test ends.
 //
 // Parameters:
 //   - t: Test that owns the process.
-//   - client: Docker client newClient returns.
+//   - client: Docker client the process's client factory returns.
 //   - detection: Files self container ID detection reads.
 //
 // Returns:
 //   - *process: The process to run preRun with.
 func newPreRunProcess(t *testing.T, client DockerClient, detection selfDetection) *process {
 	t.Helper()
-
-	setProcessFuncs(t)
-
-	proc := &process{log: new(zerolog.Nop())}
-
-	// preRun creates the notifier, except for a health check or a startup that
-	// fails first.
-	t.Cleanup(func() {
-		if proc.notifier != nil {
-			proc.notifier.Close()
-		}
-	})
-
-	savedNewClient := newClient
-
-	t.Cleanup(func() { newClient = savedNewClient })
 
 	// io/fs paths are relative to the root, so the absolute paths drop their
 	// leading slash.
@@ -111,11 +93,18 @@ func newPreRunProcess(t *testing.T, client DockerClient, detection selfDetection
 		writeFile(fmt.Sprintf("/proc/%d/cgroup", os.Getpid()), detection.cgroup)
 	}
 
-	setProcessFs(t, fsys)
-
-	newClient = func(context.Context, *zerolog.Logger, containerClient.ClientOptions) (DockerClient, error) {
+	proc := newTestProcess(fsys)
+	proc.newClient = func(context.Context, *zerolog.Logger, containerClient.ClientOptions) (DockerClient, error) {
 		return client, nil
 	}
+
+	// preRun creates the notifier, except for a health check or a startup that
+	// fails first.
+	t.Cleanup(func() {
+		if proc.notifier != nil {
+			proc.notifier.Close()
+		}
+	})
 
 	for _, key := range []string{"HOSTNAME", "DOCKER_HOST", "DOCKER_TLS_VERIFY", "DOCKER_API_VERSION", "DOCKER_CERT_PATH"} {
 		t.Setenv(key, "")
@@ -127,18 +116,6 @@ func newPreRunProcess(t *testing.T, client DockerClient, detection selfDetection
 	}
 
 	return proc
-}
-
-// setProcessFs replaces the filesystem that holds the container marker files
-// and the /proc files read by self container ID detection, and restores it
-// when the test ends.
-func setProcessFs(t *testing.T, fsys fs.FS) {
-	t.Helper()
-
-	saved := processFs
-	processFs = fsys
-
-	t.Cleanup(func() { processFs = saved })
 }
 
 // selfContainer returns the Watchtower container preRun detects, with the
@@ -338,7 +315,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			assert.Equal(t, tt.wantUnknown, proc.currentContainerUnknown())
 			assert.Equal(t, tt.wantName, containerName(proc.currentContainer))
 			assert.Equal(t, tt.wantCalls, runCalls(mockClient))
-			assert.Same(t, mockClient, proc.client, "preRun uses the client from newClient")
+			assert.Same(t, mockClient, proc.client, "preRun uses the client from the client factory")
 
 			if slices.Contains(tt.args, "--health-check") {
 				assert.Nil(t, proc.notifier, "preRun sets up no notifications")
@@ -392,7 +369,7 @@ func TestPreRun_Configuration(t *testing.T) {
 
 	var gotOpts containerClient.ClientOptions
 
-	newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
+	proc.newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
 		gotOpts = opts
 
 		return mockClient, nil
@@ -432,7 +409,7 @@ func TestPreRun_loadsSettingsOnce(t *testing.T) {
 	proc := newPreRunProcess(t, mockClient, selfDetection{})
 
 	// Outside a container, so the run has no restart policy to disable.
-	processID = func() int { return 4242 }
+	proc.pid = func() int { return 4242 }
 
 	readStderr := captureStderr(t)
 
@@ -529,7 +506,7 @@ func TestPreRun_RegistryTLSSettings(t *testing.T) {
 
 			var clientOptions containerClient.ClientOptions
 
-			newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
+			proc.newClient = func(_ context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
 				clientOptions = opts
 
 				return mockClient, nil
@@ -1089,13 +1066,13 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 
 	proc := newPreRunProcess(t, mockClient, detection)
 
-	processID = func() int { return pid }
+	proc.pid = func() int { return pid }
 
 	// The client factory prints the Docker host it connects to and whether its
 	// wait for the daemon has a deadline. It fails with clientErr when a case
 	// sets it, and with the context's error when the context has ended, as the
 	// wait for the daemon does.
-	newClient = func(ctx context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
+	proc.newClient = func(ctx context.Context, _ *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
 		_, bounded := ctx.Deadline()
 		fmt.Fprintf(os.Stderr, "newClient host=%s bounded=%t\n", opts.Docker.Host, bounded)
 

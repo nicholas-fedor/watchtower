@@ -79,37 +79,11 @@ type runTestState struct {
 	currentID container.ContainerID
 }
 
-// setProcessFuncs replaces the package functions run reads about the process,
-// and restores them when the test ends.
-//
-// Watchtower runs as the main process of its container. The Docker readiness
-// sleep is skipped.
-//
-// Parameters:
-//   - t: Test that owns the replaced functions.
-func setProcessFuncs(t *testing.T) {
-	t.Helper()
-
-	savedSleep := sleepFunc
-	savedProcessID := processID
-	savedParentProcessID := parentProcessID
-
-	t.Cleanup(func() {
-		sleepFunc = savedSleep
-		processID = savedProcessID
-		parentProcessID = savedParentProcessID
-	})
-
-	sleepFunc = func(time.Duration) {}
-	processID = func() int { return 1 }
-	parentProcessID = func() int { return 0 }
-}
-
 // newRunProcess returns a process with the state run and runMain read.
 //
-// The process logs nothing. Its notifier has no services, so it sends nothing.
-// Until the test ends, Watchtower runs as the main process of its container
-// and the Docker readiness sleep is skipped.
+// The process runs as PID 1, so it is the main process of its container. Its
+// filesystem holds no container marker or /proc files. Its sleeps return at
+// once. Its notifier has no services, so it sends nothing.
 //
 // Parameters:
 //   - t: Test that owns the process.
@@ -120,20 +94,18 @@ func setProcessFuncs(t *testing.T) {
 func newRunProcess(t *testing.T, state runTestState) *process {
 	t.Helper()
 
-	setProcessFuncs(t)
-
 	created, err := notify.NewNotifier(new(zerolog.Nop()), notifyConfig.Notify{Level: "info"})
 	require.NoError(t, err)
 	t.Cleanup(created.Close)
 
-	return &process{
-		log:                new(zerolog.Nop()),
-		client:             state.client,
-		rateLimiter:        ratelimit.New(),
-		notifier:           created,
-		currentContainer:   state.current,
-		currentContainerID: state.currentID,
-	}
+	proc := newTestProcess(fstest.MapFS{})
+	proc.client = state.client
+	proc.rateLimiter = ratelimit.New()
+	proc.notifier = created
+	proc.currentContainer = state.current
+	proc.currentContainerID = state.currentID
+
+	return proc
 }
 
 // newLoggerNotifier returns a notifier hooked to log whose logger:// service
@@ -371,9 +343,9 @@ func waitForAPI(t *testing.T, addr string) {
 // runInBackground runs the command in its own goroutine, with a process
 // context that the returned cancel ends the way a signal would. When the test
 // ends, it cancels that context and waits for run to return, so run stops
-// before the test's cleanups restore the package state it reads. A run still
-// going after 10 seconds fails the test, and the wait goes on. Cleanups the caller
-// registers later run first, so they can release anything run waits on.
+// before the test's cleanups release what it uses. A run still going after 10
+// seconds fails the test, and the wait goes on. Cleanups the caller registers
+// later run first, so they can release anything run waits on.
 //
 // Parameters:
 //   - t: Test that owns the run.
@@ -477,7 +449,7 @@ func TestRun_RunOnce(t *testing.T) {
 			proc := newRunProcess(t, state)
 
 			if tt.hostBinary {
-				processID = func() int { return 4242 }
+				proc.pid = func() int { return 4242 }
 			}
 
 			require.NoError(t, proc.run(newRunCommand(t, proc, "--run-once"), nil))
@@ -499,7 +471,7 @@ func TestRun_RunOnceStoppedAtStartup(t *testing.T) {
 	proc := newRunProcess(t, runTestState{client: mockClient})
 
 	// Outside a container, so the run has no restart policy to disable.
-	processID = func() int { return 4242 }
+	proc.pid = func() int { return 4242 }
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -1008,13 +980,13 @@ func TestRun_HealthCheck(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := mockCmd.NewMockDockerClient(t)
 			proc := newRunProcess(t, runTestState{client: mockClient})
-			setProcessFs(t, fstest.MapFS{
+			proc.fsys = fstest.MapFS{
 				".dockerenv":             &fstest.MapFile{},
 				"proc/1/task/1/children": &fstest.MapFile{Data: []byte(tt.initChildren)},
-			})
+			}
 
-			processID = func() int { return tt.pid }
-			parentProcessID = func() int { return tt.ppid }
+			proc.pid = func() int { return tt.pid }
+			proc.ppid = func() int { return tt.ppid }
 
 			err := proc.run(newRunCommand(t, proc, "--health-check"), nil)
 
@@ -1121,9 +1093,6 @@ func runExitHelper(t *testing.T, helperCase string) {
 	}
 
 	proc := newRunProcess(t, runTestState{client: mockClient, current: current, currentID: current.ID()})
-
-	// Watchtower runs as the main process of its container.
-	processID = func() int { return 1 }
 
 	log := logging.New(os.Stderr, logging.InfoLevel)
 

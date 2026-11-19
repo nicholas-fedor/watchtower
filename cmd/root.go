@@ -71,51 +71,11 @@ var (
 	errUnknownContainerID = errors.New("own container ID is not known")
 )
 
-var (
-	// sleepFunc is a function variable for time.Sleep, allowing it to be overridden in tests.
-	//
-	// It is initialized to time.Sleep by default, providing a way to mock sleep behavior during testing
-	// to avoid delays in unit tests or control timing in integration tests.
-	sleepFunc = time.Sleep
-
-	// newClient creates the Docker client, allowing it to be overridden in tests.
-	//
-	// It creates the client with containerClient.NewClient. preRun calls it with
-	// the resolved client options, so tests can substitute a mock client without
-	// a Docker daemon.
-	newClient = func(ctx context.Context, log *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
-		dockerClient, err := containerClient.NewClient(ctx, log, opts)
-		if err != nil {
-			// Return a nil interface, which callers compare with nil, rather
-			// than one holding a nil pointer.
-			return nil, err //nolint:wrapcheck // NewClient's error already names the failed step.
-		}
-
-		return dockerClient, nil
-	}
-
-	// processFs is the filesystem holding the container marker files and the
-	// /proc files that self container ID detection and main process detection
-	// read.
-	//
-	// Tests replace it to control whether Watchtower appears to run in a
-	// container and which container ID it detects.
-	processFs fs.FS = os.DirFS("/")
-
-	// processID returns the ID of the Watchtower process. Tests replace it to
-	// run as the main process of a container.
-	processID = os.Getpid
-
-	// parentProcessID returns the ID of the Watchtower process's parent. Tests
-	// replace it to run under a container's init process.
-	parentProcessID = os.Getppid
-
-	// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
-	//
-	// It defines the base usage string and the short and long descriptions. Execute assigns its lifecycle hooks
-	// (PreRunE and RunE).
-	rootCmd = NewRootCommand()
-)
+// rootCmd represents the root command for the Watchtower CLI, serving as the entry point for all subcommands.
+//
+// It defines the base usage string and the short and long descriptions. Execute assigns its lifecycle hooks
+// (PreRunE and RunE).
+var rootCmd = NewRootCommand()
 
 // DockerClient is what the commands need from the Docker client. It covers what
 // the update session, the HTTP API and the self-update handoff use. It also
@@ -136,10 +96,23 @@ type DockerClient interface {
 // process holds the state of a single CLI invocation.
 //
 // The logger is constructed in main and reconfigured in preRun after flags are
-// parsed. preRun sets the rest, and run and the exit paths read it.
+// parsed. Execute sets the functions and the filesystem that connect the
+// process to its host. Tests replace them.
+// preRun sets the rest, and run and the exit paths read it.
 type process struct {
 	// log is the process logger.
 	log *zerolog.Logger
+	// newClient creates the Docker client from the client options.
+	newClient func(ctx context.Context, log *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error)
+	// fsys holds the container marker files and the /proc files that self
+	// container ID detection and main process detection read.
+	fsys fs.FS
+	// sleep pauses the process for the given duration.
+	sleep func(d time.Duration)
+	// pid returns the ID of the Watchtower process.
+	pid func() int
+	// ppid returns the ID of the Watchtower process's parent.
+	ppid func() int
 	// clientErr is the error from creating the Docker client at startup. An
 	// exit reports it instead of waiting for the daemon again.
 	clientErr error
@@ -243,7 +216,14 @@ func NewRootCommand() *cobra.Command {
 //     their own context.
 //   - log: Process logger from main (reconfigured in preRun from --log-format / --log-level).
 func Execute(ctx context.Context, log *zerolog.Logger) {
-	proc := &process{log: log}
+	proc := &process{
+		log:       log,
+		newClient: newDockerClient,
+		fsys:      os.DirFS("/"),
+		sleep:     time.Sleep,
+		pid:       os.Getpid,
+		ppid:      os.Getppid,
+	}
 	rootCmd.PreRunE = proc.preRun
 	rootCmd.RunE = proc.run
 	notifyUpgradeCmd.RunE = proc.runNotifyUpgrade
@@ -336,6 +316,28 @@ func stoppedBy(ctx context.Context, err error) bool {
 	return errors.Is(err, context.Canceled) || errors.Is(err, context.Cause(ctx))
 }
 
+// newDockerClient creates the Docker client with the given options.
+//
+// A failure returns a nil interface rather than one holding a nil pointer,
+// since preRun and the exit path compare the client with nil.
+//
+// Parameters:
+//   - ctx: Bounds the wait for the Docker daemon.
+//   - log: Logger for the client.
+//   - opts: The resolved client options.
+//
+// Returns:
+//   - DockerClient: The client when it is created and nil otherwise.
+//   - error: Non-nil when the client cannot be created.
+func newDockerClient(ctx context.Context, log *zerolog.Logger, opts containerClient.ClientOptions) (DockerClient, error) {
+	dockerClient, err := containerClient.NewClient(ctx, log, opts)
+	if err != nil {
+		return nil, err //nolint:wrapcheck // NewClient's error already names the failed step.
+	}
+
+	return dockerClient, nil
+}
+
 // preRun prepares the environment and configuration before the main command execution begins.
 //
 // It runs these steps in order:
@@ -391,7 +393,7 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	clientOpts := p.cfg.ClientOptions()
 	clientOpts.RateLimiter = p.rateLimiter
 
-	p.client, err = newClient(ctx, p.log, clientOpts)
+	p.client, err = p.newClient(ctx, p.log, clientOpts)
 	if err != nil {
 		p.clientErr = err
 
@@ -419,7 +421,7 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	// Retrieve and store the current container ID for use throughout the application.
 	var detectErr, inspectErr error
 
-	p.currentContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, lookupCtx, processFs, p.client)
+	p.currentContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, lookupCtx, p.fsys, p.client)
 	if detectErr != nil {
 		p.log.Debug().Err(detectErr).Msg("Failed to get current container ID")
 
@@ -597,8 +599,8 @@ func (p *process) resolveScope(ctx context.Context, inspectErr error) error {
 //   - error: An [exitError] when Watchtower cannot continue or its run failed.
 func (p *process) run(cmd *cobra.Command, _ []string) error {
 	if p.cfg.Mode.HealthCheck {
-		if isContainerMainProcess() {
-			sleepFunc(1 * time.Second)
+		if p.isContainerMainProcess() {
+			p.sleep(1 * time.Second)
 
 			return &exitError{
 				err:  nil,
@@ -645,7 +647,7 @@ func (p *process) runMain(processCtx context.Context, runCfg settings.RunConfig)
 		Msg("Processing specified containers")
 
 	// Give a self-updated instance a moment before it lists its predecessors.
-	awaitDockerClient(p.log)
+	p.awaitDockerClient()
 
 	// Initialize the event broadcaster for SSE subscribers.
 	// Declared before runUpdatesWithNotifications so the closure can capture it.
@@ -906,7 +908,7 @@ func (p *process) runMain(processCtx context.Context, runCfg settings.RunConfig)
 // Parameters:
 //   - ctx: The process context, which a stop signal cancels.
 func (p *process) disableRestarts(ctx context.Context) {
-	if !isContainerMainProcess() || ctx.Err() != nil {
+	if !p.isContainerMainProcess() || ctx.Err() != nil {
 		return
 	}
 
@@ -954,7 +956,7 @@ func (p *process) disableRestartsBeforeExit(ctx context.Context, cmd *cobra.Comm
 	if p.client == nil {
 		// Only the main process changes the restart policy, so only it
 		// connects for that.
-		if !isContainerMainProcess() {
+		if !p.isContainerMainProcess() {
 			return
 		}
 
@@ -972,7 +974,7 @@ func (p *process) disableRestartsBeforeExit(ctx context.Context, cmd *cobra.Comm
 			// process is exiting, so it waits only briefly for a daemon that
 			// does not answer.
 			ctx, cancel := context.WithTimeout(ctx, restartPolicyTimeout)
-			p.client, err = newClient(ctx, p.log, containerClient.ClientOptions{Docker: docker})
+			p.client, err = p.newClient(ctx, p.log, containerClient.ClientOptions{Docker: docker})
 
 			cancel()
 		}
@@ -1006,18 +1008,18 @@ func (p *process) disableRestartsBeforeExit(ctx context.Context, cmd *cobra.Comm
 //
 // Returns:
 //   - bool: True for the main process of a container.
-func isContainerMainProcess() bool {
-	pid := processID()
+func (p *process) isContainerMainProcess() bool {
+	pid := p.pid()
 	if pid == 1 {
 		return true
 	}
 
-	if parentProcessID() != 1 || !containerClient.InContainer(processFs) {
+	if p.ppid() != 1 || !containerClient.InContainer(p.fsys) {
 		return false
 	}
 
 	// The kernel provides this list only when built with CONFIG_PROC_CHILDREN.
-	children, err := fs.ReadFile(processFs, "proc/1/task/1/children")
+	children, err := fs.ReadFile(p.fsys, "proc/1/task/1/children")
 	if err != nil {
 		return false
 	}
@@ -1040,7 +1042,7 @@ func (p *process) detectCurrentContainerID(ctx context.Context) error {
 
 	var err error
 
-	p.currentContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, processFs, p.client)
+	p.currentContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, p.fsys, p.client)
 
 	return err //nolint:wrapcheck // The error already says that the container ID could not be detected.
 }
@@ -1055,7 +1057,7 @@ func (p *process) detectCurrentContainerID(ctx context.Context) error {
 //   - bool: True when the container's ID is unknown.
 func (p *process) currentContainerUnknown() bool {
 	// A host binary has no container ID, so only a containerized run counts.
-	return p.currentContainerID == "" && containerClient.InContainer(processFs)
+	return p.currentContainerID == "" && containerClient.InContainer(p.fsys)
 }
 
 // awaitDockerClient pauses for one second before Watchtower first lists containers.
@@ -1063,8 +1065,8 @@ func (p *process) currentContainerUnknown() bool {
 // It guards against a self-update race in which the new instance's first listing of Watchtower
 // containers can come back empty, which leaves the old instance running. Waiting for a daemon
 // that is not serving its API yet happens earlier, when the client is created.
-func awaitDockerClient(log *zerolog.Logger) {
-	log.Debug().
+func (p *process) awaitDockerClient() {
+	p.log.Debug().
 		Msg("Sleeping for a second to ensure the docker api client has been properly initialized.")
-	sleepFunc(1 * time.Second)
+	p.sleep(1 * time.Second)
 }
