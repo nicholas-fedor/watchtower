@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
@@ -33,67 +32,52 @@ func init() {
 
 // runNotifyUpgrade executes the notify-upgrade command.
 //
+// It writes the legacy notification settings as Shoutrrr URLs to an
+// environment file in the working directory. The file is removed after 5
+// minutes or when the command's context ends.
+//
 // The process logger is replaced by the logger configured from the command's
 // flags, so Execute reports a failure with it.
 //
 // Parameters:
-//   - cmd: The notify-upgrade command, providing access to parsed flags.
-//   - args: Positional arguments, none for this command.
+//   - cmd: The notify-upgrade command, whose root holds the settings flags.
+//   - _: Positional arguments, none for this command.
 //
 // Returns:
-//   - error: An [exitError] when the upgrade fails.
-func (p *process) runNotifyUpgrade(cmd *cobra.Command, args []string) error {
+//   - error: An [exitError] when the settings cannot be loaded or turned into
+//     notification URLs or when the environment file cannot be written. A
+//     failure to remove the file afterwards is only logged.
+func (p *process) runNotifyUpgrade(cmd *cobra.Command, _ []string) error {
 	// Execute reports the errors returned from here on. Flag and argument
 	// errors come earlier, so Cobra still prints them with the usage text.
 	cmd.SilenceErrors = true
 	cmd.SilenceUsage = true
 
-	var err error
+	const failure = "Notification upgrade failed"
 
-	p.log, err = runNotifyUpgradeE(cmd, args, p.log)
-	if err != nil {
-		return &exitError{err: err, msg: "Notification upgrade failed", code: 1}
-	}
-
-	return nil
-}
-
-// runNotifyUpgradeE performs the core logic for the `notify-upgrade` subcommand, converting legacy Watchtower notification
-// settings into shoutrrr URL format and managing the lifecycle of a temporary file to store these URLs.
-//
-// Parameters:
-//   - cmd: The *cobra.Command instance representing the `notify-upgrade` subcommand, providing access to parsed flags
-//     such as notification types (e.g., --notifications) and other settings that influence notifier behavior.
-//   - _: A slice of strings representing positional arguments, unused here as the command accepts no arguments (enforced
-//     by cobra.NoArgs), included for compatibility with Cobra's RunE signature.
-//   - log: Process logger, reconfigured from --log-format / --log-level so subcommand output honors those flags.
-//
-// Returns:
-//   - *zerolog.Logger: Logger with the configured format and level, for outer error reporting.
-//   - error: Non-nil if the settings cannot be loaded or turned into notification URLs. Non-nil also if the
-//     environment file cannot be written. A failure to remove the file afterwards is only logged.
-func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*zerolog.Logger, error) {
 	// The settings live on the root command's flags.
-	cfg, log, err := settings.Load(log, cmd.Root(), nil)
+	cfg, log, err := settings.Load(p.log, cmd.Root(), nil)
+	p.log = log
+
 	if err != nil {
-		return log, fmt.Errorf("load configuration: %w", err)
+		return &exitError{err: fmt.Errorf("load configuration: %w", err), msg: failure, code: 1}
 	}
 
 	// Write the file to the working directory, where the instructions below tell the user to copy it from.
 	fileName, err := upgrade.WriteEnvFile(log, ".", cfg.Notify)
 	if err != nil {
-		return log, err //nolint:wrapcheck // WriteEnvFile's errors already name the step that failed.
+		return &exitError{err: err, msg: failure, code: 1}
 	}
 
 	// Attempt to retrieve the running container's ID to provide precise instructions for copying the file from the container.
 	// Use a placeholder ("<CONTAINER>") if this fails, ensuring the user still gets actionable guidance.
 	containerID := "<CONTAINER>"
 
-	cid, err := containerClient.GetContainerIDFromMountinfo(log, processFs)
+	cid, err := containerClient.GetContainerIDFromMountinfo(log, p.fsys)
 	if err == nil && cid != "" {
 		containerID = cid.ShortID()
 	} else {
-		cid, err = containerClient.GetContainerIDFromCgroupFile(log, processFs)
+		cid, err = containerClient.GetContainerIDFromCgroupFile(log, p.fsys)
 		if err == nil && cid != "" {
 			containerID = cid.ShortID()
 		}
@@ -131,5 +115,5 @@ func runNotifyUpgradeE(cmd *cobra.Command, _ []string, log *zerolog.Logger) (*ze
 
 	upgrade.RemoveEnvFile(log, fileName)
 
-	return log, nil
+	return nil
 }

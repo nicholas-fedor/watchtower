@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"testing/fstest"
 	"testing/synctest"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -83,7 +83,7 @@ func runNotifyUpgradeUntilTimeout(t *testing.T, args ...string) notifyUpgradeRun
 			done := make(chan error, 1)
 
 			go func() {
-				_, err := runNotifyUpgradeE(cmd, nil, new(zerolog.Nop()))
+				err := newTestProcess(fstest.MapFS{}).runNotifyUpgrade(cmd, nil)
 				done <- err
 			}()
 
@@ -231,7 +231,7 @@ func TestNotifyUpgrade_Failures(t *testing.T) {
 
 			cmd := newNotifyUpgradeCommand(t, tt.args...)
 
-			_, err := runNotifyUpgradeE(cmd, nil, new(zerolog.Nop()))
+			err := newTestProcess(fstest.MapFS{}).runNotifyUpgrade(cmd, nil)
 			require.Error(t, err)
 
 			assert.Contains(t, err.Error(), tt.wantMessage)
@@ -253,7 +253,8 @@ func TestRunNotifyUpgrade_ExitsOnFailure(t *testing.T) {
 			"--notification-slack-hook-url", "https://hooks.slack.com/services/not-a-token",
 		)
 
-		proc := &process{log: logging.New(os.Stderr, logging.InfoLevel)}
+		proc := newTestProcess(fstest.MapFS{})
+		proc.log = logging.New(os.Stderr, logging.InfoLevel)
 		proc.exit(cmd.Context(), cmd, proc.runNotifyUpgrade(cmd, nil))
 
 		// The failure must end the process. Reaching here means it did not.
