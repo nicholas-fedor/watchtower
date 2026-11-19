@@ -22,7 +22,7 @@ import (
 // Returns:
 //   - error: errCloneFailed wrapping the underlying cause.
 func cloneCheckout(ctx context.Context, dir, repo string, rev CheckResult, client *Client) error {
-	auth, err := client.authMethod(repo)
+	auth, err := client.Auth(repo)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errCloneFailed, err)
 	}

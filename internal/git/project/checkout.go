@@ -12,7 +12,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
 	goGit "github.com/go-git/go-git/v5"
-	gitHTTP "github.com/go-git/go-git/v5/plumbing/transport/http"
 )
 
 const projectDirPerm = 0o700
@@ -62,7 +61,9 @@ func sanitizeRemoteError(err error) error {
 
 // CheckoutOptions controls how a project worktree is moved to a commit.
 type CheckoutOptions struct {
-	// AuthFor returns fetch credentials for the origin URL. Nil is anonymous fetch.
+	// AuthFor returns fetch credentials suited to the origin URL's scheme.
+	// Without AuthFor or with a nil result, go-git uses the credentials in an
+	// HTTP origin URL and the SSH agent for an SSH origin.
 	AuthFor func(repoURL string) (transport.AuthMethod, error)
 	// restore replaces restoreSaved. Tests use it to fail a restore. Nil uses restoreSaved.
 	restore func(root string, saved []savedFile) error
@@ -561,7 +562,7 @@ func fetchOrigin(ctx context.Context, repo *goGit.Repository, opts CheckoutOptio
 	return fmt.Errorf("fetch project: %w", sanitizeRemoteError(err))
 }
 
-// originFetchOptions builds fetch options for origin, dropping HTTP BasicAuth on SSH remotes.
+// originFetchOptions builds fetch options for origin with the credentials AuthFor returns.
 //
 // Parameters:
 //   - origin: Origin remote URL, or empty.
@@ -586,7 +587,7 @@ func originFetchOptions(origin string, opts CheckoutOptions) (*goGit.FetchOption
 		return nil, fmt.Errorf("project auth: %w", sanitizeRemoteError(err))
 	}
 
-	fetchOpts.Auth = originFetchAuth(origin, auth)
+	fetchOpts.Auth = auth
 
 	return fetchOpts, nil
 }
@@ -614,38 +615,6 @@ func originURL(repo *goGit.Repository) string {
 	}
 
 	return cfg.URLs[0]
-}
-
-// originFetchAuth drops HTTP BasicAuth on SSH origins.
-//
-// The SSH transport rejects http.BasicAuth. A process-wide token must not
-// be attached when origin is git@host:path or ssh://.
-//
-// Parameters:
-//   - origin: Origin remote URL.
-//   - auth: Auth returned by AuthFor.
-//
-// Returns:
-//   - transport.AuthMethod: auth, or nil when BasicAuth cannot be used.
-func originFetchAuth(origin string, auth transport.AuthMethod) transport.AuthMethod {
-	if auth == nil || origin == "" {
-		return auth
-	}
-
-	if _, ok := auth.(*gitHTTP.BasicAuth); !ok {
-		return auth
-	}
-
-	endpoint, err := transport.NewEndpoint(origin)
-	if err != nil {
-		return auth
-	}
-
-	if endpoint.Protocol == "ssh" {
-		return nil
-	}
-
-	return auth
 }
 
 // snapshotDirty copies modified and untracked regular files from the worktree.
