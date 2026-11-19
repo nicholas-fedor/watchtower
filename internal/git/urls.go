@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
@@ -336,16 +335,17 @@ func giteaAPIAt(origin url.URL, segments ...string) *url.URL {
 
 // newGitHTTPClient builds an HTTP client for REST probes and API ref checks.
 //
+// The client sets no timeout of its own. Each request ends with its context,
+// which a ref check bounds with the Git timeout.
+//
 // Parameters:
-//   - timeout: Client timeout.
 //   - insecure: When true, skip TLS verification.
 //   - caPEM: Optional PEM CA bundle.
 //
 // Returns:
 //   - *http.Client: Client with optional custom TLS.
-func newGitHTTPClient(timeout time.Duration, insecure bool, caPEM []byte) *http.Client {
+func newGitHTTPClient(insecure bool, caPEM []byte) *http.Client {
 	client := &http.Client{
-		Timeout:       timeout,
 		CheckRedirect: rejectCrossHostRedirect,
 	}
 	if !insecure && len(caPEM) == 0 {

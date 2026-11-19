@@ -126,6 +126,11 @@ const (
 	kindBranch        = "branch"
 	kindTag           = "tag"
 	defaultGitTimeout = 30 * time.Second
+
+	// apiAttemptParts splits the time left on a lookup into equal parts. A
+	// provider API attempt gets one part and leaves the rest to the ls-remote
+	// fallback.
+	apiAttemptParts = 2
 )
 
 // New constructs a Git watcher client.
@@ -141,15 +146,10 @@ func New(log *zerolog.Logger, opts Options) *Client {
 		log = new(zerolog.Nop())
 	}
 
-	timeout := opts.Timeout
-	if timeout <= 0 {
-		timeout = defaultGitTimeout
-	}
-
 	client := &Client{
 		log:  log,
 		opts: opts,
-		http: newGitHTTPClient(timeout, opts.InsecureSkipTLS, opts.CABundle),
+		http: newGitHTTPClient(opts.InsecureSkipTLS, opts.CABundle),
 	}
 	client.lister = gitLister{client: client}
 
@@ -653,7 +653,11 @@ func (c *Client) checkTagPolicy(ctx context.Context, req CheckRequest) (CheckRes
 //   - resolvedRef: Name, hash, and kind.
 //   - error: Non-nil when the ref is missing or listing fails.
 func (c *Client) resolveRef(ctx context.Context, repo, ref, apiOrigin string) (resolvedRef, error) {
-	resolved, ok, err := c.resolveViaAPI(ctx, repo, ref, apiOrigin)
+	apiCtx, cancel := apiAttemptContext(ctx)
+	resolved, ok, err := c.resolveViaAPI(apiCtx, repo, ref, apiOrigin)
+
+	cancel()
+
 	if err != nil {
 		if !errors.Is(err, errAPINotFound) {
 			c.log.Debug().
@@ -689,7 +693,11 @@ func (c *Client) resolveRef(ctx context.Context, repo, ref, apiOrigin string) (r
 //   - []RemoteRef: Short tag names and commit hashes.
 //   - error: Non-nil when listing fails.
 func (c *Client) listTags(ctx context.Context, repo, apiOrigin string) ([]RemoteRef, error) {
-	tags, ok, err := c.listTagsViaAPI(ctx, repo, apiOrigin)
+	apiCtx, cancel := apiAttemptContext(ctx)
+	tags, ok, err := c.listTagsViaAPI(apiCtx, repo, apiOrigin)
+
+	cancel()
+
 	if err != nil {
 		c.log.Debug().
 			Err(fmt.Errorf(
@@ -716,6 +724,29 @@ func (c *Client) listTags(ctx context.Context, repo, apiOrigin string) ([]Remote
 	}
 
 	return listed, nil
+}
+
+// apiAttemptContext returns a context for a provider API attempt that leaves
+// half of the time remaining on ctx for the ls-remote fallback after it.
+//
+// Without a deadline on ctx, the attempt ends only with ctx.
+//
+// Parameters:
+//   - ctx: Context of the whole lookup, including its fallback.
+//
+// Returns:
+//   - context.Context: Context for the API attempt.
+//   - context.CancelFunc: Releases the attempt's timer once it returns.
+func apiAttemptContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	// An API request that never receives a response would otherwise use the
+	// whole deadline and make the fallback fail at once, even though the Git
+	// transport works. A healthy API responds well within half of it.
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return ctx, func() {}
+	}
+
+	return context.WithTimeout(ctx, time.Until(deadline)/apiAttemptParts)
 }
 
 // unacceptedBaseline returns the baseline to use when labelCommit was not accepted.
