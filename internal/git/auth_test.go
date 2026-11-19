@@ -21,7 +21,8 @@ import (
 )
 
 // TestClient_Auth verifies which go-git auth method each remote receives.
-// Credentials go only to trusted hosts over SSH or HTTPS.
+// Credentials go to the clone URL's own host over SSH or HTTPS, including a
+// self-hosted server.
 func TestClient_Auth(t *testing.T) {
 	t.Parallel()
 
@@ -58,13 +59,12 @@ func TestClient_Auth(t *testing.T) {
 		assert.Equal(t, "ghp_xxx", basic.Password)
 	})
 
-	t.Run("basic username and password on a trusted host", func(t *testing.T) {
+	t.Run("basic username and password", func(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{
 			Username: "octocat",
 			Password: "pw",
-			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -75,12 +75,11 @@ func TestClient_Auth(t *testing.T) {
 		assert.Equal(t, "pw", basic.Password)
 	})
 
-	t.Run("username only on a trusted host", func(t *testing.T) {
+	t.Run("username only", func(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{
 			Username: "octocat",
-			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -91,12 +90,11 @@ func TestClient_Auth(t *testing.T) {
 		assert.Empty(t, basic.Password)
 	})
 
-	t.Run("password only on a trusted host", func(t *testing.T) {
+	t.Run("password only", func(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{
 			Password: "pw",
-			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -107,13 +105,52 @@ func TestClient_Auth(t *testing.T) {
 		assert.Equal(t, "pw", basic.Password)
 	})
 
-	t.Run("untrusted host is anonymous", func(t *testing.T) {
+	t.Run("self-hosted https host receives the token", func(t *testing.T) {
 		t.Parallel()
 
 		client := &Client{opts: Options{Token: "tok", Username: "octocat", Password: "pw"}}
-		got, err := client.Auth("https://evil.example/org/app.git")
+		got, err := client.Auth("https://git.example.com/org/app.git")
 		require.NoError(t, err)
-		assertAnonymous(t, got)
+
+		basic, ok := got.(*gitHTTP.BasicAuth)
+		require.True(t, ok)
+		assert.Equal(t, tokenUserGit, basic.Username)
+		assert.Equal(t, "tok", basic.Password)
+	})
+
+	t.Run("self-hosted urls without an owner receive credentials", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{opts: Options{Token: "tok", SSHKeyPath: writeEd25519Key(t)}}
+
+		got, err := client.Auth("https://git.example.com/app.git")
+		require.NoError(t, err)
+
+		basic, ok := got.(*gitHTTP.BasicAuth)
+		require.True(t, ok)
+		assert.Equal(t, "tok", basic.Password)
+
+		got, err = client.Auth("git@git.example.com:app.git")
+		require.NoError(t, err)
+
+		_, ok = got.(*gitSSH.PublicKeys)
+		assert.True(t, ok)
+	})
+
+	t.Run("urls without a host are anonymous", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{opts: Options{Token: "tok", SSHKeyPath: writeEd25519Key(t)}}
+
+		for _, repo := range []string{
+			"https:///org/app.git",
+			"ssh:///org/app.git",
+			"file:///srv/git/app.git",
+		} {
+			got, err := client.Auth(repo)
+			require.NoError(t, err, repo)
+			assertAnonymous(t, got)
+		}
 	})
 
 	t.Run("plaintext http is anonymous", func(t *testing.T) {
@@ -122,7 +159,6 @@ func TestClient_Auth(t *testing.T) {
 		client := &Client{opts: Options{
 			Username: "octocat",
 			Password: "pw",
-			Hosts:    map[string]string{"git.example.com": provider.Gitea},
 		}}
 		got, err := client.Auth("http://git.example.com/org/app.git")
 		require.NoError(t, err)
@@ -227,13 +263,16 @@ func TestClient_Auth(t *testing.T) {
 		}
 	})
 
-	t.Run("ssh key on an untrusted host is anonymous", func(t *testing.T) {
+	t.Run("self-hosted ssh host uses the key", func(t *testing.T) {
 		t.Parallel()
 
-		client := &Client{opts: Options{SSHKeyPath: writeEd25519Key(t)}}
-		got, err := client.Auth("git@evil.example:org/app.git")
+		client := &Client{opts: Options{Token: "tok", SSHKeyPath: writeEd25519Key(t)}}
+		got, err := client.Auth("git@git.example.com:org/app.git")
 		require.NoError(t, err)
-		assertAnonymous(t, got)
+
+		keys, ok := got.(*gitSSH.PublicKeys)
+		require.True(t, ok)
+		assert.Equal(t, tokenUserGit, keys.User)
 	})
 
 	t.Run("https with only an ssh key is anonymous", func(t *testing.T) {
@@ -274,25 +313,27 @@ func TestClient_TLSSettings(t *testing.T) {
 	assert.False(t, insecure)
 }
 
+// TestBuildAuth verifies which credentials BuildAuth returns for a Docker Git
+// context URL. Only an HTTPS context URL with a host receives them.
 func TestBuildAuth(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name     string
 		client   *Client
-		repo     string
+		remote   string
 		username string
 		token    string
 	}{
 		{
 			name:     "nil client is anonymous git",
-			repo:     "https://github.com/org/app.git",
+			remote:   "https://github.com/org/app.git",
 			username: tokenUserGit,
 		},
 		{
 			name:     "empty client is anonymous git",
 			client:   &Client{},
-			repo:     "https://github.com/org/app.git",
+			remote:   "https://github.com/org/app.git",
 			username: tokenUserGit,
 		},
 		{
@@ -302,7 +343,7 @@ func TestBuildAuth(t *testing.T) {
 				Username: "ignored",
 				Password: "ignored",
 			}},
-			repo:     "https://github.com/org/app.git",
+			remote:   "https://github.com/org/app.git",
 			username: tokenUserGitHub,
 			token:    "tok",
 		},
@@ -312,18 +353,17 @@ func TestBuildAuth(t *testing.T) {
 				Token: "tok",
 				Hosts: map[string]string{"git.example.com": provider.Gitea},
 			}},
-			repo:     "https://git.example.com/org/app.git",
+			remote:   "https://git.example.com/org/app.git",
 			username: tokenUserGitea,
 			token:    "tok",
 		},
 		{
-			name: "password with username on a trusted host",
+			name: "password with username",
 			client: &Client{opts: Options{
 				Username: "octocat",
 				Password: "pw",
-				Hosts:    map[string]string{"git.example.com": provider.Gitea},
 			}},
-			repo:     "https://git.example.com/org/app.git",
+			remote:   "https://git.example.com/org/app.git",
 			username: "octocat",
 			token:    "pw",
 		},
@@ -331,31 +371,74 @@ func TestBuildAuth(t *testing.T) {
 			name: "password without username defaults to git",
 			client: &Client{opts: Options{
 				Password: "pw",
-				Hosts:    map[string]string{"git.example.com": provider.Gitea},
 			}},
-			repo:     "https://git.example.com/org/app.git",
+			remote:   "https://git.example.com/org/app.git",
 			username: tokenUserGit,
 			token:    "pw",
 		},
 		{
-			name:     "untrusted host is anonymous",
+			name:     "self-hosted host receives the token",
 			client:   &Client{opts: Options{Token: "tok", Password: "pw"}},
-			repo:     "https://evil.example/org/app.git",
+			remote:   "https://git.example.com/org/app.git",
 			username: tokenUserGit,
+			token:    "tok",
+		},
+		{
+			name:     "context url with a commit and subdirectory receives the token",
+			client:   &Client{opts: Options{Token: "tok"}},
+			remote:   "https://git.example.com/org/app.git#abc123:apps/api",
+			username: tokenUserGit,
+			token:    "tok",
+		},
+		{
+			name:     "ssh url is not a build context and is anonymous",
+			client:   &Client{opts: Options{Token: "tok"}},
+			remote:   "git@git.example.com:org/app.git",
+			username: tokenUserGit,
+		},
+		{
+			name:     "https url without a host is anonymous",
+			client:   &Client{opts: Options{Token: "tok", Password: "pw"}},
+			remote:   "https:///org/app.git",
+			username: tokenUserGit,
+		},
+		{
+			name:     "ssh url without a host is anonymous",
+			client:   &Client{opts: Options{Token: "tok", Password: "pw"}},
+			remote:   "ssh:///org/app.git",
+			username: tokenUserGit,
+		},
+		{
+			name:     "file url is anonymous",
+			client:   &Client{opts: Options{Token: "tok", Password: "pw"}},
+			remote:   "file:///srv/git/app.git",
+			username: tokenUserGit,
+		},
+		{
+			name:     "git protocol url is not a build context and is anonymous",
+			client:   &Client{opts: Options{Token: "tok", Password: "pw"}},
+			remote:   "git://git.example.com/org/app.git",
+			username: tokenUserGit,
+		},
+		{
+			name:     "self-hosted url without an owner receives the token",
+			client:   &Client{opts: Options{Token: "tok"}},
+			remote:   "https://git.example.com/app.git",
+			username: tokenUserGit,
+			token:    "tok",
 		},
 		{
 			name: "plaintext http is anonymous",
 			client: &Client{opts: Options{
 				Token: "tok",
-				Hosts: map[string]string{"git.example.com": provider.Gitea},
 			}},
-			repo:     "http://git.example.com/org/app.git",
+			remote:   "http://git.example.com/org/app.git",
 			username: tokenUserGit,
 		},
 		{
 			name:     "username without password is anonymous",
 			client:   &Client{opts: Options{Username: "octocat"}},
-			repo:     "https://github.com/org/app.git",
+			remote:   "https://github.com/org/app.git",
 			username: tokenUserGit,
 		},
 	}
@@ -364,7 +447,7 @@ func TestBuildAuth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			username, token := tt.client.BuildAuth(tt.repo)
+			username, token := tt.client.BuildAuth(tt.remote)
 			assert.Equal(t, tt.username, username)
 			assert.Equal(t, tt.token, token)
 		})

@@ -255,6 +255,65 @@ func TestSession_build(t *testing.T) {
 			assert.Equal(t, container.ImageID("sha256:built"), sess.built[c.ID()])
 		})
 	})
+
+	// The builder fetches every non-http clone URL over HTTPS, so its context
+	// URL carries the token for the clone host. A plaintext http clone URL
+	// stays http and carries none.
+	t.Run("embeds the token in the https context of each clone url", func(t *testing.T) {
+		t.Parallel()
+
+		const commit = "ffffffffffffffffffffffffffffffffffffffff"
+
+		tests := []struct {
+			name   string
+			repo   string
+			remote string
+		}{
+			{
+				name:   "git protocol",
+				repo:   "git://github.com/org/app.git",
+				remote: "https://x-access-token:tok@github.com/org/app.git#" + commit,
+			},
+			{
+				name:   "self-hosted ssh without an owner",
+				repo:   "git@git.example.com:app.git",
+				remote: "https://git:tok@git.example.com/app.git#" + commit,
+			},
+			{
+				name:   "plaintext http",
+				repo:   "http://git.example.com/org/app.git",
+				remote: "http://git.example.com/org/app.git#" + commit,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				client := git.New(newTestLogger(t), git.Options{Token: "tok", Timeout: time.Second})
+				sess := NewSession(client, dockerConfig.Docker{})
+				c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
+					labels.GitRepo: tt.repo,
+				})
+				docker := mockRebuild.NewMockImageBuilder(t)
+				docker.EXPECT().
+					BuildRemoteImage(mock.Anything, tt.remote, mock.Anything, mock.Anything).
+					Return("sha256:built", nil).
+					Once()
+
+				err := sess.build(
+					newTestLogger(t),
+					t.Context(),
+					docker,
+					c,
+					git.CheckResult{Stale: true, Commit: commit},
+					updateParams.Params{Git: gitConfig.Defaults{Enable: true}},
+					nil,
+				)
+				require.NoError(t, err)
+			})
+		}
+	})
 }
 
 // Test_gitImageTag verifies the name:git-<shortsha> tag of a Git build.

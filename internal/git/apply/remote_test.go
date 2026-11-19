@@ -26,6 +26,14 @@ func TestRemoteContext(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "https://github.com/org/app.git#abc123", got)
 
+	got, err = RemoteContext("git@git.example.com:app.git", "abc123", "")
+	require.NoError(t, err)
+	assert.Equal(t, "https://git.example.com/app.git#abc123", got)
+
+	got, err = RemoteContext("git://git.example.com/org/app.git", "abc123", "")
+	require.NoError(t, err)
+	assert.Equal(t, "https://git.example.com/org/app.git#abc123", got)
+
 	_, err = RemoteContext("https://github.com/org/app.git", "abc123", "../etc")
 	require.ErrorIs(t, err, errPathEscape)
 
