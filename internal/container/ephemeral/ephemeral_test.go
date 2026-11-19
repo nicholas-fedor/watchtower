@@ -796,8 +796,10 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				t.Parallel()
 
 				// The parent is canceled, as when Watchtower shuts down during
-				// the handoff.
-				ctx, cancel := context.WithCancel(t.Context())
+				// the handoff. It carries a value the cleanup context keeps.
+				type callerKey struct{}
+
+				ctx, cancel := context.WithCancel(context.WithValue(t.Context(), callerKey{}, "caller"))
 				cancel()
 
 				api := mockContainer.NewMockAPIClient(t)
@@ -805,10 +807,12 @@ func TestEphemeralOrchestrator(t *testing.T) {
 					Return(dockerClient.ContainerCreateResult{ID: "orchestrator-fail-start"}, nil).Once()
 				api.EXPECT().ContainerStart(mock.Anything, "orchestrator-fail-start", dockerClient.ContainerStartOptions{}).
 					Return(dockerClient.ContainerStartResult{}, serverError).Once()
-				// The created container is removed, with a context of its own so
-				// cleanup survives a canceled parent.
+				// The created container is removed with a context derived from
+				// the parent, without its cancellation.
 				api.EXPECT().ContainerRemove(
-					mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }),
+					mock.MatchedBy(func(ctx context.Context) bool {
+						return ctx.Err() == nil && ctx.Value(callerKey{}) == "caller"
+					}),
 					"orchestrator-fail-start",
 					dockerClient.ContainerRemoveOptions{Force: true},
 				).Return(dockerClient.ContainerRemoveResult{}, nil).Once()

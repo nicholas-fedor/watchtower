@@ -210,15 +210,14 @@ func CreateOrchestrator(
 			Err(err).
 			Msg("Failed to start ephemeral orchestrator container")
 
-		// Attempt cleanup of the created but not-started container.
-		// Use a fresh context so cleanup can proceed even if the original ctx is cancelled.
+		// Remove the created but not-started container. The cleanup ignores
+		// the caller's cancellation, so it still runs when ctx ends.
 		ctxCleanup, cancelCleanup := context.WithTimeout(
-			context.Background(),
+			context.WithoutCancel(ctx),
 			orchestratorCleanupTimeout,
 		)
 		defer cancelCleanup()
 
-		//nolint:contextcheck // Fresh context intentional for cleanup to survive parent cancellation.
 		_, cleanupErr := api.ContainerRemove(
 			ctxCleanup,
 			resp.ID,
