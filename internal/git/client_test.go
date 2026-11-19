@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,7 +46,6 @@ func testClient(t *testing.T, refs []RemoteRef) *Client {
 	nop := zerolog.Nop()
 	client := New(&nop, Options{})
 	client.lister = stubLister{refs: refs}
-	client.opts.Hosts = nil
 
 	return client
 }
@@ -468,11 +468,24 @@ func TestCheck_MismatchedGitHostUsesLister(t *testing.T) {
 	assert.Equal(t, "abc1111", got.Commit)
 }
 
+// TestLookupAPIHostMatch verifies that a git-host origin on the clone host is
+// classified by probing it, and that an origin on another host is ignored
+// without a probe.
 func TestLookupAPIHostMatch(t *testing.T) {
 	t.Parallel()
 
-	client := testClient(t, nil)
-	client.opts.Hosts = map[string]string{"git.example.com": provider.Gitea}
+	var probes atomic.Int32
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/gitea/api/v1/version", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"version":"1.22.0"}`))
+	})
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		probes.Add(1)
+		w.WriteHeader(http.StatusNotFound)
+	})
+
+	client := newDetectClient(t, mux)
 
 	kind, origin, ok := client.lookupAPI(t.Context(), "git.example.com", "https://git.example.com:3000/gitea")
 	require.True(t, ok)
@@ -481,6 +494,7 @@ func TestLookupAPIHostMatch(t *testing.T) {
 
 	_, _, ok = client.lookupAPI(t.Context(), "git.example.com", "https://evil.example")
 	assert.False(t, ok)
+	assert.Zero(t, probes.Load())
 }
 
 func TestCheck_TagPolicyNoStampSelectsHighest(t *testing.T) {
@@ -1105,169 +1119,6 @@ func githubTagsAt(ctx context.Context, client *Client, base, owner, repo string)
 	return tags, true, nil
 }
 
-func TestProviderKindUnknownUsesGoGit(t *testing.T) {
-	t.Parallel()
-
-	assert.Empty(t, provider.ResolveHostKind("git.unknown.example", nil))
-	assert.Equal(t, provider.Gitea, provider.ResolveHostKind("git.example.com", map[string]string{
-		"git.example.com": provider.Forgejo,
-	}))
-	assert.Equal(t, provider.GitHub, provider.ResolveHostKind("github.com", nil))
-	assert.Equal(t, provider.GitLab, provider.ResolveHostKind("gitlab.com", nil))
-	assert.Equal(t, provider.Gitea, provider.ResolveHostKind("codeberg.org", nil))
-	assert.Equal(t, provider.GitHub, provider.ResolveHostKind("github.company.com", map[string]string{
-		"github.company.com": provider.GitHub,
-	}))
-}
-
-func TestClassifyHostsDetectsProviders(t *testing.T) {
-	t.Parallel()
-
-	t.Run("gitea", func(t *testing.T) {
-		t.Parallel()
-
-		mux := http.NewServeMux()
-		mux.HandleFunc("/api/v1/version", func(w http.ResponseWriter, _ *http.Request) {
-			_ = json.NewEncoder(w).Encode(map[string]string{"version": "1.22.0"})
-		})
-
-		srv := httptest.NewServer(mux)
-		t.Cleanup(srv.Close)
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-		client.http = rewriteHostClient(srv)
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("git.example.com")})
-		assert.Equal(t, provider.Gitea, got["git.example.com"])
-	})
-
-	t.Run("gitlab", func(t *testing.T) {
-		t.Parallel()
-
-		mux := http.NewServeMux()
-		mux.HandleFunc("/api/v4/metadata", func(w http.ResponseWriter, _ *http.Request) {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"version":    "16.8.1",
-				"revision":   "cbe7d4e7",
-				"enterprise": false,
-			})
-		})
-
-		srv := httptest.NewServer(mux)
-		t.Cleanup(srv.Close)
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-		client.http = rewriteHostClient(srv)
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("gitlab.internal")})
-		assert.Equal(t, provider.GitLab, got["gitlab.internal"])
-	})
-
-	t.Run("github enterprise", func(t *testing.T) {
-		t.Parallel()
-
-		mux := http.NewServeMux()
-		mux.HandleFunc("/api/v3", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("X-Github-Request-Id", "abc123")
-			w.WriteHeader(http.StatusOK)
-		})
-
-		srv := httptest.NewServer(mux)
-		t.Cleanup(srv.Close)
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-		client.http = rewriteHostClient(srv)
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("github.company.com")})
-		assert.Equal(t, provider.GitHub, got["github.company.com"])
-	})
-
-	t.Run("path prefix", func(t *testing.T) {
-		t.Parallel()
-
-		mux := http.NewServeMux()
-		mux.HandleFunc("/gitlab/api/v4/metadata", func(w http.ResponseWriter, _ *http.Request) {
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"version":  "16.8.1",
-				"revision": "abc",
-			})
-		})
-
-		srv := httptest.NewServer(mux)
-		t.Cleanup(srv.Close)
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-		client.http = rewriteHostClient(srv)
-
-		origin := url.URL{Scheme: "https", Host: "git.example.com", Path: "/gitlab"}
-		got := client.ClassifyHosts(t.Context(), []url.URL{origin})
-		assert.Equal(t, provider.GitLab, got["git.example.com"])
-		assert.Equal(t, "https://git.example.com/gitlab/api/v4/projects/group%2Fapp/repository/commits/main",
-			joinEscaped(client.gitlabAPIAt(url.URL{}, "git.example.com"), "projects", "group/app", "repository", "commits", "main").String())
-	})
-
-	t.Run("unauthorized without fingerprint", func(t *testing.T) {
-		t.Parallel()
-
-		mux := http.NewServeMux()
-		mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusUnauthorized)
-		})
-
-		srv := httptest.NewServer(mux)
-		t.Cleanup(srv.Close)
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-		client.http = rewriteHostClient(srv)
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("git.unknown.example")})
-		assert.Empty(t, got["git.unknown.example"])
-	})
-
-	t.Run("unknown", func(t *testing.T) {
-		t.Parallel()
-
-		srv := httptest.NewServer(http.NewServeMux())
-		t.Cleanup(srv.Close)
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-		client.http = rewriteHostClient(srv)
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("git.unknown.example")})
-		assert.Empty(t, got["git.unknown.example"])
-	})
-
-	t.Run("skips built-in", func(t *testing.T) {
-		t.Parallel()
-
-		nop := zerolog.Nop()
-		client := New(&nop, Options{})
-
-		got := client.ClassifyHosts(t.Context(), []url.URL{httpsOrigin("github.com")})
-		assert.NotContains(t, got, "github.com")
-	})
-}
-
-func TestGitHubAPIURL(t *testing.T) {
-	t.Parallel()
-
-	nop := zerolog.Nop()
-	client := New(&nop, Options{})
-
-	assert.Equal(t, "https://api.github.com/repos/org/app", client.githubAPIAt(url.URL{}, "github.com", "repos", "org", "app").String())
-	assert.Equal(t, "https://github.company.com/api/v3/repos/org/app", client.githubAPIAt(url.URL{}, "github.company.com", "repos", "org", "app").String())
-}
-
-func httpsOrigin(host string) url.URL {
-	return url.URL{Scheme: "https", Host: host}
-}
-
 func TestSplitRepo(t *testing.T) {
 	t.Parallel()
 
@@ -1316,12 +1167,12 @@ func TestGitHubRefTriesTagsAfterMissingBranch(t *testing.T) {
 	client := New(&nop, Options{})
 	client.http = rewriteHostClient(srv)
 
-	resolved, found, err := client.githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "heads/v1.2.3")
+	resolved, found, err := client.githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "heads/v1.2.3")
 	require.NoError(t, err)
 	assert.False(t, found)
 	assert.Empty(t, resolved.Hash)
 
-	resolved, found, err = client.githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "tags/v1.2.3")
+	resolved, found, err = client.githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "tags/v1.2.3")
 	require.NoError(t, err)
 	require.True(t, found)
 	assert.Equal(t, "tagcommit", resolved.Hash)
@@ -1353,7 +1204,7 @@ func TestGitHubTagsFollowsLinkHeader(t *testing.T) {
 	client := New(&nop, Options{})
 	client.http = rewriteHostClient(srv)
 
-	tags, ok, err := client.githubTags(t.Context(), "github.com", url.URL{}, "org", "app")
+	tags, ok, err := client.githubTags(t.Context(), "github.com", originOf("github.com"), "org", "app")
 	require.NoError(t, err)
 	assert.True(t, ok)
 	require.Len(t, tags, 2)

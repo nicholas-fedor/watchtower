@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
 	"net/http"
 	"net/url"
 
@@ -49,69 +48,12 @@ var knownAPIs = []knownAPI{
 	},
 }
 
-// ClassifyHosts probes extra HTTP origins and records which product they speak.
-//
-// Built-in hosts are skipped. A host that does not match a known API stays
-// unclassified and uses go-git only.
-//
-// Parameters:
-//   - ctx: Cancellation and timeout.
-//   - origins: Typed HTTP origins from git-host.
-//
-// Returns:
-//   - map[string]string: Hostname to detected provider.
-func (c *Client) ClassifyHosts(ctx context.Context, origins []url.URL) map[string]string {
-	out := make(map[string]string, len(origins)+len(c.opts.Hosts))
-	maps.Copy(out, c.opts.Hosts)
-
-	if c.origins == nil {
-		c.origins = make(map[string]url.URL, len(origins))
-	}
-
-	for i := range origins {
-		origin := origins[i]
-
-		host := origin.Hostname()
-		if host == "" {
-			continue
-		}
-
-		host = toHostname(host)
-		c.origins[host] = origin
-
-		// Built-in public hosts are already classified.
-		if provider.ResolveHostKind(host, nil) != "" {
-			continue
-		}
-
-		if out[host] != "" {
-			continue
-		}
-
-		kind := c.detectKind(ctx, origin, "")
-		if kind == "" {
-			continue
-		}
-
-		c.log.Debug().
-			Str("host", host).
-			Str("kind", kind).
-			Str("origin", origin.String()).
-			Msg("detected git host API")
-
-		out[host] = kind
-	}
-
-	c.opts.Hosts = out
-
-	return out
-}
-
 // detectKind probes known product APIs until one fingerprint matches.
 //
 // Parameters:
 //   - ctx: Cancellation and timeout.
 //   - origin: HTTP origin from git-host.
+//   - cloneHost: Clone hostname. Only a probe of that host carries credentials.
 //
 // Returns:
 //   - string: Product kind, or empty when no API matches.
@@ -144,6 +86,7 @@ func (c *Client) detectKind(ctx context.Context, origin url.URL, cloneHost strin
 // Parameters:
 //   - ctx: Cancellation and timeout.
 //   - endpoint: Fully built probe URL.
+//   - cloneHost: Clone hostname. Only a probe of that host carries credentials.
 //
 // Returns:
 //   - apiProbe: Status, headers, and truncated body.

@@ -120,36 +120,36 @@ func (c *Client) listTagsViaAPI(ctx context.Context, repo, apiOrigin string) ([]
 //   - url.URL: API origin.
 //   - bool: True when an HTTP API should be used.
 func (c *Client) lookupAPI(ctx context.Context, cloneHost, apiOrigin string) (string, url.URL, bool) {
-	if apiOrigin != "" {
-		parsed, err := provenance.ParseAPIOrigin(apiOrigin)
-		if err != nil {
-			return "", url.URL{}, false
-		}
+	kind := provider.ResolveHostKind(cloneHost)
 
-		// A label may select another port or path. A different hostname
-		// would receive the process token, so ignore it and use ls-remote.
-		if toHostname(parsed.Hostname()) != toHostname(cloneHost) {
-			return "", url.URL{}, false
-		}
-
-		kind := provider.ResolveHostKind(parsed.Hostname(), c.opts.Hosts)
-		if kind == "" {
-			kind = c.detectKind(ctx, parsed, cloneHost)
-		}
-
+	if apiOrigin == "" {
 		if kind == "" {
 			return "", url.URL{}, false
 		}
 
-		return kind, parsed, true
+		return kind, originOf(cloneHost), true
 	}
 
-	kind := provider.ResolveHostKind(cloneHost, nil)
+	parsed, err := provenance.ParseAPIOrigin(apiOrigin)
+	if err != nil {
+		return "", url.URL{}, false
+	}
+
+	// A label may select another port or path. A different hostname would
+	// receive the process token, so ignore it and use ls-remote.
+	if toHostname(parsed.Hostname()) != toHostname(cloneHost) {
+		return "", url.URL{}, false
+	}
+
+	if kind == "" {
+		kind = c.detectKind(ctx, parsed, cloneHost)
+	}
+
 	if kind == "" {
 		return "", url.URL{}, false
 	}
 
-	return kind, c.originOf(cloneHost), true
+	return kind, parsed, true
 }
 
 // splitRepo parses a clone URL into host, owner, and repository name.
@@ -217,7 +217,7 @@ func splitOwnerRepo(host, path string) (string, string, string, bool) {
 //   - bool: True when the ref exists.
 //   - error: Non-nil on HTTP failure.
 func (c *Client) githubRef(ctx context.Context, host string, origin url.URL, owner, repo, ref string) (resolvedRef, bool, error) {
-	endpoint := c.githubAPIAt(origin, host, "repos", owner, repo, "git", "ref", ref)
+	endpoint := githubAPIAt(origin, "repos", owner, repo, "git", "ref", ref)
 
 	var body struct {
 		Object struct {
@@ -298,7 +298,7 @@ func (c *Client) githubRef(ctx context.Context, host string, origin url.URL, own
 //   - bool: True when the API was used.
 //   - error: Non-nil on HTTP failure.
 func (c *Client) githubTags(ctx context.Context, host string, origin url.URL, owner, repo string) ([]RemoteRef, bool, error) {
-	endpointURL := c.githubAPIAt(origin, host, "repos", owner, repo, "tags")
+	endpointURL := githubAPIAt(origin, "repos", owner, repo, "tags")
 	query := endpointURL.Query()
 	query.Set("per_page", strconv.Itoa(tagsPerPage))
 	endpointURL.RawQuery = query.Encode()
@@ -359,7 +359,7 @@ func (c *Client) gitlabRef(ctx context.Context, host string, origin url.URL, own
 
 	for _, refKind := range refKinds {
 		endpoint := joinEscaped(
-			c.gitlabAPIAt(origin, host),
+			gitlabAPIAt(origin),
 			"projects",
 			owner+"/"+repo,
 			"repository",
@@ -405,7 +405,7 @@ func (c *Client) gitlabRef(ctx context.Context, host string, origin url.URL, own
 //   - bool: True when the API was used.
 //   - error: Non-nil on HTTP failure.
 func (c *Client) gitlabTags(ctx context.Context, host string, origin url.URL, owner, repo string) ([]RemoteRef, bool, error) {
-	endpointURL := joinEscaped(c.gitlabAPIAt(origin, host), "projects", owner+"/"+repo, "repository", "tags")
+	endpointURL := joinEscaped(gitlabAPIAt(origin), "projects", owner+"/"+repo, "repository", "tags")
 	query := endpointURL.Query()
 	query.Set("per_page", strconv.Itoa(tagsPerPage))
 	endpointURL.RawQuery = query.Encode()
@@ -456,14 +456,14 @@ func (c *Client) gitlabTags(ctx context.Context, host string, origin url.URL, ow
 //   - bool: True when the ref exists.
 //   - error: Non-nil on HTTP failure.
 func (c *Client) giteaRef(ctx context.Context, host string, origin url.URL, owner, repo, ref string) (resolvedRef, bool, error) {
-	endpoint := c.giteaAPIAt(origin, host, "repos", owner, repo, "git", "refs", "heads", ref)
+	endpoint := giteaAPIAt(origin, "repos", owner, repo, "git", "refs", "heads", ref)
 
 	resolved, found, err := c.giteaRefs(ctx, endpoint.String(), ref, kindBranch, host)
 	if err != nil || found {
 		return resolved, found, err
 	}
 
-	endpoint = c.giteaAPIAt(origin, host, "repos", owner, repo, "git", "refs", "tags", ref)
+	endpoint = giteaAPIAt(origin, "repos", owner, repo, "git", "refs", "tags", ref)
 
 	return c.giteaRefs(ctx, endpoint.String(), ref, kindTag, host)
 }
@@ -556,7 +556,7 @@ func (c *Client) giteaTags(ctx context.Context, host string, origin url.URL, own
 
 	var tags []RemoteRef
 
-	endpointURL := c.giteaAPIAt(origin, host, "repos", owner, repo, "tags")
+	endpointURL := giteaAPIAt(origin, "repos", owner, repo, "tags")
 	query := endpointURL.Query()
 	query.Set("limit", strconv.Itoa(giteaTagsPerPage))
 	query.Set("page", "1")
@@ -584,7 +584,7 @@ func (c *Client) giteaTags(ctx context.Context, host string, origin url.URL, own
 				break
 			}
 
-			endpointURL = c.giteaAPIAt(origin, host, "repos", owner, repo, "tags")
+			endpointURL = giteaAPIAt(origin, "repos", owner, repo, "tags")
 			query = endpointURL.Query()
 			query.Set("limit", strconv.Itoa(giteaTagsPerPage))
 			query.Set("page", strconv.Itoa(page+1))

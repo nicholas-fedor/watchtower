@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,8 +12,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 func TestResolveViaAPI(t *testing.T) {
@@ -78,10 +75,13 @@ func TestResolveViaAPI(t *testing.T) {
 		assert.Equal(t, "tagsha", resolved.Hash)
 	})
 
-	t.Run("gitlab extra host", func(t *testing.T) {
+	t.Run("self-hosted gitlab", func(t *testing.T) {
 		t.Parallel()
 
 		mux := http.NewServeMux()
+		mux.HandleFunc("/api/v4/metadata", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, map[string]any{"version": "16.8.1", "revision": "abc"})
+		})
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			if !strings.Contains(r.URL.Path, "/repository/branches/") {
 				w.WriteHeader(http.StatusNotFound)
@@ -93,7 +93,6 @@ func TestResolveViaAPI(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{"gitlab.internal": provider.GitLab}
 
 		resolved, found, err := client.resolveViaAPI(t.Context(), "https://gitlab.internal/group/app.git", "main", "https://gitlab.internal")
 		require.NoError(t, err)
@@ -102,10 +101,13 @@ func TestResolveViaAPI(t *testing.T) {
 		assert.Equal(t, kindBranch, resolved.Kind)
 	})
 
-	t.Run("gitea extra host", func(t *testing.T) {
+	t.Run("self-hosted gitea", func(t *testing.T) {
 		t.Parallel()
 
 		mux := http.NewServeMux()
+		mux.HandleFunc("/api/v1/version", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, map[string]string{"version": "1.22.0"})
+		})
 		mux.HandleFunc("/api/v1/repos/org/app/git/refs/heads/main", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, []map[string]any{
 				{"ref": "refs/heads/main", "object": map[string]string{"sha": "giteasha", "type": "commit"}},
@@ -113,7 +115,6 @@ func TestResolveViaAPI(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{"git.example.com": provider.Gitea}
 
 		resolved, found, err := client.resolveViaAPI(t.Context(), "https://git.example.com/org/app.git", "main", "https://git.example.com")
 		require.NoError(t, err)
@@ -191,6 +192,9 @@ func TestListTagsViaAPI(t *testing.T) {
 		t.Parallel()
 
 		mux := http.NewServeMux()
+		mux.HandleFunc("/api/v1/version", func(w http.ResponseWriter, _ *http.Request) {
+			writeJSON(w, map[string]string{"version": "1.22.0"})
+		})
 		mux.HandleFunc("/api/v1/repos/org/app/tags", func(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, []map[string]any{
 				{"name": "v3.0.0", "commit": map[string]string{"sha": "ccc"}},
@@ -198,7 +202,6 @@ func TestListTagsViaAPI(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		client.opts.Hosts = map[string]string{"code.local": provider.Gitea}
 
 		tags, used, err := client.listTagsViaAPI(t.Context(), "https://code.local/org/app.git", "https://code.local")
 		require.NoError(t, err)
@@ -294,7 +297,7 @@ func TestGithubRef(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "heads/main")
+		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "heads/main")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, "main", resolved.Name)
@@ -320,7 +323,7 @@ func TestGithubRef(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "tags/v1.0.0")
+		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "tags/v1.0.0")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, "v1.0.0", resolved.Name)
@@ -346,7 +349,7 @@ func TestGithubRef(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "tags/tree")
+		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "tags/tree")
 		require.NoError(t, err)
 		assert.False(t, found)
 		assert.Empty(t, resolved.Hash)
@@ -366,7 +369,7 @@ func TestGithubRef(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "tags/v1.0.0")
+		resolved, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "tags/v1.0.0")
 		require.NoError(t, err)
 		assert.False(t, found)
 		assert.Empty(t, resolved.Hash)
@@ -380,7 +383,7 @@ func TestGithubRef(t *testing.T) {
 			writeJSON(w, map[string]any{"object": map[string]any{}})
 		})
 
-		_, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "heads/main")
+		_, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "heads/main")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
@@ -393,7 +396,7 @@ func TestGithubRef(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		})
 
-		_, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "heads/missing")
+		_, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "heads/missing")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
@@ -406,7 +409,7 @@ func TestGithubRef(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 		})
 
-		_, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", url.URL{}, "org", "app", "heads/main")
+		_, found, err := newDetectClient(t, mux).githubRef(t.Context(), "github.com", originOf("github.com"), "org", "app", "heads/main")
 		require.Error(t, err)
 		assert.False(t, found)
 		require.ErrorIs(t, err, errAPIStatus)
@@ -426,7 +429,7 @@ func TestGithubTags(t *testing.T) {
 			})
 		})
 
-		tags, used, err := newDetectClient(t, mux).githubTags(t.Context(), "github.com", url.URL{}, "org", "app")
+		tags, used, err := newDetectClient(t, mux).githubTags(t.Context(), "github.com", originOf("github.com"), "org", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		require.Len(t, tags, 1)
@@ -441,7 +444,7 @@ func TestGithubTags(t *testing.T) {
 			w.WriteHeader(http.StatusBadGateway)
 		})
 
-		_, used, err := newDetectClient(t, mux).githubTags(t.Context(), "github.com", url.URL{}, "org", "app")
+		_, used, err := newDetectClient(t, mux).githubTags(t.Context(), "github.com", originOf("github.com"), "org", "app")
 		require.Error(t, err)
 		assert.False(t, used)
 	})
@@ -459,7 +462,7 @@ func TestGitlabRef(t *testing.T) {
 			writeJSON(w, map[string]any{"commit": map[string]string{"id": "glsha"}})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "main")
+		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "main")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, "main", resolved.Name)
@@ -483,7 +486,7 @@ func TestGitlabRef(t *testing.T) {
 			}
 		})
 
-		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "v1.2.3")
+		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "v1.2.3")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, kindTag, resolved.Kind)
@@ -506,7 +509,7 @@ func TestGitlabRef(t *testing.T) {
 			}
 		})
 
-		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "release")
+		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "release")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, "release", resolved.Name)
@@ -530,7 +533,7 @@ func TestGitlabRef(t *testing.T) {
 			}
 		})
 
-		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "release")
+		resolved, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "release")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, "release", resolved.Name)
@@ -554,7 +557,7 @@ func TestGitlabRef(t *testing.T) {
 			}
 		})
 
-		_, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "main")
+		_, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "main")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
@@ -567,7 +570,7 @@ func TestGitlabRef(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		})
 
-		_, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "missing")
+		_, found, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "missing")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
@@ -580,7 +583,7 @@ func TestGitlabRef(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 		})
 
-		_, _, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", url.URL{}, "org", "app", "main")
+		_, _, err := newDetectClient(t, mux).gitlabRef(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app", "main")
 		require.ErrorIs(t, err, errAPIStatus)
 	})
 }
@@ -598,7 +601,7 @@ func TestGitlabTags(t *testing.T) {
 			})
 		})
 
-		tags, used, err := newDetectClient(t, mux).gitlabTags(t.Context(), "gitlab.com", url.URL{}, "group", "app")
+		tags, used, err := newDetectClient(t, mux).gitlabTags(t.Context(), "gitlab.com", originOf("gitlab.com"), "group", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		require.Len(t, tags, 1)
@@ -624,7 +627,7 @@ func TestGitlabTags(t *testing.T) {
 			})
 		})
 
-		tags, used, err := newDetectClient(t, mux).gitlabTags(t.Context(), "gitlab.com", url.URL{}, "group", "app")
+		tags, used, err := newDetectClient(t, mux).gitlabTags(t.Context(), "gitlab.com", originOf("gitlab.com"), "group", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		require.Len(t, tags, 2)
@@ -639,7 +642,7 @@ func TestGitlabTags(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 		})
 
-		_, used, err := newDetectClient(t, mux).gitlabTags(t.Context(), "gitlab.com", url.URL{}, "org", "app")
+		_, used, err := newDetectClient(t, mux).gitlabTags(t.Context(), "gitlab.com", originOf("gitlab.com"), "org", "app")
 		require.Error(t, err)
 		assert.False(t, used)
 	})
@@ -658,7 +661,7 @@ func TestGiteaRef(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).giteaRef(t.Context(), "git.example.com", url.URL{}, "org", "app", "main")
+		resolved, found, err := newDetectClient(t, mux).giteaRef(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app", "main")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, kindBranch, resolved.Kind)
@@ -678,7 +681,7 @@ func TestGiteaRef(t *testing.T) {
 			})
 		})
 
-		resolved, found, err := newDetectClient(t, mux).giteaRef(t.Context(), "git.example.com", url.URL{}, "org", "app", "v1.0.0")
+		resolved, found, err := newDetectClient(t, mux).giteaRef(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app", "v1.0.0")
 		require.NoError(t, err)
 		require.True(t, found)
 		assert.Equal(t, kindTag, resolved.Kind)
@@ -693,7 +696,7 @@ func TestGiteaRef(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 		})
 
-		_, _, err := newDetectClient(t, mux).giteaRef(t.Context(), "git.example.com", url.URL{}, "org", "app", "main")
+		_, _, err := newDetectClient(t, mux).giteaRef(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app", "main")
 		require.ErrorIs(t, err, errAPIStatus)
 	})
 }
@@ -792,7 +795,7 @@ func TestGiteaTags(t *testing.T) {
 			})
 		})
 
-		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
+		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		require.Len(t, tags, 1)
@@ -807,7 +810,7 @@ func TestGiteaTags(t *testing.T) {
 			writeJSON(w, []any{})
 		})
 
-		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
+		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		assert.Empty(t, tags)
@@ -854,7 +857,7 @@ func TestGiteaTags(t *testing.T) {
 			})
 		})
 
-		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
+		tags, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		require.Len(t, tags, giteaTagsPerPage*2+1)
@@ -883,7 +886,7 @@ func TestGiteaTags(t *testing.T) {
 		})
 
 		client := newDetectClient(t, mux)
-		tags, used, err := client.giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
+		tags, used, err := client.giteaTags(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app")
 		require.NoError(t, err)
 		assert.True(t, used)
 		require.Len(t, tags, 2)
@@ -898,7 +901,7 @@ func TestGiteaTags(t *testing.T) {
 			w.WriteHeader(http.StatusInternalServerError)
 		})
 
-		_, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", url.URL{}, "org", "app")
+		_, used, err := newDetectClient(t, mux).giteaTags(t.Context(), "git.example.com", originOf("git.example.com"), "org", "app")
 		require.Error(t, err)
 		assert.False(t, used)
 	})
