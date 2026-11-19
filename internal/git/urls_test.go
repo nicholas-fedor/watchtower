@@ -183,6 +183,13 @@ func TestGithubAPI(t *testing.T) {
 		assert.Equal(t, "https://api.github.com/repos/org/app", got.String())
 	})
 
+	t.Run("fully qualified github.com uses api.github.com", func(t *testing.T) {
+		t.Parallel()
+
+		got := githubAPIAt(url.URL{Scheme: "https", Host: "github.com."}, "repos", "org", "app")
+		assert.Equal(t, "https://api.github.com/repos/org/app", got.String())
+	})
+
 	t.Run("enterprise uses origin", func(t *testing.T) {
 		t.Parallel()
 
@@ -313,6 +320,7 @@ func TestToHostname(t *testing.T) {
 	assert.Equal(t, "git.example.com", toHostname("Git.Example.COM"))
 	assert.Equal(t, "2001:db8::1", toHostname("[2001:db8::1]"))
 	assert.Equal(t, "git.example.com", toHostname("[git.example.com]"))
+	assert.Equal(t, "github.com", toHostname("GitHub.com."))
 	assert.Empty(t, toHostname(""))
 }
 

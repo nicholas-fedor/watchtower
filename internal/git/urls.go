@@ -384,15 +384,18 @@ func newGitHTTPClient(timeout time.Duration, insecure bool, caPEM []byte) *http.
 	return client
 }
 
-// toHostname lowercases host and strips IPv6 brackets.
+// toHostname lowercases host and strips IPv6 brackets and a trailing dot.
+//
+// A fully qualified name such as github.com. names the same host as
+// github.com, so both compare equal.
 //
 // Parameters:
 //   - host: Hostname or [IPv6] literal.
 //
 // Returns:
-//   - string: Lowercase hostname.
+//   - string: Lowercase hostname without a trailing dot.
 func toHostname(host string) string {
-	return strings.ToLower(strings.Trim(host, "[]"))
+	return strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
 }
 
 // joinEscaped appends path segments onto base, escaping each segment.
