@@ -83,7 +83,7 @@ func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
 	case c == nil:
 		// A missing client gets no process credentials.
 	case sshRemote(repo) && c.opts.SSHKeyPath != "":
-		return c.sshAuth()
+		return c.sshAuth(repo)
 	case !httpsRemote(repo):
 		// SSH without a key, plaintext HTTP and every other scheme get no
 		// process credentials.
@@ -108,13 +108,28 @@ func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
 	return nil, nil
 }
 
-// sshAuth loads the configured SSH key.
+// sshAuth loads the configured SSH key for logging in to repo.
+//
+// It logs in as the user repo names, such as deploy in
+// deploy@git.example.com:app.git, and as git when repo names none.
+//
+// Parameters:
+//   - repo: SSH or scp-like clone URL.
 //
 // Returns:
 //   - transport.AuthMethod: PublicKeys auth for the key.
 //   - error: Non-nil when the key or known_hosts file cannot be loaded.
-func (c *Client) sshAuth() (transport.AuthMethod, error) {
-	publicKeys, err := gitSSH.NewPublicKeysFromFile(tokenUserGit, c.opts.SSHKeyPath, "")
+func (c *Client) sshAuth(repo string) (transport.AuthMethod, error) {
+	// go-git logs in as the PublicKeys user and ignores the URL's user once
+	// an auth method is set, so the URL's user is copied here.
+	user := tokenUserGit
+
+	endpoint, err := transport.NewEndpoint(repo)
+	if err == nil && endpoint.User != "" {
+		user = endpoint.User
+	}
+
+	publicKeys, err := gitSSH.NewPublicKeysFromFile(user, c.opts.SSHKeyPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("load ssh key: %w", err)
 	}

@@ -118,6 +118,25 @@ func TestClient_Auth(t *testing.T) {
 		assert.Equal(t, "tok", basic.Password)
 	})
 
+	t.Run("self-hosted ssh key logs in as the url's user", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{opts: Options{SSHKeyPath: writeEd25519Key(t)}}
+
+		for origin, wantUser := range map[string]string{
+			"deploy@git.example.com:org/app.git":             "deploy",
+			"ssh://forgejo@git.example.com:2222/org/app.git": "forgejo",
+			"git.example.com:org/app.git":                    tokenUserGit,
+		} {
+			got, err := client.Auth(origin)
+			require.NoError(t, err)
+
+			keys, ok := got.(*gitSSH.PublicKeys)
+			require.True(t, ok, origin)
+			assert.Equal(t, wantUser, keys.User, origin)
+		}
+	})
+
 	t.Run("self-hosted urls without an owner receive credentials", func(t *testing.T) {
 		t.Parallel()
 
