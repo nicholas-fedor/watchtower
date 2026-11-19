@@ -15,23 +15,30 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
-// newGenericWebhookURL returns the Shoutrrr URL of a generic webhook over HTTP
-// that accepts one notification. Shoutrrr logs "got custom URL" and
-// "converted custom URL" at debug for it. It logs "sending without TLS" at
-// warn and "response received" at debug when sending to it.
+// newGenericWebhook returns the Shoutrrr URL of a generic webhook over HTTP
+// that accepts one notification, and a client with its own transport for it.
+// Shoutrrr logs "got custom URL" and "converted custom URL" at debug for it.
+// It logs "sending without TLS" at warn and "response received" at debug when
+// sending to it.
+//
+// A parallel test sends through the returned client. Shoutrrr's default
+// client uses http.DefaultTransport. A closing test server drops the idle
+// connections of that transport, so a send through it can fail while a sibling
+// test ends.
 //
 // Parameters:
 //   - t: Test that owns the webhook server.
 //
 // Returns:
 //   - string: The generic+http service URL.
-func newGenericWebhookURL(t *testing.T) string {
+//   - *http.Client: A client for the webhook that shares no transport.
+func newGenericWebhook(t *testing.T) (string, *http.Client) {
 	t.Helper()
 
 	server := httpstub.New(t)
 	server.AppendHandlers(httpstub.RespondWith(http.StatusNoContent, "", nil))
 
-	return "generic+" + server.URL()
+	return "generic+" + server.URL(), server.Client()
 }
 
 // TestNewShoutrrrLogger verifies that a Shoutrrr sender with this logger
@@ -71,12 +78,13 @@ func TestNewShoutrrrLogger(t *testing.T) {
 
 			records, recordsBuf := logcapture.NewJSON(tt.level)
 			textBuf := &logcapture.Buffer{}
+			webhookURL, client := newGenericWebhook(t)
 
 			sender, err := shoutrrr.NewSenderWithOptions(
 				newShoutrrrLogger(records, textBuf, ""),
-				shoutrrrTypes.SenderOptions{},
+				shoutrrrTypes.SenderOptions{HTTPClient: client},
 				"logger://",
-				newGenericWebhookURL(t),
+				webhookURL,
 			)
 			require.NoError(t, err)
 
