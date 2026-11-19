@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update ossf/scorecard-action action to v2.6.0 by @renovate[bot] in [#3947](https://github.com/nicholas-fedor/watchtower/pull/3947)
 - Update google.golang.org/genproto/googleapis/rpc digest to c8830f6 by @renovate[bot] in [#3941](https://github.com/nicholas-fedor/watchtower/pull/3941)
 - Update google.golang.org/genproto/googleapis/api digest to c8830f6 by @renovate[bot] in [#3935](https://github.com/nicholas-fedor/watchtower/pull/3935)
 - Update golang.org/x/exp digest to 2791e40 by @renovate[bot] in [#3934](https://github.com/nicholas-fedor/watchtower/pull/3934)
