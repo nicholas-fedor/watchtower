@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move invocation state onto the process by @nicholas-fedor in [#3932](https://github.com/nicholas-fedor/watchtower/pull/3932)
 - Return orchestrator errors to the exit path by @nicholas-fedor in [#3925](https://github.com/nicholas-fedor/watchtower/pull/3925)
 
+### Documentation
+
+- Limit Git credentials to HTTPS and SSH remotes by @nicholas-fedor in [#3945](https://github.com/nicholas-fedor/watchtower/pull/3945)
+
 ### Tests
 
 - Isolate tests from settings in the shell environment by @nicholas-fedor in [#3919](https://github.com/nicholas-fedor/watchtower/pull/3919)
