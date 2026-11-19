@@ -57,9 +57,13 @@ type Client interface {
 	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
 	// GetImageDiskUsage returns the daemon's image storage usage.
 	GetImageDiskUsage(ctx context.Context) (containerClient.ImageDiskUsage, error)
-	// ListStoppedContainers returns the created and exited containers,
-	// whatever the include-stopped option is.
-	ListStoppedContainers(ctx context.Context) ([]*container.Container, error)
+	// ListStoppedNetworkDependents returns the created and exited containers
+	// that join the network of one of the given containers, whatever the
+	// include-stopped option is.
+	ListStoppedNetworkDependents(
+		ctx context.Context,
+		networkContainers []container.ContainerID,
+	) ([]*container.Container, error)
 }
 
 // stalenessCheck is the outcome of one container's staleness check, before
@@ -247,9 +251,8 @@ func update(
 	// recreated. Such containers join the dependency graph, so they are
 	// recreated with the container whose network they join. They are not
 	// checked for updates, and they stay stopped.
-	stoppedDependents := listStoppedNetworkDependents(log, ctx, client, config, allContainers)
-	allContainers = append(allContainers, stoppedDependents...)
-	graphContainers := append(slices.Clone(filteredContainers), stoppedDependents...)
+	stoppedDependents := listStoppedNetworkDependents(log, ctx, client, config, allContainers, filteredContainers)
+	graphContainers := slices.Concat(filteredContainers, stoppedDependents)
 
 	// A graph that cannot be built ends the session before any hook runs or
 	// any image is checked.
@@ -364,13 +367,15 @@ func update(
 	return progress.Report(log), cleanupImageInfos, nil
 }
 
-// listStoppedNetworkDependents returns the stopped containers that join
-// another container's network namespace and are not listed yet.
+// listStoppedNetworkDependents returns the stopped containers that join the
+// network of a monitored container and are not listed yet.
 //
 // A container listed already, such as a stopped one listed because of the
-// include-stopped option, is left out. So is a container the session's filter
-// excludes. A failed listing is logged and returns none, so the session goes
-// on without them.
+// include-stopped option, is left out. So are Watchtower containers and the
+// containers the session's filter excludes. None is returned with the
+// revive-stopped option, which would start them. That option requires the
+// include-stopped option, which lists these containers already. A failed
+// listing is logged and returns none, so the session goes on without them.
 //
 // Parameters:
 //   - log: Process logger.
@@ -378,18 +383,28 @@ func update(
 //   - client: Container client that lists the stopped containers.
 //   - config: Update parameters with the session's filter.
 //   - listed: The containers the session listed already.
+//   - monitored: The monitored containers whose network dependents to list.
 //
 // Returns:
-//   - []*container.Container: The stopped containers that join another
-//     container's network namespace.
+//   - []*container.Container: The stopped containers that join the network of
+//     a monitored container.
 func listStoppedNetworkDependents(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client Client,
 	config updateParams.Params,
-	listed []*container.Container,
+	listed, monitored []*container.Container,
 ) []*container.Container {
-	stopped, err := client.ListStoppedContainers(ctx)
+	if config.ReviveStopped || len(monitored) == 0 {
+		return nil
+	}
+
+	monitoredIDs := make([]container.ContainerID, 0, len(monitored))
+	for _, c := range monitored {
+		monitoredIDs = append(monitoredIDs, c.ID())
+	}
+
+	stopped, err := client.ListStoppedNetworkDependents(ctx, monitoredIDs)
 	if err != nil {
 		log.Warn().
 			Err(err).
@@ -406,12 +421,7 @@ func listStoppedNetworkDependents(
 	var dependents []*container.Container
 
 	for _, c := range stopped {
-		if _, ok := listedIDs[c.ID()]; ok {
-			continue
-		}
-
-		info := c.ContainerInfo()
-		if info == nil || info.HostConfig == nil || !info.HostConfig.NetworkMode.IsContainer() {
+		if _, ok := listedIDs[c.ID()]; ok || c.IsWatchtower() {
 			continue
 		}
 

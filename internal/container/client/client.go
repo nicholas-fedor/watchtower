@@ -569,31 +569,52 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 
 	listOptions := dockerClient.ContainerListOptions{All: true, Filters: filterArgs}
 
-	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
+	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil, nil)
 }
 
-// ListStoppedContainers returns the containers in the created or exited
-// state.
+// ListStoppedNetworkDependents returns the containers in the created or
+// exited state that join the network namespace of one of the given
+// containers.
 //
-// The include-stopped configuration option does not apply. An update session
-// uses this list to find the stopped containers that join the network
-// namespace of a container it recreates, because those keep the removed
-// container's ID unless they are recreated too. A container that joins
-// another container's network names that container while it exists.
+// The include-stopped configuration option does not apply. Docker records the
+// network of such a container by the ID of the container it joins, so it must
+// be recreated with that container to keep working. Only these containers are
+// inspected, and a container that joins it names it while it exists.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
+//   - networkContainers: IDs of the containers whose network the returned
+//     containers join.
 //
 // Returns:
-//   - []*container.Container: The stopped containers.
+//   - []*container.Container: The stopped containers that join the network
+//     of one of networkContainers.
 //   - error: Non-nil if listing fails, nil on success.
-func (c *Client) ListStoppedContainers(ctx context.Context) ([]*container.Container, error) {
+func (c *Client) ListStoppedNetworkDependents(
+	ctx context.Context,
+	networkContainers []container.ContainerID,
+) ([]*container.Container, error) {
+	if len(networkContainers) == 0 {
+		return nil, nil
+	}
+
+	modes := make(map[string]struct{}, len(networkContainers))
+	for _, id := range networkContainers {
+		modes["container:"+string(id)] = struct{}{}
+	}
+
 	listOptions := dockerClient.ContainerListOptions{
 		All:     true,
 		Filters: statusFilter(false, "created", "exited"),
 	}
 
-	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
+	joinsNetwork := func(summary *dockerContainer.Summary) bool {
+		_, ok := modes[summary.HostConfig.NetworkMode]
+
+		return ok
+	}
+
+	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, joinsNetwork, nil)
 }
 
 // GetContainer fetches detailed information about a specific container by its ID.

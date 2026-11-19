@@ -80,7 +80,7 @@ func listSourceContainers(log *zerolog.Logger,
 		Msg("Built filter arguments")
 
 	// Fetch containers with status filters always applied based on ClientOptions.
-	hostContainers, err := inspectListedContainers(clog, ctx, api, dockerClient.ContainerListOptions{Filters: filterArgs}, filter)
+	hostContainers, err := inspectListedContainers(clog, ctx, api, dockerClient.ContainerListOptions{Filters: filterArgs}, nil, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +110,8 @@ func listSourceContainers(log *zerolog.Logger,
 //   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - listOptions: Docker list options, such as the states and labels to list.
+//   - keep: Function that picks the listed containers to inspect, or nil to
+//     inspect every one.
 //   - filter: Function to filter containers, or nil to keep every container.
 //
 // Returns:
@@ -121,6 +123,7 @@ func inspectListedContainers(log *zerolog.Logger,
 	ctx context.Context,
 	api dockerClient.APIClient,
 	listOptions dockerClient.ContainerListOptions,
+	keep func(*dockerContainer.Summary) bool,
 	filter filters.Filter,
 ) ([]*container.Container, error) {
 	containers, err := api.ContainerList(ctx, listOptions)
@@ -160,6 +163,10 @@ func inspectListedContainers(log *zerolog.Logger,
 	imageCache := make(map[string]*dockerImage.InspectResponse, len(containers.Items))
 
 	for _, runningContainer := range containers.Items {
+		if keep != nil && !keep(&runningContainer) {
+			continue
+		}
+
 		c, err := getSourceContainer(log, ctx, api, container.ContainerID(runningContainer.ID), imageCache)
 		if err != nil {
 			// Log detailed error information for debugging container inspect failures

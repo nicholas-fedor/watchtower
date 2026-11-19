@@ -825,64 +825,70 @@ func (_c *MockClient_ListLabeledContainers_Call) RunAndReturn(run func(ctx conte
 	return _c
 }
 
-// ListStoppedContainers provides a mock function for the type MockClient
-func (_mock *MockClient) ListStoppedContainers(ctx context.Context) ([]*container.Container, error) {
-	ret := _mock.Called(ctx)
+// ListStoppedNetworkDependents provides a mock function for the type MockClient
+func (_mock *MockClient) ListStoppedNetworkDependents(ctx context.Context, networkContainers []container.ContainerID) ([]*container.Container, error) {
+	ret := _mock.Called(ctx, networkContainers)
 
 	if len(ret) == 0 {
-		panic("no return value specified for ListStoppedContainers")
+		panic("no return value specified for ListStoppedNetworkDependents")
 	}
 
 	var r0 []*container.Container
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]*container.Container, error)); ok {
-		return returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []container.ContainerID) ([]*container.Container, error)); ok {
+		return returnFunc(ctx, networkContainers)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context) []*container.Container); ok {
-		r0 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []container.ContainerID) []*container.Container); ok {
+		r0 = returnFunc(ctx, networkContainers)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*container.Container)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
-		r1 = returnFunc(ctx)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []container.ContainerID) error); ok {
+		r1 = returnFunc(ctx, networkContainers)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockClient_ListStoppedContainers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListStoppedContainers'
-type MockClient_ListStoppedContainers_Call struct {
+// MockClient_ListStoppedNetworkDependents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListStoppedNetworkDependents'
+type MockClient_ListStoppedNetworkDependents_Call struct {
 	*mock.Call
 }
 
-// ListStoppedContainers is a helper method to define mock.On call
+// ListStoppedNetworkDependents is a helper method to define mock.On call
 //   - ctx context.Context
-func (_e *MockClient_Expecter) ListStoppedContainers(ctx any) *MockClient_ListStoppedContainers_Call {
-	return &MockClient_ListStoppedContainers_Call{Call: _e.mock.On("ListStoppedContainers", ctx)}
+//   - networkContainers []container.ContainerID
+func (_e *MockClient_Expecter) ListStoppedNetworkDependents(ctx any, networkContainers any) *MockClient_ListStoppedNetworkDependents_Call {
+	return &MockClient_ListStoppedNetworkDependents_Call{Call: _e.mock.On("ListStoppedNetworkDependents", ctx, networkContainers)}
 }
 
-func (_c *MockClient_ListStoppedContainers_Call) Run(run func(ctx context.Context)) *MockClient_ListStoppedContainers_Call {
+func (_c *MockClient_ListStoppedNetworkDependents_Call) Run(run func(ctx context.Context, networkContainers []container.ContainerID)) *MockClient_ListStoppedNetworkDependents_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
+		var arg1 []container.ContainerID
+		if args[1] != nil {
+			arg1 = args[1].([]container.ContainerID)
+		}
 		run(
 			arg0,
+			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockClient_ListStoppedContainers_Call) Return(containers []*container.Container, err error) *MockClient_ListStoppedContainers_Call {
+func (_c *MockClient_ListStoppedNetworkDependents_Call) Return(containers []*container.Container, err error) *MockClient_ListStoppedNetworkDependents_Call {
 	_c.Call.Return(containers, err)
 	return _c
 }
 
-func (_c *MockClient_ListStoppedContainers_Call) RunAndReturn(run func(ctx context.Context) ([]*container.Container, error)) *MockClient_ListStoppedContainers_Call {
+func (_c *MockClient_ListStoppedNetworkDependents_Call) RunAndReturn(run func(ctx context.Context, networkContainers []container.ContainerID) ([]*container.Container, error)) *MockClient_ListStoppedNetworkDependents_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -64,7 +64,7 @@ func newMockClient(t *testing.T) *mockUpdate.MockClient {
 	client := mockUpdate.NewMockClient(t)
 	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil).Maybe()
 	client.EXPECT().DiscardCopyFiles(mock.Anything).Maybe()
-	client.EXPECT().ListStoppedContainers(mock.Anything).Return(nil, nil).Maybe()
+	client.EXPECT().ListStoppedNetworkDependents(mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 
 	return client
 }

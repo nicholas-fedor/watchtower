@@ -1,6 +1,7 @@
 package update
 
 import (
+	"errors"
 	"slices"
 	"testing"
 	"time"
@@ -20,8 +21,9 @@ import (
 // stoppedDependentsTestData returns a stale or fresh provider "vpn", a running
 // container "app" in its network namespace, and the stopped containers
 // "off" and "other". "off" joins the provider's network namespace and
-// "other" joins the namespace of a container that is not listed.
-func stoppedDependentsTestData(providerStale bool) (*mockUpdate.TestData, *container.Container, *container.Container) {
+// "other" joins the namespace of a container that is not listed. It returns
+// "off" too.
+func stoppedDependentsTestData(providerStale bool) (*mockUpdate.TestData, *container.Container) {
 	newContainer := func(id, name string, running bool, networkMode string) *container.Container {
 		c := mockUpdate.CreateMockContainerWithConfig(id, "/"+name, name+":latest", running, false,
 			time.Now(), &dockerContainer.Config{Image: name + ":latest"})
@@ -39,7 +41,7 @@ func stoppedDependentsTestData(providerStale bool) (*mockUpdate.TestData, *conta
 		Staleness:         map[string]bool{"vpn": providerStale, "app": false},
 		Containers:        []*container.Container{vpn, app},
 		StoppedContainers: []*container.Container{off, other},
-	}, off, other
+	}, off
 }
 
 // countOperations returns how often the client recorded the operation.
@@ -66,7 +68,7 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 	t.Run("recreates a stopped dependent of an updated container and keeps it stopped", func(t *testing.T) {
 		t.Parallel()
 
-		testData, off, other := stoppedDependentsTestData(true)
+		testData, _ := stoppedDependentsTestData(true)
 		client := mockUpdate.CreateFakeClient(testData, false, false)
 
 		report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
@@ -74,12 +76,10 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 
 		assert.Equal(t, []string{"vpn", "app", "off"}, testData.CreateOrder,
 			"the stopped dependent is recreated after the container whose network it joins")
-		assert.NotContains(t, testData.CreateOrder, other.Name())
 		assert.Equal(t, 2, countOperations(testData, "StartContainerByID"),
 			"only the containers that were running are started")
 		assert.Equal(t, int32(2), testData.IsContainerStaleCount.Load(),
 			"the stopped dependent is not checked for updates")
-		assert.Equal(t, "container:vpn", string(off.ContainerInfo().HostConfig.NetworkMode))
 
 		restarted := make([]string, 0, len(report.Restarted()))
 		for _, status := range report.Restarted() {
@@ -93,7 +93,7 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 	t.Run("leaves a stopped dependent of a fresh container alone", func(t *testing.T) {
 		t.Parallel()
 
-		testData, _, _ := stoppedDependentsTestData(false)
+		testData, _ := stoppedDependentsTestData(false)
 		client := mockUpdate.CreateFakeClient(testData, false, false)
 
 		report, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
@@ -106,7 +106,7 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 	t.Run("leaves a stopped dependent the filter excludes alone", func(t *testing.T) {
 		t.Parallel()
 
-		testData, off, _ := stoppedDependentsTestData(true)
+		testData, off := stoppedDependentsTestData(true)
 		client := mockUpdate.CreateFakeClient(testData, false, false)
 
 		params := updateParams.Params{
@@ -122,7 +122,7 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 	t.Run("recreates a stopped container listed already once", func(t *testing.T) {
 		t.Parallel()
 
-		testData, off, _ := stoppedDependentsTestData(true)
+		testData, off := stoppedDependentsTestData(true)
 		testData.Containers = append(testData.Containers, off)
 		testData.Staleness[off.Name()] = false
 		client := mockUpdate.CreateFakeClient(testData, false, false)
@@ -131,5 +131,31 @@ func TestUpdate_StoppedNetworkDependents(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Equal(t, []string{"vpn", "app", "off"}, testData.CreateOrder)
+	})
+
+	t.Run("leaves stopped dependents alone with revive-stopped", func(t *testing.T) {
+		t.Parallel()
+
+		testData, _ := stoppedDependentsTestData(true)
+		client := mockUpdate.CreateFakeClient(testData, false, false)
+
+		_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{ReviveStopped: true}, ratelimit.New())
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"vpn", "app"}, testData.CreateOrder,
+			"revive-stopped would start a recreated stopped dependent")
+	})
+
+	t.Run("goes on without stopped dependents when listing them fails", func(t *testing.T) {
+		t.Parallel()
+
+		testData, _ := stoppedDependentsTestData(true)
+		testData.ListStoppedError = errors.New("list failed")
+		client := mockUpdate.CreateFakeClient(testData, false, false)
+
+		_, _, err := update(newTestLogger(t), t.Context(), client, updateParams.Params{}, ratelimit.New())
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"vpn", "app"}, testData.CreateOrder)
 	})
 }

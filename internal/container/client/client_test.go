@@ -1855,26 +1855,49 @@ func TestListLabeledContainers(t *testing.T) {
 	}
 }
 
-// TestListStoppedContainers verifies that the stopped listing asks Docker for
-// the created and exited containers, whatever the include-stopped option is.
-func TestListStoppedContainers(t *testing.T) {
+// TestListStoppedNetworkDependents verifies that the stopped listing asks
+// Docker for the created and exited containers, whatever the include-stopped
+// option is, and inspects only those that join the network of a given
+// container. Without containers to join, it makes no call.
+func TestListStoppedNetworkDependents(t *testing.T) {
 	t.Parallel()
 
-	api := newDockerAPI(t)
-	api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
-		All:     true,
-		Filters: dockerClient.Filters{"status": {"created": true, "exited": true}},
-	}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
-		{ID: string(fixtureStopped.id)},
-	}}, nil).Once()
-	expectContainerFixtures(t, api, fixtureStopped)
+	t.Run("inspects the containers that join a given network", func(t *testing.T) {
+		t.Parallel()
 
-	client := &Client{log: newTestLogger(t), api: api}
+		joining := dockerContainer.Summary{ID: string(fixtureStopped.id)}
+		joining.HostConfig.NetworkMode = "container:provider-id"
 
-	stopped, err := client.ListStoppedContainers(t.Context())
-	require.NoError(t, err)
-	require.Len(t, stopped, 1)
-	assert.Equal(t, fixtureStopped.id, stopped[0].ID())
+		other := dockerContainer.Summary{ID: "other-id"}
+		other.HostConfig.NetworkMode = "container:unrelated-id"
+
+		bridged := dockerContainer.Summary{ID: "bridged-id"}
+		bridged.HostConfig.NetworkMode = "bridge"
+
+		api := newDockerAPI(t)
+		api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
+			All:     true,
+			Filters: statusFilters("created", "exited"),
+		}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{joining, other, bridged}}, nil).Once()
+		expectContainerFixtures(t, api, fixtureStopped)
+
+		client := &Client{log: newTestLogger(t), api: api}
+
+		stopped, err := client.ListStoppedNetworkDependents(t.Context(), []container.ContainerID{"provider-id"})
+		require.NoError(t, err)
+		require.Len(t, stopped, 1)
+		assert.Equal(t, fixtureStopped.id, stopped[0].ID())
+	})
+
+	t.Run("makes no call without containers to join", func(t *testing.T) {
+		t.Parallel()
+
+		client := &Client{log: newTestLogger(t), api: newDockerAPI(t)}
+
+		stopped, err := client.ListStoppedNetworkDependents(t.Context(), nil)
+		require.NoError(t, err)
+		assert.Empty(t, stopped)
+	})
 }
 
 // TestCreateFailureNamedOnce verifies that a failed create, through

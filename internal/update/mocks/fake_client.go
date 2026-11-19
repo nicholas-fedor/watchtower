@@ -33,6 +33,7 @@ type FakeClient struct {
 type TestData struct {
 	IsContainerStaleError     error                                          // Error to return from IsContainerStale (for testing).
 	ListContainersError       error                                          // Error to return from ListContainers (for testing).
+	ListStoppedError          error                                          // Error to return from ListStoppedNetworkDependents.
 	StopContainerError        error                                          // Error to return from StopContainer (for testing).
 	StartContainerError       error                                          // Error to return from StartContainer (for testing).
 	StartContainerByIDError   error                                          // Error to return from StartContainerByID (for testing).
@@ -58,7 +59,7 @@ type TestData struct {
 	SetRestartPolicyID        container.ContainerID                          // Last container ID passed to SetRestartPolicy.
 	RenameTargets             []string                                       // Ordered list of rename targets.
 	Containers                []*container.Container                         // List of mock containers.
-	StoppedContainers         []*container.Container                         // Containers returned by ListStoppedContainers.
+	StoppedContainers         []*container.Container                         // Stopped containers ListStoppedNetworkDependents picks from.
 	FailedImageIDs            []container.ImageID                            // List of image IDs that should fail removal.
 	StopOrder                 []string                                       // Order in which containers were stopped.
 	CreateOrder               []string                                       // Order in which containers were created.
@@ -220,13 +221,38 @@ func (client FakeClient) ListLabeledContainers(ctx context.Context, label string
 	return labeled, nil
 }
 
-// ListStoppedContainers returns the containers in TestData.StoppedContainers.
-func (client FakeClient) ListStoppedContainers(ctx context.Context) ([]*container.Container, error) {
+// ListStoppedNetworkDependents returns the containers in
+// TestData.StoppedContainers whose network mode names one of the given
+// containers by name, as an inspect reports it while that container exists.
+// It returns TestData.ListStoppedError when set.
+func (client FakeClient) ListStoppedNetworkDependents(
+	ctx context.Context,
+	networkContainers []container.ContainerID,
+) ([]*container.Container, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return nil, err
 	}
 
-	return client.TestData.StoppedContainers, nil
+	if client.TestData.ListStoppedError != nil {
+		return nil, client.TestData.ListStoppedError
+	}
+
+	modes := make(map[string]bool, len(networkContainers))
+	for _, id := range networkContainers {
+		if c, ok := client.TestData.ContainersByID[id]; ok {
+			modes["container:"+c.Name()] = true
+		}
+	}
+
+	var dependents []*container.Container
+
+	for _, c := range client.TestData.StoppedContainers {
+		if modes[string(c.ContainerInfo().HostConfig.NetworkMode)] {
+			dependents = append(dependents, c)
+		}
+	}
+
+	return dependents, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.
