@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/exp digest to b15d094 by @renovate[bot] in [#3961](https://github.com/nicholas-fedor/watchtower/pull/3961)
 - Merge automerged updates only after every check passes by @nicholas-fedor in [#3957](https://github.com/nicholas-fedor/watchtower/pull/3957)
 - Update module github.com/docker/secrets-engine/x to v0.9.0 by @renovate[bot] in [#3951](https://github.com/nicholas-fedor/watchtower/pull/3951)
 - Update ossf/scorecard-action action to v2.6.0 by @renovate[bot] in [#3947](https://github.com/nicholas-fedor/watchtower/pull/3947)
