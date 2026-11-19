@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Decide anonymous Git access in one place by @nicholas-fedor in [#3943](https://github.com/nicholas-fedor/watchtower/pull/3943)
 - Pass process dependencies through the process by @nicholas-fedor in [#3937](https://github.com/nicholas-fedor/watchtower/pull/3937)
 - Move invocation state onto the process by @nicholas-fedor in [#3932](https://github.com/nicholas-fedor/watchtower/pull/3932)
 - Return orchestrator errors to the exit path by @nicholas-fedor in [#3925](https://github.com/nicholas-fedor/watchtower/pull/3925)
