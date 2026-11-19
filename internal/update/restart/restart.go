@@ -710,7 +710,7 @@ func restartStaleContainer(
 	detachedTimeout := max(config.DetachedTimeout(), defaultCreateStartTimeout)
 
 	detachedCtx, cancelDetached := context.WithTimeout(
-		context.Background(),
+		context.WithoutCancel(ctx),
 		detachedTimeout,
 	)
 
@@ -763,7 +763,6 @@ func restartStaleContainer(
 	}
 
 	// Create the new container with updated configuration.
-	//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
 	newContainerID, err := client.CreateContainer(detachedCtx, sourceContainer)
 	if err != nil {
 		log.Debug().
@@ -780,7 +779,6 @@ func restartStaleContainer(
 	//   - Watchtower containers bypass the NoRestart check
 	//   - All containers (including Watchtower) start only if they were running or ReviveStopped is enabled
 	if (!config.NoRestart || sourceContainer.IsWatchtower()) && (sourceContainer.IsRunning() || config.ReviveStopped) {
-		//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
 		err = startReplacement(log, detachedCtx, client, sourceContainer, newContainerID, config, fields)
 		if err != nil {
 			// A Watchtower container renamed for this self-update still runs
@@ -791,7 +789,6 @@ func restartStaleContainer(
 		}
 	}
 
-	//nolint:contextcheck // Using detached context intentionally to survive parent cancellation
 	rename.Retire(detachedCtx, client)
 
 	return newContainerID, rename.Renamed(), nil

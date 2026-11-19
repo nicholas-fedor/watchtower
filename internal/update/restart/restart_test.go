@@ -248,9 +248,13 @@ func Test_restartStaleContainer(t *testing.T) {
 // TestDetachedContext covers the detached contexts that restartStaleContainer
 // creates from the Timeout setting. The create and start calls get the stop
 // timeout plus 30 seconds, with a 5 minute minimum. A zero or negative Timeout
-// counts as zero, so no detached call can block indefinitely.
+// counts as zero, so no detached call can block indefinitely. The detached
+// context keeps the caller's values.
 func TestDetachedContext(t *testing.T) {
 	t.Parallel()
+
+	// callerKey marks a value the caller's context carries.
+	type callerKey struct{}
 
 	// TestDetachedContextDeadlineCase represents a test case for detached context deadline behavior.
 	type TestDetachedContextDeadlineCase struct {
@@ -332,7 +336,7 @@ func TestDetachedContext(t *testing.T) {
 
 				// Call restartStaleContainer which creates and uses the detached context.
 				newID, renamed, err := restartStaleContainer(newTestLogger(t),
-					t.Context(),
+					context.WithValue(t.Context(), callerKey{}, "caller"),
 					testContainer,
 					client,
 					params,
@@ -358,6 +362,7 @@ func TestDetachedContext(t *testing.T) {
 				require.NotNil(t, startCtx, "StartContainerByID should receive a context")
 				assert.Same(t, startCtx, createCtx, "CreateContainer and StartContainerByID should share the same detached context")
 				assert.Same(t, noRestartCtx, createCtx, "CreateContainer should use the same detached context as SetRestartPolicy")
+				assert.Equal(t, "caller", createCtx.Value(callerKey{}), "the detached context keeps the caller's values")
 				assert.Equal(t, int32(1), client.TestData.CreateContainerCount.Load())
 				assert.Equal(t, int32(1), client.TestData.StartContainerCount.Load())
 
