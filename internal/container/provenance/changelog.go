@@ -104,8 +104,8 @@ func derivedReleasesURL(repo, apiOrigin, tag string) string {
 	base := "https://" + host
 
 	if apiOrigin != "" {
-		origin, err := ParseAPIOrigin(apiOrigin)
-		if err != nil || !sameChangelogHost(host, origin) {
+		origin, ok := APIOriginFor(apiOrigin, host)
+		if !ok {
 			return ""
 		}
 
@@ -215,23 +215,6 @@ func isUnsafeRepoRune(r rune) bool {
 //   - bool: True for U+0000 to U+001F and U+007F.
 func isASCIIControl(r rune) bool {
 	return r < 0x20 || r == 0x7f
-}
-
-// sameChangelogHost reports whether a clone host and API origin share a hostname.
-//
-// Parameters:
-//   - cloneHost: Hostname with an optional port from the clone URL.
-//   - origin: Parsed API origin.
-//
-// Returns:
-//   - bool: True when the hostnames match, ignoring ports.
-func sameChangelogHost(cloneHost string, origin url.URL) bool {
-	parsed, err := url.Parse("//" + cloneHost)
-	if err != nil {
-		return false
-	}
-
-	return strings.EqualFold(parsed.Hostname(), origin.Hostname())
 }
 
 // changelogProvider identifies a provider from a documented API path prefix.

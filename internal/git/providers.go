@@ -130,14 +130,9 @@ func (c *Client) lookupAPI(ctx context.Context, cloneHost, apiOrigin string) (st
 		return kind, originOf(cloneHost), true
 	}
 
-	parsed, err := provenance.ParseAPIOrigin(apiOrigin)
-	if err != nil {
-		return "", url.URL{}, false
-	}
-
-	// A label may select another port or path. A different hostname would
-	// receive the process token, so ignore it and use ls-remote.
-	if toHostname(parsed.Hostname()) != toHostname(cloneHost) {
+	// A label that names another hostname is ignored in favor of ls-remote.
+	parsed, ok := provenance.APIOriginFor(apiOrigin, cloneHost)
+	if !ok {
 		return "", url.URL{}, false
 	}
 
@@ -168,7 +163,7 @@ func splitRepo(repo string) (string, string, string, bool) {
 		return "", "", "", false
 	}
 
-	return splitOwnerRepo(toHostname(endpoint.Host), endpoint.Path)
+	return splitOwnerRepo(provider.Hostname(endpoint.Host), endpoint.Path)
 }
 
 // splitOwnerRepo splits a Git path into owner and repository name.

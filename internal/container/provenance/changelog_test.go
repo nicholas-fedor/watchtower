@@ -138,6 +138,18 @@ func TestDerivedReleasesURL(t *testing.T) {
 			want:      "https://github.com/org/app/releases",
 		},
 		{
+			name:      "fully qualified clone host matches its git-host",
+			repo:      "https://git.example.com./org/app.git",
+			apiOrigin: "https://git.example.com:3000/gitea",
+			want:      "https://git.example.com:3000/gitea/org/app/releases",
+		},
+		{
+			name:      "fully qualified git-host matches its clone host",
+			repo:      "git@git.example.com:org/app.git",
+			apiOrigin: "https://Git.Example.com.:3000/gitea",
+			want:      "https://git.example.com.:3000/gitea/org/app/releases",
+		},
+		{
 			name:      "mismatched git-host",
 			repo:      "https://github.com/org/app.git",
 			apiOrigin: "https://git.example.com/gitlab",

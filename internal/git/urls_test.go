@@ -314,16 +314,6 @@ func TestNewGitHTTPClient(t *testing.T) {
 	})
 }
 
-func TestToHostname(t *testing.T) {
-	t.Parallel()
-
-	assert.Equal(t, "git.example.com", toHostname("Git.Example.COM"))
-	assert.Equal(t, "2001:db8::1", toHostname("[2001:db8::1]"))
-	assert.Equal(t, "git.example.com", toHostname("[git.example.com]"))
-	assert.Equal(t, "github.com", toHostname("GitHub.com."))
-	assert.Empty(t, toHostname(""))
-}
-
 // TestSanitizeRepository verifies that repository sanitization removes credentials and details from supported remote formats.
 func TestSanitizeRepository(t *testing.T) {
 	t.Parallel()

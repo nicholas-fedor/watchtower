@@ -69,3 +69,43 @@ func TestParseAPIOrigin(t *testing.T) {
 		})
 	}
 }
+
+// TestAPIOriginFor verifies that a git-host label is used only when it names
+// the clone host, whatever its port, path or spelling of that host.
+func TestAPIOriginFor(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		raw       string
+		cloneHost string
+		want      string
+		wantOK    bool
+	}{
+		{name: "same host with port and path", raw: "https://git.example.com:3000/gitea", cloneHost: "git.example.com", want: "https://git.example.com:3000/gitea", wantOK: true},
+		{name: "clone host with port", raw: "https://git.example.com", cloneHost: "git.example.com:2222", want: "https://git.example.com", wantOK: true},
+		{name: "fully qualified clone host", raw: "https://git.example.com", cloneHost: "git.example.com.", want: "https://git.example.com", wantOK: true},
+		{name: "fully qualified label", raw: "https://Git.Example.com.", cloneHost: "git.example.com", want: "https://git.example.com.", wantOK: true},
+		{name: "bare IPv6 clone host", raw: "https://[2001:db8::1]:3000", cloneHost: "2001:db8::1", want: "https://[2001:db8::1]:3000", wantOK: true},
+		{name: "another hostname", raw: "https://evil.example", cloneHost: "git.example.com"},
+		{name: "invalid label", raw: "ssh://git.example.com", cloneHost: "git.example.com"},
+		{name: "empty label", cloneHost: "git.example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := APIOriginFor(tt.raw, tt.cloneHost)
+			require.Equal(t, tt.wantOK, ok)
+
+			if !tt.wantOK {
+				assert.Zero(t, got)
+
+				return
+			}
+
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
+}

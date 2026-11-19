@@ -25,24 +25,13 @@ const (
 // empty, which means go-git only.
 //
 // Parameters:
-//   - host: Hostname without scheme. A port, IPv6 brackets, a trailing dot,
-//     and uppercase letters are ignored.
+//   - host: Hostname without scheme, optionally with a port. Spellings that
+//     [Hostname] treats as the same host classify the same way.
 //
 // Returns:
 //   - string: github, gitlab, gitea, or empty.
 func ResolveHostKind(host string) string {
-	host = strings.ToLower(strings.TrimSpace(host))
-
-	host = strings.Trim(host, "[]")
-
-	hostname, _, err := net.SplitHostPort(host)
-	if err == nil {
-		host = hostname
-	}
-
-	host = strings.TrimSuffix(host, ".")
-
-	switch host {
+	switch Hostname(host) {
 	case "github.com":
 		return GitHub
 	case "gitlab.com":
@@ -52,4 +41,34 @@ func ResolveHostKind(host string) string {
 	default:
 		return ""
 	}
+}
+
+// Hostname returns host in the form Git hosts are compared in.
+//
+// Two spellings name the same host when their forms are equal, so
+// GitHub.com.:443 and github.com compare equal. The form ignores these parts
+// of a spelling:
+//   - surrounding spaces
+//   - a port
+//   - IPv6 brackets
+//   - letter case
+//   - the trailing dot of a fully qualified name
+//
+// An IPv6 literal carries a port only inside brackets, so a bare literal such
+// as 2001:db8::1 is kept whole.
+//
+// Parameters:
+//   - host: Hostname, optionally with a port.
+//
+// Returns:
+//   - string: Lowercase hostname without a port, brackets or a trailing dot.
+func Hostname(host string) string {
+	host = strings.TrimSpace(host)
+
+	hostname, _, err := net.SplitHostPort(host)
+	if err == nil {
+		host = hostname
+	}
+
+	return strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
 }

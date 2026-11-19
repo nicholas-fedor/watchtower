@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/nicholas-fedor/watchtower/internal/git/provider"
 )
 
 // ErrInvalidHost indicates a git-host label is not an HTTP base URL.
@@ -57,6 +59,28 @@ func ParseAPIOrigin(raw string) (url.URL, error) {
 	parsed.Host = canonicalAPIHost(strings.ToLower(parsed.Hostname()), parsed.Port())
 
 	return *parsed, nil
+}
+
+// APIOriginFor returns the API origin a git-host label names for a clone host.
+//
+// The label is used only when it names the clone host's hostname. Its port
+// and path may differ. A label naming another hostname is ignored, so it
+// cannot send the process token, or a changelog link, to another host.
+//
+// Parameters:
+//   - raw: Label value.
+//   - cloneHost: Host from the clone URL, optionally with a port.
+//
+// Returns:
+//   - url.URL: The origin as [ParseAPIOrigin] returns it.
+//   - bool: True when the label parses and names the clone host.
+func APIOriginFor(raw, cloneHost string) (url.URL, bool) {
+	origin, err := ParseAPIOrigin(raw)
+	if err != nil || provider.Hostname(origin.Hostname()) != provider.Hostname(cloneHost) {
+		return url.URL{}, false
+	}
+
+	return origin, true
 }
 
 // canonicalAPIHost builds a url.URL Host value from a hostname and optional port.
