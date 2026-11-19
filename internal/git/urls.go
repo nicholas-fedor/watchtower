@@ -242,14 +242,14 @@ func repositorySecrets(raw string) []string {
 // credentialHostAllowed reports whether a process credential may be sent to requestHost.
 //
 // Parameters:
-//   - requestHost: Hostname of the outgoing request, port ignored.
-//   - cloneHost: Hostname from the clone URL, port ignored.
+//   - requestHost: Hostname of the outgoing request, without a port.
+//   - cloneHost: Hostname from the clone URL, without a port.
 //
 // Returns:
 //   - bool: True when the hosts match, or the request is api.github.com for github.com.
 func credentialHostAllowed(requestHost, cloneHost string) bool {
-	requestHost = toHostname(requestHost)
-	cloneHost = toHostname(cloneHost)
+	requestHost = provider.Hostname(requestHost)
+	cloneHost = provider.Hostname(cloneHost)
 
 	if requestHost == "" || cloneHost == "" {
 		return false
@@ -271,7 +271,7 @@ func credentialHostAllowed(requestHost, cloneHost string) bool {
 // Returns:
 //   - url.URL: https://host.
 func originOf(host string) url.URL {
-	return url.URL{Scheme: "https", Host: httpHost(toHostname(host))}
+	return url.URL{Scheme: "https", Host: httpHost(provider.Hostname(host))}
 }
 
 // httpHost returns hostname, bracketed when it is IPv6.
@@ -301,7 +301,7 @@ func httpHost(hostname string) string {
 // Returns:
 //   - *url.URL: Absolute API URL.
 func githubAPIAt(origin url.URL, segments ...string) *url.URL {
-	if toHostname(origin.Hostname()) == "github.com" {
+	if provider.Hostname(origin.Hostname()) == "github.com" {
 		return (&url.URL{Scheme: "https", Host: "api.github.com"}).JoinPath(segments...)
 	}
 
@@ -382,20 +382,6 @@ func newGitHTTPClient(timeout time.Duration, insecure bool, caPEM []byte) *http.
 	client.Transport = transport
 
 	return client
-}
-
-// toHostname lowercases host and strips IPv6 brackets and a trailing dot.
-//
-// A fully qualified name such as github.com. names the same host as
-// github.com, so both compare equal.
-//
-// Parameters:
-//   - host: Hostname or [IPv6] literal.
-//
-// Returns:
-//   - string: Lowercase hostname without a trailing dot.
-func toHostname(host string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.Trim(host, "[]")), ".")
 }
 
 // joinEscaped appends path segments onto base, escaping each segment.
