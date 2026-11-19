@@ -252,8 +252,7 @@ linters:
         - ratelimit.FromResponse(
         - ratelimit.FromError(
     gocyclo:
-      # Functions above this complexity are reported. The functions listed under
-      # exclusions are already above it and are excluded until they are split up.
+      # Functions above this complexity are reported.
       min-complexity: 25
     testifylint:
       enable-all: true
