@@ -54,6 +54,35 @@ func TestResolveViaAPI(t *testing.T) {
 		assert.Equal(t, kindBranch, resolved.Kind)
 	})
 
+	// A fully qualified clone host names github.com, so the lookup goes to
+	// api.github.com and carries the token.
+	t.Run("fully qualified github.com uses api.github.com", func(t *testing.T) {
+		t.Parallel()
+
+		var requested *http.Request
+
+		nop := zerolog.Nop()
+		client := New(&nop, Options{Token: "tok"})
+		client.http = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			requested = req
+
+			rec := httptest.NewRecorder()
+			writeJSON(rec, map[string]any{
+				"object": map[string]any{"sha": "abc123", "type": "commit"},
+			})
+
+			return rec.Result(), nil
+		})}
+
+		resolved, found, err := client.resolveViaAPI(t.Context(), "https://github.com./org/app.git", "main", "")
+		require.NoError(t, err)
+		require.True(t, found)
+		assert.Equal(t, "abc123", resolved.Hash)
+		require.NotNil(t, requested)
+		assert.Equal(t, "https://api.github.com/repos/org/app/git/ref/heads/main", requested.URL.String())
+		assert.Equal(t, "Bearer tok", requested.Header.Get("Authorization"))
+	})
+
 	t.Run("github falls back to tag", func(t *testing.T) {
 		t.Parallel()
 
