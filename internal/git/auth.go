@@ -31,24 +31,25 @@ func (c *Client) TLSSettings() ([]byte, bool) {
 	return c.opts.CABundle, c.opts.InsecureSkipTLS
 }
 
-// BuildAuth returns HTTPS credentials the Docker builder can embed in a Git context URL.
+// BuildAuth returns HTTPS credentials the Docker builder can embed in remote.
 //
-// Credentials are returned only for a trusted host that is not plaintext HTTP.
-// A container label cannot redirect the process token or password to another host.
+// Credentials are returned only when remote is an HTTPS URL with a host, and
+// they are for that host. The Git context URL is HTTPS for HTTPS, SSH and git
+// clone URLs, and plaintext HTTP for an http clone URL.
 //
 // Parameters:
-//   - repo: Associated clone URL.
+//   - remote: Docker Git context URL that the credentials will be embedded in.
 //
 // Returns:
 //   - username: Basic user for the token or configured username.
 //   - token: Token or password. Empty when the builder should clone anonymously.
-func (c *Client) BuildAuth(repo string) (string, string) {
-	if c == nil || !c.builderCredentialAllowed(repo) {
+func (c *Client) BuildAuth(remote string) (string, string) {
+	if c == nil || !httpsRemote(remote) {
 		return tokenUserGit, ""
 	}
 
 	if c.opts.Token != "" {
-		return tokenUsername(repo, c.opts.Hosts), c.opts.Token
+		return tokenUsername(remote, c.opts.Hosts), c.opts.Token
 	}
 
 	if c.opts.Password != "" {
@@ -66,10 +67,10 @@ func (c *Client) BuildAuth(repo string) (string, string) {
 // Auth returns the process-wide go-git auth method for repo, which matches
 // the remote URL scheme.
 //
-// A nil client and an untrusted host get no process credentials. SSH and
-// scp-like remotes use only the SSH key, when one is set. HTTPS uses the token,
-// then the username and password. Plaintext HTTP never receives credentials.
-// Every other case gets no process credentials.
+// Process credentials go only to the host repo names, over HTTPS or SSH. A nil
+// client gets none. SSH and scp-like remotes use only the SSH key, when one is
+// set. HTTPS uses the token, then the username and password. Every other case
+// gets no process credentials.
 //
 // Parameters:
 //   - repo: Clone or origin URL used to pick the scheme and token username.
@@ -79,12 +80,13 @@ func (c *Client) BuildAuth(repo string) (string, string) {
 //   - error: Non-nil when an SSH key or known_hosts file cannot be loaded.
 func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
 	switch {
-	case c == nil || !c.credentialHostTrusted(repo):
-		// A missing client or an untrusted host gets no process credentials.
+	case c == nil:
+		// A missing client gets no process credentials.
 	case sshRemote(repo) && c.opts.SSHKeyPath != "":
-		return c.sshAuth()
+		return c.sshAuth(repo)
 	case !httpsRemote(repo):
-		// SSH without a key and plaintext HTTP get no process credentials.
+		// SSH without a key, plaintext HTTP and every other scheme get no
+		// process credentials.
 	case c.opts.Token != "":
 		return &gitHTTP.BasicAuth{
 			Username: tokenUsername(repo, c.opts.Hosts),
@@ -106,13 +108,28 @@ func (c *Client) Auth(repo string) (transport.AuthMethod, error) {
 	return nil, nil
 }
 
-// sshAuth loads the configured SSH key.
+// sshAuth loads the configured SSH key for logging in to repo.
+//
+// It logs in as the user repo names, such as deploy in
+// deploy@git.example.com:app.git, and as git when repo names none.
+//
+// Parameters:
+//   - repo: SSH or scp-like clone URL.
 //
 // Returns:
 //   - transport.AuthMethod: PublicKeys auth for the key.
 //   - error: Non-nil when the key or known_hosts file cannot be loaded.
-func (c *Client) sshAuth() (transport.AuthMethod, error) {
-	publicKeys, err := gitSSH.NewPublicKeysFromFile(tokenUserGit, c.opts.SSHKeyPath, "")
+func (c *Client) sshAuth(repo string) (transport.AuthMethod, error) {
+	// go-git logs in as the PublicKeys user and ignores the URL's user once
+	// an auth method is set, so the URL's user is copied here.
+	user := tokenUserGit
+
+	endpoint, err := transport.NewEndpoint(repo)
+	if err == nil && endpoint.User != "" {
+		user = endpoint.User
+	}
+
+	publicKeys, err := gitSSH.NewPublicKeysFromFile(user, c.opts.SSHKeyPath, "")
 	if err != nil {
 		return nil, fmt.Errorf("load ssh key: %w", err)
 	}
@@ -129,87 +146,30 @@ func (c *Client) sshAuth() (transport.AuthMethod, error) {
 	return publicKeys, nil
 }
 
-// builderCredentialAllowed reports whether BuildAuth may embed process credentials.
-//
-// SSH clone URLs are allowed because the builder context is rewritten to HTTPS.
-// Plaintext HTTP is not.
-//
-// Parameters:
-//   - repo: Associated clone URL.
-//
-// Returns:
-//   - bool: True when the host is trusted and the URL is not plaintext HTTP.
-func (c *Client) builderCredentialAllowed(repo string) bool {
-	if c == nil || !c.credentialHostTrusted(repo) || plaintextHTTP(repo) {
-		return false
-	}
-
-	return true
-}
-
-// credentialHostTrusted reports whether repo's host may receive process credentials.
-//
-// Built-in provider hosts and operator host mappings are trusted. A container
-// label cannot add a host.
+// httpsRemote reports whether repo is an HTTPS Git URL with a host.
 //
 // Parameters:
 //   - repo: Clone or origin URL.
 //
 // Returns:
-//   - bool: True when the hostname is a known or configured provider host.
-func (c *Client) credentialHostTrusted(repo string) bool {
-	if c == nil {
-		return false
-	}
-
-	host, _, _, ok := splitRepo(repo)
-	if !ok || host == "" {
-		return false
-	}
-
-	return provider.ResolveHostKind(host, c.opts.Hosts) != ""
-}
-
-// httpsRemote reports whether repo is an HTTPS Git URL.
-//
-// Parameters:
-//   - repo: Clone or origin URL.
-//
-// Returns:
-//   - bool: True for https:// remotes.
+//   - bool: True for https:// remotes that name a host.
 func httpsRemote(repo string) bool {
 	endpoint, err := transport.NewEndpoint(repo)
 
-	return err == nil && endpoint.Protocol == "https"
+	return err == nil && endpoint.Protocol == "https" && endpoint.Host != ""
 }
 
-// plaintextHTTP reports whether repo is a plaintext HTTP Git URL.
+// sshRemote reports whether repo is an SSH or scp-like Git URL with a host.
 //
 // Parameters:
 //   - repo: Clone or origin URL.
 //
 // Returns:
-//   - bool: True for http:// remotes.
-func plaintextHTTP(repo string) bool {
-	endpoint, err := transport.NewEndpoint(repo)
-
-	return err == nil && endpoint.Protocol == "http"
-}
-
-// sshRemote reports whether repo is an SSH or scp-like Git URL.
-//
-// Parameters:
-//   - repo: Clone or origin URL.
-//
-// Returns:
-//   - bool: True for ssh:// and git@host:path remotes.
+//   - bool: True for ssh:// and git@host:path remotes that name a host.
 func sshRemote(repo string) bool {
 	endpoint, err := transport.NewEndpoint(repo)
-	if err != nil {
-		return false
-	}
 
-	return endpoint.Protocol == "ssh"
+	return err == nil && endpoint.Protocol == "ssh" && endpoint.Host != ""
 }
 
 // tokenUsername returns the Basic-auth user for a hosted Git token.

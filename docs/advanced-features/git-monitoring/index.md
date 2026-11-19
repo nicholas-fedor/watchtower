@@ -916,6 +916,9 @@ Watchtower tries the configured credentials in this order and stops at the first
 2. [Git Username](../../configuration/git-monitoring/index.md#git_username) together with [Git Password](../../configuration/git-monitoring/index.md#git_password)
 3. No credentials. The remote must allow anonymous reads.
 
+Watchtower sends these credentials to the host that a container's `com.centurylinklabs.watchtower.git-repo` label names, including a self-hosted server.
+An image can carry that label, so configure them only when you trust the Git labels of the containers Watchtower monitors.
+
 A [Git URL context](#git_url_context) build is performed by the Docker daemon, not by Watchtower.
 The daemon is given those credentials inside an `https://` clone URL.
 It is not given an SSH key.
@@ -938,7 +941,8 @@ Without [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_k
 The Watchtower image runs no SSH agent, so an SSH remote needs the key unless you mount an agent socket and set that variable.
 
 The HTTPS token and password are not sent on the SSH connection.
-They can still be used for the HTTP API when [Hosts](#hosts) names the same hostname as the clone URL.
+They are still used for the clone host's HTTP API.
+A self-hosted server needs a matching `git-host` label for that, as described under [Hosts](#hosts).
 
 SSH lists refs, and it checks out a [local path context](#local_path_context) whose origin is SSH.
 It does not build a Git URL context.

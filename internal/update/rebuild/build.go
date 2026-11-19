@@ -80,7 +80,7 @@ func (s *Session) build(
 		return fmt.Errorf("git remote context: %w", err)
 	}
 
-	user, token := s.client.BuildAuth(assoc.Repo)
+	user, token := s.client.BuildAuth(remote)
 
 	remote, err = apply.WithAuth(remote, user, token)
 	if err != nil {
