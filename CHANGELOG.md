@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Share one hostname rule for Git hosts by @nicholas-fedor in [#3966](https://github.com/nicholas-fedor/watchtower/pull/3966)
 - Treat fully qualified Git hosts as equal by @nicholas-fedor in [#3963](https://github.com/nicholas-fedor/watchtower/pull/3963)
 - Send Git credentials to self-hosted clone hosts by @nicholas-fedor in [#3949](https://github.com/nicholas-fedor/watchtower/pull/3949)
 - Keep the caller's context in detached Docker calls by @nicholas-fedor in [#3939](https://github.com/nicholas-fedor/watchtower/pull/3939)
