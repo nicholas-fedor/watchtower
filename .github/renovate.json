@@ -29,9 +29,10 @@
       "enabled": false
     },
     {
-      "description": "Automerge non-major updates",
+      "description": "Automerge non-major updates once every status check has passed. Renovate merges them itself, because GitHub's native auto-merge merges a pull request with failing checks when the branch requires none.",
       "matchUpdateTypes": ["minor", "patch", "digest"],
-      "automerge": true
+      "automerge": true,
+      "platformAutomerge": false
     },
     {
       "description": "docker/compose builds only against the compose-go version it requires. compose-go changes its Go API in minor releases, as v2.16 did when it moved service fields into an embedded ContainerSpec. Do not update compose-go on its own. A docker/compose update raises it through go get when that release requires a newer compose-go.",
