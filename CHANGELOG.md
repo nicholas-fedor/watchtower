@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/swaggo to v1.0.18 by @renovate[bot] in [#3968](https://github.com/nicholas-fedor/watchtower/pull/3968)
 - Drop the stale gocyclo exclusion note by @nicholas-fedor in [#3971](https://github.com/nicholas-fedor/watchtower/pull/3971)
 - Update golang.org/x/exp digest to b15d094 by @renovate[bot] in [#3961](https://github.com/nicholas-fedor/watchtower/pull/3961)
 - Merge automerged updates only after every check passes by @nicholas-fedor in [#3957](https://github.com/nicholas-fedor/watchtower/pull/3957)
