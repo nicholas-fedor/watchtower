@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Send Git credentials to self-hosted clone hosts by @nicholas-fedor in [#3949](https://github.com/nicholas-fedor/watchtower/pull/3949)
 - Keep the caller's context in detached Docker calls by @nicholas-fedor in [#3939](https://github.com/nicholas-fedor/watchtower/pull/3939)
 - Handle stop signals in one place by @nicholas-fedor in [#3927](https://github.com/nicholas-fedor/watchtower/pull/3927)
 - Report no-restart compose builds with their built image by @nicholas-fedor in [#3923](https://github.com/nicholas-fedor/watchtower/pull/3923)
