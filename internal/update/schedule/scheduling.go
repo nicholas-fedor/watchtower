@@ -201,6 +201,10 @@ type ScheduleDeps struct {
 	// Watchtower instance in this process's scope. The scheduler then makes no
 	// update at startup. Its first scheduled run also skips self-updates.
 	ReplacedOlderInstance bool
+	// ContainerChanges, when set, follows container changes (--watch-events):
+	// a container started between scheduled runs is then checked for updates
+	// as soon as it starts. Nil checks new containers at the next run.
+	ContainerChanges ContainerChanges
 }
 
 // updatesOnStart reports whether the scheduler makes an update at startup.
@@ -256,7 +260,8 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 	// Define the update function to be used both for scheduled runs and immediate execution.
 	// skipWatchtowerSelfUpdate: whether to skip updating the Watchtower container itself
 	// blocking: whether to wait for the lock (true for scheduled runs, false for immediate runs)
-	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool) {
+	// due: the containers checked for updates, or nil for every filtered container
+	updateFunc := func(skipWatchtowerSelfUpdate, blocking bool, due filters.Filter) {
 		// Acquire the update lock: blocking waits until shutdown, non-blocking returns if unavailable
 		if blocking {
 			err := lock.Lock(ctx)
@@ -295,6 +300,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 		}
 
 		params.Filter = updateFilter
+		params.Due = due
 
 		if deps.RunUpdate == nil {
 			log.Debug().Msg("Update skipped: RunUpdate hook is not configured")
@@ -322,7 +328,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			log.Debug().Msg("Skipping Watchtower self-update on first scheduled run due to cleanup")
 		}
 
-		updateFunc(skipWatchtowerSelfUpdate, true)
+		updateFunc(skipWatchtowerSelfUpdate, true, nil)
 	}
 
 	// Add the update function to the cron schedule, handling concurrency and metrics.
@@ -356,9 +362,14 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 			log.Debug().Msg("Update skipped: another update was running at startup")
 			metrics.Default().RegisterSkippedScan()
 		} else {
-			updateFunc(false, false)
+			updateFunc(false, false, nil)
 		}
 	}
+
+	// Containers started between scheduled runs, checked as they start.
+	stopStartedChecks := watchStarted(ctx, log, deps.ContainerChanges, func(due filters.Filter) {
+		updateFunc(false, true, due)
+	})
 
 	// Start the scheduler to begin periodic execution if scheduling is enabled.
 	// Only start if a schedule spec was provided (empty string means no scheduling).
@@ -372,6 +383,7 @@ func RunUpgradesOnSchedule(ctx context.Context, deps ScheduleDeps) error {
 
 	// Stop the scheduler and wait for any running update to complete.
 	scheduler.Stop()
+	stopStartedChecks()
 	log.Debug().Msg("Waiting for running update to be finished...")
 
 	// Original ctx is often already canceled at shutdown. Detach cancel and

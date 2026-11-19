@@ -80,6 +80,27 @@ Environment Variable: WATCHTOWER_UPDATE_ON_START
 !!! Note
     If used with [`run-once`](#run_once), a warning is logged and [`run-once`](#run_once) takes precedence.
 
+## Watch Events
+
+Follows Docker's container events, and checks a new container for updates as soon as it starts, instead of at the next scheduled run.
+A container started for the first time, or recreated (with `docker compose up`, for example), is then brought up to date within moments, even when the next scheduled run is hours or days away.
+
+```text
+            Argument: --watch-events
+Environment Variable: WATCHTOWER_WATCH_EVENTS
+                Type: Boolean
+             Default: false
+```
+
+- The new containers are checked after no new container has started for 10 seconds (at most a minute after the first), so a Compose project brought up together is checked in one run.
+- A container is checked on its first start only. Restarting it does not check it again; recreating it makes a new container, which is checked. Containers are matched by ID, so one that Compose creates under a temporary name and renames before it starts is still found.
+- Each check is an ordinary update run over the containers Watchtower manages, as a scheduled run is, but checks only the new containers. Dependencies work as in a scheduled run: when a new container is updated, the containers that depend on it restart with it, in dependency order.
+- The usual selection settings apply: a new container in another [scope](../container-selection/index.md#scope_filter), or one not enabled when [label-enable](../container-selection/index.md#enable_label_filter) is set, is not updated.
+- A container that Watchtower itself recreates in an update is new too, and is checked once more, which finds it up to date.
+- When the event stream is lost (when Docker restarts, for example), Watchtower reconnects, after a delay that grows to a minute, and picks up from the last event it saw.
+- With the [HTTP API](../http-api/index.md)'s update endpoint, these checks run only when [HTTP API periodic polls](#http_api_periodic_polls) are enabled, as scheduled runs do.
+- Requires access to Docker's event stream. Behind a Docker socket proxy, allow events (for example `EVENTS=1` for [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy){target="_blank" rel="noopener noreferrer"}).
+
 ## HTTP API Periodic Polls
 
 Enables periodic updates when the HTTP API update endpoint is active.

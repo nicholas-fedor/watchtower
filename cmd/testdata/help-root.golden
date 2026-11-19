@@ -122,5 +122,6 @@ Flags:
       --update-on-start[=true|false]                             Perform an update check on startup, then continue with periodic updates
       --use-compose-depends-on[=true|false]                      Include Docker Compose depends_on label when determining container update order (default true)
       --warn-on-head-failure string                              When to warn about HEAD pull requests failing. Possible values: always, auto or never
+      --watch-events[=true|false]                                Follow Docker's container events, and check a new container for updates as soon as it starts instead of at the next scheduled run
 
 Use "watchtower [command] --help" for more information about a command.
