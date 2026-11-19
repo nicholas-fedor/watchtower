@@ -44,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Drop the stale gocyclo exclusion note by @nicholas-fedor in [#3971](https://github.com/nicholas-fedor/watchtower/pull/3971)
 - Update golang.org/x/exp digest to b15d094 by @renovate[bot] in [#3961](https://github.com/nicholas-fedor/watchtower/pull/3961)
 - Merge automerged updates only after every check passes by @nicholas-fedor in [#3957](https://github.com/nicholas-fedor/watchtower/pull/3957)
 - Update module github.com/docker/secrets-engine/x to v0.9.0 by @renovate[bot] in [#3951](https://github.com/nicholas-fedor/watchtower/pull/3951)
