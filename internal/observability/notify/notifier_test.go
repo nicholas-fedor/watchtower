@@ -770,9 +770,11 @@ func TestNewSender_AcceptsGotifyURLFromFileExpansion(t *testing.T) {
 // Shoutrrr a loop-safe logger. A Shoutrrr warning is a warn entry that is not
 // notified. The logger service's text is still logged without a level. Both
 // messages start with the Shoutrrr prefix.
+//
+// newSender sends through Shoutrrr's default client on http.DefaultTransport,
+// whose idle connections a parallel test's closing server drops. It does not
+// run in parallel for that reason.
 func TestNewSender_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
-	t.Parallel()
-
 	// entry holds the fields of a log entry that the sender's logger decides.
 	type entry struct {
 		Level   string `json:"level"`
@@ -782,7 +784,9 @@ func TestNewSender_LogsShoutrrrRecordsAtTheirLevel(t *testing.T) {
 
 	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
 
-	sender, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}})
+	webhookURL, _ := newGenericWebhook(t)
+
+	sender, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", webhookURL}})
 	require.NoError(t, err)
 
 	for _, err := range sender.Send("Found new image", &shoutrrrTypes.Params{}) {
@@ -811,7 +815,9 @@ func TestNewSender_PrintsLoggerTextToStdout(t *testing.T) {
 
 	log, buf := logcapture.NewJSON(zerolog.InfoLevel)
 
-	sender, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", newGenericWebhookURL(t)}, LogStdout: true})
+	webhookURL, _ := newGenericWebhook(t)
+
+	sender, _, err := newSender(log, notifyConfig.Notify{URLs: []string{"logger://", webhookURL}, LogStdout: true})
 	require.NoError(t, err)
 
 	for _, err := range sender.Send("Found new image", &shoutrrrTypes.Params{}) {
