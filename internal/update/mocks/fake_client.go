@@ -58,6 +58,7 @@ type TestData struct {
 	SetRestartPolicyID        container.ContainerID                          // Last container ID passed to SetRestartPolicy.
 	RenameTargets             []string                                       // Ordered list of rename targets.
 	Containers                []*container.Container                         // List of mock containers.
+	StoppedContainers         []*container.Container                         // Containers returned by ListStoppedContainers.
 	FailedImageIDs            []container.ImageID                            // List of image IDs that should fail removal.
 	StopOrder                 []string                                       // Order in which containers were stopped.
 	CreateOrder               []string                                       // Order in which containers were created.
@@ -217,6 +218,15 @@ func (client FakeClient) ListLabeledContainers(ctx context.Context, label string
 	}
 
 	return labeled, nil
+}
+
+// ListStoppedContainers returns the containers in TestData.StoppedContainers.
+func (client FakeClient) ListStoppedContainers(ctx context.Context) ([]*container.Container, error) {
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return nil, err
+	}
+
+	return client.TestData.StoppedContainers, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.

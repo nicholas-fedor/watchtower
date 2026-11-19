@@ -49,9 +49,9 @@ func (b *sessionBatch) record(report *state.Report) {
 	b.sent = append(b.sent, report)
 }
 
-// newMockClient returns a client mock that stores no copy files. The restart
-// package's tests cover copy files, so the update tests leave the copy-file
-// calls unchecked.
+// newMockClient returns a client mock that stores no copy files and lists no
+// stopped containers. The restart package's tests cover copy files, so the
+// update tests leave the copy-file calls unchecked.
 //
 // Parameters:
 //   - t: Test the mock belongs to.
@@ -64,6 +64,7 @@ func newMockClient(t *testing.T) *mockUpdate.MockClient {
 	client := mockUpdate.NewMockClient(t)
 	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil).Maybe()
 	client.EXPECT().DiscardCopyFiles(mock.Anything).Maybe()
+	client.EXPECT().ListStoppedContainers(mock.Anything).Return(nil, nil).Maybe()
 
 	return client
 }

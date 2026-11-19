@@ -405,6 +405,7 @@ func TestPreRun_loadsSettingsOnce(t *testing.T) {
 	mockClient := mockCmd.NewMockDockerClient(t)
 	mockClient.EXPECT().GetVersion().Return("1.47")
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil)
+	mockClient.EXPECT().ListStoppedContainers(mock.Anything).Return(nil, nil).Maybe()
 
 	proc := newPreRunProcess(t, mockClient, selfDetection{})
 
@@ -436,6 +437,7 @@ func TestPreRun_scopeLabel(t *testing.T) {
 	mockClient.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).Return(self, nil)
 	mockClient.EXPECT().GetVersion().Return("1.47").Maybe()
 	mockClient.EXPECT().ListContainers(mock.Anything, withFilter).Return(nil, nil).Maybe()
+	mockClient.EXPECT().ListStoppedContainers(mock.Anything).Return(nil, nil).Maybe()
 	mockClient.EXPECT().ListLabeledContainers(mock.Anything, mock.Anything).Return(nil, nil).Maybe()
 	mockClient.EXPECT().SetRestartPolicy(mock.Anything, mock.Anything, mock.Anything).Return(nil).Maybe()
 

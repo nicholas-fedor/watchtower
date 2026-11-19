@@ -57,6 +57,9 @@ type Client interface {
 	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
 	// GetImageDiskUsage returns the daemon's image storage usage.
 	GetImageDiskUsage(ctx context.Context) (containerClient.ImageDiskUsage, error)
+	// ListStoppedContainers returns the created and exited containers,
+	// whatever the include-stopped option is.
+	ListStoppedContainers(ctx context.Context) ([]*container.Container, error)
 }
 
 // stalenessCheck is the outcome of one container's staleness check, before
@@ -239,9 +242,18 @@ func update(
 		Str("filter", fmt.Sprintf("%T", config.Filter)).
 		Msg("Retrieved containers for update check")
 
+	// A stopped container that joins another container's network namespace
+	// keeps that container's ID, which is gone once the container is
+	// recreated. Such containers join the dependency graph, so they are
+	// recreated with the container whose network they join. They are not
+	// checked for updates, and they stay stopped.
+	stoppedDependents := listStoppedNetworkDependents(log, ctx, client, config, allContainers)
+	allContainers = append(allContainers, stoppedDependents...)
+	graphContainers := append(slices.Clone(filteredContainers), stoppedDependents...)
+
 	// A graph that cannot be built ends the session before any hook runs or
 	// any image is checked.
-	graph, skipped, err := checkDependencies(log, config, progress, allContainers, filteredContainers)
+	graph, skipped, err := checkDependencies(log, config, progress, allContainers, graphContainers)
 	if err != nil {
 		return nil, cleanupImageInfos, err
 	}
@@ -279,11 +291,19 @@ func update(
 		progress,
 		graph,
 		allContainers,
-		filteredContainers,
+		graphContainers,
 		skipped,
 	)
 	if err != nil {
 		return nil, cleanupImageInfos, err
+	}
+
+	// A stopped dependent was not scanned. Record the ones to recreate, so
+	// the report holds their outcome.
+	for _, c := range allContainersToRestart {
+		if slices.Contains(stoppedDependents, c) {
+			progress.AddScanned(log, c, c.ImageID(), config)
+		}
 	}
 
 	// Perform updates and restarts, either with rolling restarts or in batches.
@@ -342,6 +362,67 @@ func update(
 
 	// Return the final report summarizing the session and the cleanup image infos.
 	return progress.Report(log), cleanupImageInfos, nil
+}
+
+// listStoppedNetworkDependents returns the stopped containers that join
+// another container's network namespace and are not listed yet.
+//
+// A container listed already, such as a stopped one listed because of the
+// include-stopped option, is left out. So is a container the session's filter
+// excludes. A failed listing is logged and returns none, so the session goes
+// on without them.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - client: Container client that lists the stopped containers.
+//   - config: Update parameters with the session's filter.
+//   - listed: The containers the session listed already.
+//
+// Returns:
+//   - []*container.Container: The stopped containers that join another
+//     container's network namespace.
+func listStoppedNetworkDependents(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	config updateParams.Params,
+	listed []*container.Container,
+) []*container.Container {
+	stopped, err := client.ListStoppedContainers(ctx)
+	if err != nil {
+		log.Warn().
+			Err(err).
+			Msg("Failed to list stopped containers. Stopped containers that join another container's network are not recreated with it")
+
+		return nil
+	}
+
+	listedIDs := make(map[container.ContainerID]struct{}, len(listed))
+	for _, c := range listed {
+		listedIDs[c.ID()] = struct{}{}
+	}
+
+	var dependents []*container.Container
+
+	for _, c := range stopped {
+		if _, ok := listedIDs[c.ID()]; ok {
+			continue
+		}
+
+		info := c.ContainerInfo()
+		if info == nil || info.HostConfig == nil || !info.HostConfig.NetworkMode.IsContainer() {
+			continue
+		}
+
+		if config.Filter != nil && !config.Filter(c) {
+			continue
+		}
+
+		dependents = append(dependents, c)
+	}
+
+	return dependents
 }
 
 // currentOldInstance returns the current container when it is an old

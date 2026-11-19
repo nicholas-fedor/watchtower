@@ -1855,6 +1855,28 @@ func TestListLabeledContainers(t *testing.T) {
 	}
 }
 
+// TestListStoppedContainers verifies that the stopped listing asks Docker for
+// the created and exited containers, whatever the include-stopped option is.
+func TestListStoppedContainers(t *testing.T) {
+	t.Parallel()
+
+	api := newDockerAPI(t)
+	api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
+		All:     true,
+		Filters: dockerClient.Filters{"status": {"created": true, "exited": true}},
+	}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
+		{ID: string(fixtureStopped.id)},
+	}}, nil).Once()
+	expectContainerFixtures(t, api, fixtureStopped)
+
+	client := &Client{log: newTestLogger(t), api: api}
+
+	stopped, err := client.ListStoppedContainers(t.Context())
+	require.NoError(t, err)
+	require.Len(t, stopped, 1)
+	assert.Equal(t, fixtureStopped.id, stopped[0].ID())
+}
+
 // TestCreateFailureNamedOnce verifies that a failed create, through
 // CreateContainer or StartContainer, returns the recreation's error without a
 // second prefix and is logged once, by the recreation.

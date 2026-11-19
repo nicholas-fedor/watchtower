@@ -142,6 +142,7 @@ Dependents are found with the same dependency graph that orders the update, so t
 - A Watchtower container restarts when a container it depends on restarts, such as a VPN container it shares a network with.
 - A container that names a Watchtower container exactly, by container name or ID, restarts when that Watchtower container is updated. The name without its replica number (such as `infra-watchtower` for `infra-watchtower-1`) also works when exactly one Watchtower container has it, so it names nothing when the service runs several replicas.
 - Containers in a circular dependency are neither updated nor restarted.
+- A stopped container that uses the network of a recreated container is recreated with it and stays stopped, even without [Include Stopped Containers](../../configuration/container-selection/index.md#include_stopped_containers). Docker records that network by container ID, so the stopped container would otherwise keep the removed container's ID and fail to start. Watchtower does not check it for updates unless stopped containers are included.
 
 ### Dependencies on Unmonitored Containers
 

@@ -572,6 +572,30 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
 }
 
+// ListStoppedContainers returns the containers in the created or exited
+// state.
+//
+// The include-stopped configuration option does not apply. An update session
+// uses this list to find the stopped containers that join the network
+// namespace of a container it recreates, because those keep the removed
+// container's ID unless they are recreated too. A container that joins
+// another container's network names that container while it exists.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
+// Returns:
+//   - []*container.Container: The stopped containers.
+//   - error: Non-nil if listing fails, nil on success.
+func (c *Client) ListStoppedContainers(ctx context.Context) ([]*container.Container, error) {
+	listOptions := dockerClient.ContainerListOptions{
+		All:     true,
+		Filters: statusFilter(false, "created", "exited"),
+	}
+
+	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
+}
+
 // GetContainer fetches detailed information about a specific container by its ID.
 //
 // Parameters:
