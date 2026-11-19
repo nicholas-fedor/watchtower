@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -249,15 +248,15 @@ func TestNewGitHTTPClient(t *testing.T) {
 	t.Run("default transport", func(t *testing.T) {
 		t.Parallel()
 
-		got := newGitHTTPClient(5*time.Second, false, nil)
-		assert.Equal(t, 5*time.Second, got.Timeout)
+		got := newGitHTTPClient(false, nil)
+		assert.Zero(t, got.Timeout)
 		assert.Nil(t, got.Transport)
 	})
 
 	t.Run("insecure skip verify", func(t *testing.T) {
 		t.Parallel()
 
-		got := newGitHTTPClient(time.Second, true, nil)
+		got := newGitHTTPClient(true, nil)
 		tr, ok := got.Transport.(*http.Transport)
 		require.True(t, ok)
 		require.NotNil(t, tr.TLSClientConfig)
@@ -268,7 +267,7 @@ func TestNewGitHTTPClient(t *testing.T) {
 	t.Run("ca bundle", func(t *testing.T) {
 		t.Parallel()
 
-		got := newGitHTTPClient(time.Second, false, []byte("not-a-real-pem"))
+		got := newGitHTTPClient(false, []byte("not-a-real-pem"))
 		tr, ok := got.Transport.(*http.Transport)
 		require.True(t, ok)
 		require.NotNil(t, tr.TLSClientConfig)
@@ -283,7 +282,7 @@ func TestNewGitHTTPClient(t *testing.T) {
 		t.Cleanup(server.Close)
 		bundle := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
 
-		got := newGitHTTPClient(time.Second, false, bundle)
+		got := newGitHTTPClient(false, bundle)
 		tr, ok := got.Transport.(*http.Transport)
 		require.True(t, ok)
 		require.NotNil(t, tr.TLSClientConfig)
@@ -305,7 +304,7 @@ func TestNewGitHTTPClient(t *testing.T) {
 	t.Run("insecure TLS with invalid ca bundle", func(t *testing.T) {
 		t.Parallel()
 
-		got := newGitHTTPClient(time.Second, true, []byte("not-a-real-pem"))
+		got := newGitHTTPClient(true, []byte("not-a-real-pem"))
 		tr, ok := got.Transport.(*http.Transport)
 		require.True(t, ok)
 		require.NotNil(t, tr.TLSClientConfig)

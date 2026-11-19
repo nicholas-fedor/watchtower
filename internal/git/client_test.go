@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -31,12 +32,27 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 )
 
+// stubLister lists fixed refs, or fails with a fixed error.
 type stubLister struct {
 	refs []RemoteRef
 	err  error
 }
 
-func (s stubLister) List(context.Context, string) ([]RemoteRef, error) {
+// List returns the configured refs and error, or the context's error once it
+// has ended, as go-git's ls-remote does.
+//
+// Parameters:
+//   - ctx: Request context.
+//
+// Returns:
+//   - []RemoteRef: The configured refs.
+//   - error: The context's error, or the configured error.
+func (s stubLister) List(ctx context.Context, _ string) ([]RemoteRef, error) {
+	err := ctx.Err()
+	if err != nil {
+		return nil, err
+	}
+
 	return s.refs, s.err
 }
 
@@ -322,14 +338,15 @@ func TestCheck_TagPolicyIgnoresNonSemver(t *testing.T) {
 	assert.False(t, none.Stale)
 }
 
-func TestNew_NilLogAndZeroTimeout(t *testing.T) {
+// TestNew_nilLog verifies that New builds a usable client without a logger.
+func TestNew_nilLog(t *testing.T) {
 	t.Parallel()
 
 	client := New(nil, Options{})
 	require.NotNil(t, client)
 	require.NotNil(t, client.log)
 	assert.NotNil(t, client.lister)
-	assert.Equal(t, defaultGitTimeout, client.http.Timeout)
+	assert.NotNil(t, client.http)
 }
 
 func TestCheck_NilClient(t *testing.T) {
@@ -495,6 +512,69 @@ func TestLookupAPIHostMatch(t *testing.T) {
 	_, _, ok = client.lookupAPI(t.Context(), "git.example.com", "https://evil.example")
 	assert.False(t, ok)
 	assert.Zero(t, probes.Load())
+}
+
+// TestCheck_stalledAPI verifies that a provider API request that never
+// receives a response leaves ls-remote time to resolve the check within the
+// Git timeout.
+//
+// The cases cover an exact ref and a tag policy on github.com, plus an exact
+// ref on a self-hosted host named by a git-host label.
+func TestCheck_stalledAPI(t *testing.T) {
+	t.Parallel()
+
+	refs := []RemoteRef{
+		{Name: "refs/heads/main", Hash: "newcommit"},
+		{Name: "refs/tags/v1.0.0", Hash: "oldcommit"},
+		{Name: "refs/tags/v1.0.1", Hash: "newcommit"},
+	}
+
+	tests := []struct {
+		name    string
+		request CheckRequest
+		wantTag string
+	}{
+		{
+			name:    "self-hosted exact ref",
+			request: CheckRequest{Repo: "https://git.example.com/org/app.git", Host: "https://git.example.com:3000", LastCommit: "oldcommit"},
+		},
+		{
+			name:    "github.com exact ref",
+			request: CheckRequest{Repo: "https://github.com/org/app.git", LastCommit: "oldcommit"},
+		},
+		{
+			name:    "github.com tag policy",
+			request: CheckRequest{Repo: "https://github.com/org/app.git", Policy: semver.PolicyPatch, LastTag: "v1.0.0", LastCommit: "oldcommit"},
+			wantTag: "v1.0.1",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				var apiRequests atomic.Int32
+
+				nop := zerolog.Nop()
+				client := New(&nop, Options{})
+				client.lister = stubLister{refs: refs}
+				client.http.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					apiRequests.Add(1)
+					<-req.Context().Done()
+
+					return nil, req.Context().Err()
+				})
+
+				got, err := client.Check(t.Context(), tt.request)
+				require.NoError(t, err)
+				assert.Positive(t, apiRequests.Load())
+				assert.True(t, got.Stale)
+				assert.Equal(t, "newcommit", got.Commit)
+				assert.Equal(t, tt.wantTag, got.Tag)
+			})
+		})
+	}
 }
 
 func TestCheck_TagPolicyNoStampSelectsHighest(t *testing.T) {
