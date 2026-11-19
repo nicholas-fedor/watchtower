@@ -908,7 +908,7 @@ Repeatable values are newline-separated.
 
 ### HTTPS and HTTP
 
-Use a token or a username and password when the clone URL starts with `https://` or `http://`.
+Use a token or a username and password when the clone URL starts with `https://`.
 
 Watchtower tries the configured credentials in this order and stops at the first match:
 
@@ -921,7 +921,9 @@ The daemon is given those credentials inside an `https://` clone URL.
 It is not given an SSH key.
 A private repository on this path needs an `https://` URL and either a token or a username and password.
 
-A plain `http://` URL is not given those credentials for the build.
+A plain `http://` clone URL never receives the token, username, or password.
+Watchtower reads it without them for ref checks and checkouts.
+The Docker daemon also builds it without them.
 Use HTTPS for a private repository.
 
 ### SSH
@@ -931,6 +933,9 @@ Use an SSH key when the clone URL is `ssh://` or `git@host:path`.
 Mount the private key and set [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_key_path).
 Also mount a `known_hosts` file and set [Git SSH Known Hosts](../../configuration/git-monitoring/index.md#git_ssh_known_hosts).
 The Watchtower image has no host keys of its own, so the connection fails when that file is missing.
+
+Without [Git SSH Key Path](../../configuration/git-monitoring/index.md#git_ssh_key_path), the connection falls back to an SSH agent named by the `SSH_AUTH_SOCK` environment variable.
+The Watchtower image runs no SSH agent, so an SSH remote needs the key unless you mount an agent socket and set that variable.
 
 The HTTPS token and password are not sent on the SSH connection.
 They can still be used for the HTTP API when [Hosts](#hosts) names the same hostname as the clone URL.
