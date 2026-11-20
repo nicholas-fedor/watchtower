@@ -125,7 +125,7 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/buildkit v0.35.1 // indirect
-	github.com/moby/extensions v0.0.0-20261026144205-2b6b3bd5fa82 // indirect
+	github.com/moby/extensions v0.0.0-20261120190433-fb779cf107cd // indirect
 	github.com/moby/go-archive v0.3.3 // indirect
 	github.com/moby/locker v1.0.1 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
