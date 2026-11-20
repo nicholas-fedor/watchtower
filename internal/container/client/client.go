@@ -578,16 +578,17 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 //
 // The include-stopped configuration option does not apply. Docker records the
 // network of such a container by the ID of the container it joins, so it must
-// be recreated with that container to keep working. Only these containers are
-// inspected, and a container that joins it names it while it exists.
+// be recreated with that container to keep working. The listing names the
+// joined container by ID, so only matching containers are inspected. Their
+// inspect names it by name while it exists.
 //
 // Podman before version 6 reports "host" as the network mode of every listed
-// container, so on Podman every stopped container is inspected and those that
-// join any container's network are returned.
+// container, so on Podman those containers are inspected too and kept only if
+// they join one of the given containers.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
-//   - networkContainers: IDs of the containers whose network the returned
+//   - networkContainers: The containers whose network the returned
 //     containers join.
 //
 // Returns:
@@ -596,29 +597,41 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 //   - error: Non-nil if listing fails, nil on success.
 func (c *Client) ListStoppedNetworkDependents(
 	ctx context.Context,
-	networkContainers []container.ContainerID,
+	networkContainers []*container.Container,
 ) ([]*container.Container, error) {
-	modes := make(map[string]struct{}, len(networkContainers))
-	for _, id := range networkContainers {
-		modes["container:"+string(id)] = struct{}{}
+	if len(networkContainers) == 0 {
+		return nil, nil
 	}
+
+	modes := make(map[string]struct{})
+	for _, networkContainer := range networkContainers {
+		modes["container:"+string(networkContainer.ID())] = struct{}{}
+		modes["container:"+networkContainer.Name()] = struct{}{}
+	}
+
+	joins := func(networkMode string) bool {
+		target, found := strings.CutPrefix(networkMode, "container:")
+		if !found {
+			return false
+		}
+
+		_, ok := modes["container:"+container.NormalizeContainerName(target)]
+
+		return ok
+	}
+
+	podman := c.isPodmanRuntime(ctx)
 
 	listOptions := dockerClient.ContainerListOptions{
 		All:     true,
 		Filters: statusFilter(false, "created", "exited"),
 	}
 
-	joinsNetwork := func(summary *dockerContainer.Summary) bool {
-		_, ok := modes[summary.HostConfig.NetworkMode]
-
-		return ok
+	mayJoin := func(summary *dockerContainer.Summary) bool {
+		return joins(summary.HostConfig.NetworkMode) || (podman && summary.HostConfig.NetworkMode == "host")
 	}
 
-	if !c.isPodmanRuntime(ctx) {
-		return inspectListedContainers(c.logger(), ctx, c.api, listOptions, joinsNetwork, nil)
-	}
-
-	stopped, err := inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil, nil)
+	stopped, err := inspectListedContainers(c.logger(), ctx, c.api, listOptions, mayJoin, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -626,7 +639,7 @@ func (c *Client) ListStoppedNetworkDependents(
 	return slices.DeleteFunc(stopped, func(stoppedContainer *container.Container) bool {
 		hostConfig := stoppedContainer.ContainerInfo().HostConfig
 
-		return hostConfig == nil || !hostConfig.NetworkMode.IsContainer()
+		return hostConfig == nil || !joins(string(hostConfig.NetworkMode))
 	}), nil
 }
 

@@ -227,7 +227,7 @@ func (client FakeClient) ListLabeledContainers(ctx context.Context, label string
 // It returns TestData.ListStoppedError when set.
 func (client FakeClient) ListStoppedNetworkDependents(
 	ctx context.Context,
-	networkContainers []container.ContainerID,
+	networkContainers []*container.Container,
 ) ([]*container.Container, error) {
 	if err := client.checkContextCancellation(ctx); err != nil {
 		return nil, err
@@ -238,10 +238,8 @@ func (client FakeClient) ListStoppedNetworkDependents(
 	}
 
 	modes := make(map[string]bool, len(networkContainers))
-	for _, id := range networkContainers {
-		if c, ok := client.TestData.ContainersByID[id]; ok {
-			modes["container:"+c.Name()] = true
-		}
+	for _, c := range networkContainers {
+		modes["container:"+c.Name()] = true
 	}
 
 	var dependents []*container.Container

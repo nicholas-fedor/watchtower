@@ -1857,61 +1857,103 @@ func TestListLabeledContainers(t *testing.T) {
 
 // TestListStoppedNetworkDependents verifies that the stopped listing asks
 // Docker for the created and exited containers, whatever the include-stopped
-// option is, and inspects only those that join the network of a given
-// container. On Podman, whose listing does not report the network mode, it
-// inspects every stopped container and keeps those in another container's
-// network.
+// option is, and returns those that join the network of a given container.
+// On Docker only those are inspected. On Podman, whose listing reports "host"
+// before version 6, the "host" entries are inspected too and kept only if
+// they join a given container. Without containers to join, it makes no call.
 func TestListStoppedNetworkDependents(t *testing.T) {
 	t.Parallel()
 
-	t.Run("inspects the containers that join a given network", func(t *testing.T) {
+	supplier := container.NewContainer(nil, &dockerContainer.InspectResponse{
+		ID:   string(fixtureNetSupplier.id),
+		Name: "/wt-contnet-producer-1",
+	}, nil)
+	unrelated := container.NewContainer(nil, &dockerContainer.InspectResponse{ID: "unrelated-id", Name: "/unrelated"}, nil)
+
+	summary := func(id container.ContainerID, networkMode string) dockerContainer.Summary {
+		entry := dockerContainer.Summary{ID: string(id)}
+		entry.HostConfig.NetworkMode = networkMode
+
+		return entry
+	}
+
+	tests := []struct {
+		name string
+		// podman is the detected runtime.
+		podman bool
+		// listed are the list entries Docker returns.
+		listed []dockerContainer.Summary
+		// inspected are the containers inspected.
+		inspected []*dockerContainerFixture
+		// networkContainers are the containers whose dependents to list.
+		networkContainers []*container.Container
+		// want are the IDs returned.
+		want []container.ContainerID
+	}{
+		{
+			name: "Docker inspects only the dependents of the given containers",
+			listed: []dockerContainer.Summary{
+				summary(fixtureNetConsumer.id, "container:"+string(fixtureNetSupplier.id)),
+				summary("other-id", "container:unrelated-id"),
+				summary("bridged-id", "bridge"),
+			},
+			inspected:         []*dockerContainerFixture{fixtureNetConsumer},
+			networkContainers: []*container.Container{supplier},
+			want:              []container.ContainerID{fixtureNetConsumer.id},
+		},
+		{
+			name:   "Podman keeps the dependents of the given containers",
+			podman: true,
+			listed: []dockerContainer.Summary{
+				summary(fixtureNetConsumer.id, "host"),
+				summary(fixtureStopped.id, "host"),
+			},
+			inspected:         []*dockerContainerFixture{fixtureNetConsumer, fixtureStopped},
+			networkContainers: []*container.Container{supplier},
+			want:              []container.ContainerID{fixtureNetConsumer.id},
+		},
+		{
+			name:              "Podman leaves out the dependents of other containers",
+			podman:            true,
+			listed:            []dockerContainer.Summary{summary(fixtureNetConsumer.id, "host")},
+			inspected:         []*dockerContainerFixture{fixtureNetConsumer},
+			networkContainers: []*container.Container{unrelated},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := newDockerAPI(t)
+			api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
+				All:     true,
+				Filters: statusFilters("created", "exited"),
+			}).Return(dockerClient.ContainerListResult{Items: tt.listed}, nil).Once()
+			expectContainerFixtures(t, api, tt.inspected...)
+
+			client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true, podmanRuntime: tt.podman}
+
+			stopped, err := client.ListStoppedNetworkDependents(t.Context(), tt.networkContainers)
+			require.NoError(t, err)
+
+			ids := make([]container.ContainerID, 0, len(stopped))
+			for _, c := range stopped {
+				ids = append(ids, c.ID())
+			}
+
+			assert.ElementsMatch(t, tt.want, ids)
+		})
+	}
+
+	t.Run("makes no call without containers to join", func(t *testing.T) {
 		t.Parallel()
 
-		joining := dockerContainer.Summary{ID: string(fixtureStopped.id)}
-		joining.HostConfig.NetworkMode = "container:provider-id"
+		client := &Client{log: newTestLogger(t), api: newDockerAPI(t)}
 
-		other := dockerContainer.Summary{ID: "other-id"}
-		other.HostConfig.NetworkMode = "container:unrelated-id"
-
-		bridged := dockerContainer.Summary{ID: "bridged-id"}
-		bridged.HostConfig.NetworkMode = "bridge"
-
-		api := newDockerAPI(t)
-		api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{
-			All:     true,
-			Filters: statusFilters("created", "exited"),
-		}).Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{joining, other, bridged}}, nil).Once()
-		expectContainerFixtures(t, api, fixtureStopped)
-
-		client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true}
-
-		stopped, err := client.ListStoppedNetworkDependents(t.Context(), []container.ContainerID{"provider-id"})
+		stopped, err := client.ListStoppedNetworkDependents(t.Context(), nil)
 		require.NoError(t, err)
-		require.Len(t, stopped, 1)
-		assert.Equal(t, fixtureStopped.id, stopped[0].ID())
-	})
-
-	t.Run("inspects every stopped container on Podman", func(t *testing.T) {
-		t.Parallel()
-
-		// Podman before version 6 reports "host" for every listed container.
-		joining := dockerContainer.Summary{ID: string(fixtureNetConsumer.id)}
-		joining.HostConfig.NetworkMode = "host"
-
-		bridged := dockerContainer.Summary{ID: string(fixtureStopped.id)}
-		bridged.HostConfig.NetworkMode = "host"
-
-		api := newDockerAPI(t)
-		api.EXPECT().ContainerList(mock.Anything, mock.Anything).
-			Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{joining, bridged}}, nil).Once()
-		expectContainerFixtures(t, api, fixtureNetConsumer, fixtureStopped)
-
-		client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true, podmanRuntime: true}
-
-		stopped, err := client.ListStoppedNetworkDependents(t.Context(), []container.ContainerID{"provider-id"})
-		require.NoError(t, err)
-		require.Len(t, stopped, 1, "a stopped container outside another container's network is left out")
-		assert.Equal(t, fixtureNetConsumer.id, stopped[0].ID())
+		assert.Empty(t, stopped)
 	})
 }
 

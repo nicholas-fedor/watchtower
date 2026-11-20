@@ -62,7 +62,7 @@ type Client interface {
 	// include-stopped option is.
 	ListStoppedNetworkDependents(
 		ctx context.Context,
-		networkContainers []container.ContainerID,
+		networkContainers []*container.Container,
 	) ([]*container.Container, error)
 }
 
@@ -405,12 +405,7 @@ func listStoppedNetworkDependents(
 		return nil
 	}
 
-	monitoredIDs := make([]container.ContainerID, 0, len(monitored))
-	for _, c := range monitored {
-		monitoredIDs = append(monitoredIDs, c.ID())
-	}
-
-	stopped, err := client.ListStoppedNetworkDependents(ctx, monitoredIDs)
+	stopped, err := client.ListStoppedNetworkDependents(ctx, monitored)
 	if err != nil {
 		log.Warn().
 			Err(err).
