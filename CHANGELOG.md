@@ -45,6 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/huandu/xstrings to v1.6.4 by @renovate[bot] in [#3986](https://github.com/nicholas-fedor/watchtower/pull/3986)
+- Update module github.com/klauspost/compress to v1.20.5 by @renovate[bot] in [#3987](https://github.com/nicholas-fedor/watchtower/pull/3987)
+- Update github/codeql-action action to v4.39.4 by @renovate[bot] in [#3985](https://github.com/nicholas-fedor/watchtower/pull/3985)
 - Update golang.org/x/exp digest to b6de8d3 by @renovate[bot] in [#3983](https://github.com/nicholas-fedor/watchtower/pull/3983)
 - Update docker/dockerfile:1 docker digest to 572cebb by @renovate[bot] in [#3982](https://github.com/nicholas-fedor/watchtower/pull/3982)
 - Update module github.com/moby/buildkit to v0.35.1 by @renovate[bot] in [#3974](https://github.com/nicholas-fedor/watchtower/pull/3974)
