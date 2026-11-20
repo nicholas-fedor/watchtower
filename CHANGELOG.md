@@ -45,6 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/exp digest to b6de8d3 by @renovate[bot] in [#3983](https://github.com/nicholas-fedor/watchtower/pull/3983)
+- Update docker/dockerfile:1 docker digest to 572cebb by @renovate[bot] in [#3982](https://github.com/nicholas-fedor/watchtower/pull/3982)
 - Update module github.com/moby/buildkit to v0.35.1 by @renovate[bot] in [#3974](https://github.com/nicholas-fedor/watchtower/pull/3974)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.12 by @renovate[bot] in [#3969](https://github.com/nicholas-fedor/watchtower/pull/3969)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.18 by @renovate[bot] in [#3968](https://github.com/nicholas-fedor/watchtower/pull/3968)
