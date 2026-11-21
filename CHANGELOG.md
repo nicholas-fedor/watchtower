@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/exp digest to e1094ee by @renovate[bot] in [#3997](https://github.com/nicholas-fedor/watchtower/pull/3997)
 - Update module go.opentelemetry.io/auto/sdk to v1.2.2 by @renovate[bot] in [#3993](https://github.com/nicholas-fedor/watchtower/pull/3993)
 - Update golang.org/x/exp digest to 8801fbd by @renovate[bot] in [#3990](https://github.com/nicholas-fedor/watchtower/pull/3990)
 - Update github.com/moby/extensions digest to fb779cf by @renovate[bot] in [#3989](https://github.com/nicholas-fedor/watchtower/pull/3989)
