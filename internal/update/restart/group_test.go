@@ -24,6 +24,12 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
 
+// liveContext matches a context that is not canceled, as a stop that must run
+// to its end receives.
+var liveContext = mock.MatchedBy(func(ctx context.Context) bool {
+	return ctx.Err() == nil
+})
+
 // newNetworkGroup returns a stale, running vpn container, a running torrent
 // container rebound to vpn's network namespace, and a stopped chain container
 // rebound to torrent's, in restart order.
@@ -281,6 +287,41 @@ func TestStopContainersInReversedOrder_networkGroup(t *testing.T) {
 	}
 }
 
+// TestStopContainersInReversedOrder_networkGroupNameNotRestored verifies that
+// the containers already removed join the restored vpn by its ID when vpn
+// could not take its name back, since a recreation that names vpn would find
+// no container under that name. The chain container joins torrent, which is
+// recreated under its own name, so it keeps naming torrent.
+func TestStopContainersInReversedOrder_networkGroupNameNotRestored(t *testing.T) {
+	t.Parallel()
+
+	group := newNetworkGroup()
+	vpn, torrent, chain := group[0], group[1], group[2]
+	replacement := modelfixture.Container(containerfixture.WithID("new-vpn"))
+
+	client := mockRestart.NewMockClient(t)
+	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+	client.EXPECT().DiscardCopyFiles(vpn.ID()).Return().Once()
+	mock.InOrder(
+		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, torrent, mock.Anything).Return(nil).Once(),
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(errors.New("remove failed")).Once(),
+		client.EXPECT().GetContainer(mock.Anything, container.ContainerID("new-vpn")).Return(replacement, nil).Once(),
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, replacement, mock.Anything).Return(nil).Once(),
+		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").Return(errors.New("rename failed")).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, vpn.ID()).Return(nil).Once(),
+	)
+
+	failed, stopped := stopContainersInReversedOrder(newTestLogger(t), t.Context(), group, client, updateParams.Params{})
+
+	require.ErrorIs(t, failed[vpn.ID()], errNotRestored)
+	assert.Equal(t, map[container.ContainerID]container.ContainerID{"chain-id": "", "torrent-id": ""}, stopped)
+	assert.Equal(t, "vpn-id", torrent.NetworkContainer())
+	assert.Equal(t, "torrent", chain.NetworkContainer())
+}
+
 // TestStopContainersInReversedOrder_networkGroupAfterDependency verifies that
 // a container others join is not replaced early when it joins the network of
 // a container earlier in the list. A replacement created then would stay
@@ -513,6 +554,76 @@ func TestStopContainersInReversedOrder_mergedGroupHeld(t *testing.T) {
 	assert.True(t, isSkip(failed[r.ID()]))
 }
 
+// TestStopContainersInReversedOrder_mergedGroupCanceled verifies that a stop
+// already begun runs to its end when the update is canceled, since Docker
+// finishes it anyway. No further container of the group is stopped, and vpn
+// is not replaced, also when the canceled stop was the last before vpn's own
+// steps. The containers not stopped are skipped, while those removed are
+// recreated as usual. The strict mock fails on any other stop or on a rename
+// of vpn.
+func TestStopContainersInReversedOrder_mergedGroupCanceled(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// canceledAt picks the container whose stop is under way when the
+		// update is canceled.
+		canceledAt func(k, r2 *container.Container) *container.Container
+		// stops returns the containers stopped, in order.
+		stops func(k, r2 *container.Container) []*container.Container
+	}{
+		{
+			name:       "during the first stop",
+			canceledAt: func(_, r2 *container.Container) *container.Container { return r2 },
+			stops:      func(_, r2 *container.Container) []*container.Container { return []*container.Container{r2} },
+		},
+		{
+			name:       "during the last stop before vpn",
+			canceledAt: func(k, _ *container.Container) *container.Container { return k },
+			stops:      func(k, r2 *container.Container) []*container.Container { return []*container.Container{r2, k} },
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			group := newMergedGroup()
+			k, r2 := group[1], group[3]
+			canceledAt := tt.canceledAt(k, r2)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			client := mockRestart.NewMockClient(t)
+			wantStopped := map[container.ContainerID]container.ContainerID{}
+
+			for _, c := range tt.stops(k, r2) {
+				snapshot := client.EXPECT().SnapshotCopyFiles(mock.Anything, c)
+				if c == canceledAt {
+					snapshot = snapshot.Run(func(context.Context, *container.Container) { cancel() })
+				}
+
+				snapshot.Return(nil).Once()
+
+				client.EXPECT().StopAndRemoveContainer(liveContext, c, mock.Anything).Return(nil).Once()
+
+				wantStopped[c.ID()] = ""
+			}
+
+			failed, stopped := stopContainersInReversedOrder(newTestLogger(t), ctx, group, client, updateParams.Params{})
+
+			assert.Equal(t, wantStopped, stopped)
+			assert.Len(t, failed, len(group)-len(wantStopped))
+
+			for id, err := range failed {
+				require.ErrorIs(t, err, context.Canceled, id)
+				assert.True(t, isSkip(err), id)
+			}
+		})
+	}
+}
+
 // TestStopContainersInReversedOrder_networkGroupCanceled verifies that once
 // vpn's replacement exists, the stops of the containers that join it and of
 // vpn itself run to their end when the update is canceled, since Docker
@@ -525,17 +636,13 @@ func TestStopContainersInReversedOrder_networkGroupCanceled(t *testing.T) {
 	vpn := group[0]
 	ctx, cancel := context.WithCancel(t.Context())
 
-	live := mock.MatchedBy(func(stopCtx context.Context) bool {
-		return stopCtx.Err() == nil
-	})
-
 	client := mockRestart.NewMockClient(t)
 	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
 	client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once()
 	client.EXPECT().CreateContainer(mock.Anything, vpn).
 		Run(func(context.Context, *container.Container) { cancel() }).
 		Return(container.ContainerID("new-vpn"), nil).Once()
-	client.EXPECT().StopAndRemoveContainer(live, mock.Anything, mock.Anything).Return(nil).Times(3)
+	client.EXPECT().StopAndRemoveContainer(liveContext, mock.Anything, mock.Anything).Return(nil).Times(3)
 
 	failed, stopped := stopContainersInReversedOrder(newTestLogger(t), ctx, group, client, updateParams.Params{})
 

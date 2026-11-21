@@ -388,14 +388,7 @@ func stopContainersInReversedOrder(
 		// Check for context cancellation to avoid additional work when context is canceled.
 		// The current group and the ones before it are skipped.
 		if ctx.Err() != nil {
-			for _, untouched := range slices.Backward(containers[:start+len(group)]) {
-				log.Info().
-					Str("container", untouched.Name()).
-					Str("image", untouched.ImageName()).
-					Str("container_id", untouched.ID().ShortID()).
-					Msg("Skipped container stop due to context cancellation")
-				failed[untouched.ID()] = skipped(fmt.Errorf("stop skipped: %w", ctx.Err()))
-			}
+			skipCanceled(log, ctx, containers[:start+len(group)], failed, stopped)
 
 			return failed, stopped
 		}
@@ -654,12 +647,16 @@ func prepareStop(
 
 // stopAndRemove stops and removes a container whose copy files are stored.
 //
-// A container that no longer exists is skipped, so it is not recreated from
-// the scan's inspect data.
+// The stop and the removal run to their end when the update is canceled,
+// since Docker finishes a stop it has begun. A stop cut short would leave the
+// container stopped but not removed, so it would not be recreated. They keep
+// ctx's values and get the longer of the configured and the container's stop
+// timeout, plus 30 seconds. A container that no longer exists is skipped, so
+// it is not recreated from the scan's inspect data.
 //
 // Parameters:
 //   - log: Session logger.
-//   - ctx: Context for cancellation and timeouts.
+//   - ctx: The update's context.
 //   - c: Container to stop.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying the stop timeout.
@@ -674,7 +671,10 @@ func stopAndRemove(
 	client Client,
 	config updateParams.Params,
 ) error {
-	err := client.StopAndRemoveContainer(ctx, c, config.Timeout)
+	stopCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedStopTimeout(c))
+	defer cancel()
+
+	err := client.StopAndRemoveContainer(stopCtx, c, config.Timeout)
 	if err == nil {
 		return nil
 	}

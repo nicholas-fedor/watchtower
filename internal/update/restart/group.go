@@ -111,9 +111,9 @@ func stopGroup(
 		return
 	}
 
-	if stopMembers(log, ctx, group, group[1:], client, config, failed, stopped) {
-		_ = stopOne(log, ctx, head, client, config, failed, stopped)
-	}
+	// The container comes last in reverse order, and it joins no member, so
+	// it never keeps the group in place.
+	stopMembers(log, ctx, group, group, client, config, failed, stopped)
 }
 
 // stopNetworkGroup replaces a container and stops the rest of its group.
@@ -173,6 +173,14 @@ func stopNetworkGroup(
 		return
 	}
 
+	// The container steps aside only while the update runs, since nothing
+	// after that point is cut short.
+	if ctx.Err() != nil {
+		skipCanceled(log, ctx, group, failed, stopped)
+
+		return
+	}
+
 	clog.Debug().Msg("Stopping container for restart")
 
 	err := prepareStop(log, ctx, head, client, config)
@@ -203,7 +211,7 @@ func stopNetworkGroup(
 	if err != nil {
 		clog.Debug().Err(err).Msg("Failed to create container")
 
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, "", config, err)
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, "", nil, config, err)
 		keepMembers(group, failed, stopped)
 
 		return
@@ -211,18 +219,21 @@ func stopNetworkGroup(
 
 	for _, member := range slices.Backward(reaching) {
 		// A container still joined to the old namespace would lose its
-		// network with it, so the replacement is undone instead.
-		stopCtx, cancelStop := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedStopTimeout(member))
-		err = stopOne(log, stopCtx, member, client, config, failed, stopped)
+		// network with it, so the replacement is undone instead. Once the
+		// replacement exists, the group finishes or is restored even when the
+		// update is canceled. The stop bounds itself, and this bound covers
+		// the steps before it, such as the copy-file snapshot.
+		prepareCtx, cancelPrepare := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
+		err = stopOne(log, prepareCtx, member, client, config, failed, stopped)
 
-		cancelStop()
+		cancelPrepare()
 
 		if !holdsMember(group, member, err) {
 			continue
 		}
 
 		heldBy(group, member, err, failed, stopped)
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, config, failed[head.ID()])
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, reaching, config, failed[head.ID()])
 
 		// The member starts again only once the namespace it joins is restored.
 		startAgain(ctx, member, client, config, failed, err)
@@ -232,12 +243,9 @@ func stopNetworkGroup(
 
 	// A container already gone counts as removed, since its replacement
 	// exists.
-	stopCtx, cancelStop := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedStopTimeout(head))
-	defer cancelStop()
-
-	err = stopAndRemove(log, stopCtx, head, client, config)
+	err = stopAndRemove(log, ctx, head, client, config)
 	if err != nil && !errors.Is(err, errContainerGone) {
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, config, err)
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, reaching, config, err)
 
 		return
 	}
@@ -252,7 +260,8 @@ func stopNetworkGroup(
 //
 // After the replacement is removed, the container takes its name back. It is
 // started when it was running, under its temporary name when the rename
-// fails. These steps keep ctx's values but not its
+// fails. The joiners that name it then name it by ID, so those recreated
+// against it still find it. These steps keep ctx's values but not its
 // cancellation. The rename and the start get the stop timeout plus 30
 // seconds. A failed removal shows as a failed rename.
 //
@@ -262,6 +271,7 @@ func stopNetworkGroup(
 //   - client: Container client for Docker operations.
 //   - source: The container that stepped aside.
 //   - newID: The replacement, empty when it was not created.
+//   - joiners: The containers that may be recreated against source.
 //   - config: Update options. The removal waits up to the stop timeout.
 //   - cause: The error that failed the replacement.
 //
@@ -274,6 +284,7 @@ func restoreReplaced(
 	client Client,
 	source *container.Container,
 	newID container.ContainerID,
+	joiners []*container.Container,
 	config updateParams.Params,
 	cause error,
 ) error {
@@ -287,6 +298,12 @@ func restoreReplaced(
 	err := client.RenameContainer(restoreCtx, source, source.Name())
 	if err != nil {
 		restoreErrs = append(restoreErrs, err)
+
+		for _, joiner := range joiners {
+			if joiner.JoinsNetworkOf(source) {
+				joiner.SetNetworkContainer(string(source.ID()))
+			}
+		}
 	}
 
 	// Starting a container that still runs does nothing. A container left
@@ -311,7 +328,9 @@ func restoreReplaced(
 //
 // A member that joins another member and cannot be stopped keeps the group in
 // place. The group's first container then fails and the members not stopped
-// yet are skipped. The member starts again if it was running.
+// yet are skipped. The member starts again if it was running. Once the update
+// is canceled, no further member is stopped, and the group's containers not
+// stopped yet are skipped.
 //
 // Parameters:
 //   - log: Session logger.
@@ -336,6 +355,12 @@ func stopMembers(
 	stopped map[container.ContainerID]container.ContainerID,
 ) bool {
 	for _, member := range slices.Backward(members) {
+		if ctx.Err() != nil {
+			skipCanceled(log, ctx, group, failed, stopped)
+
+			return false
+		}
+
 		err := stopOne(log, ctx, member, client, config, failed, stopped)
 		if holdsMember(group, member, err) {
 			heldBy(group, member, err, failed, stopped)
@@ -346,6 +371,36 @@ func stopMembers(
 	}
 
 	return true
+}
+
+// skipCanceled skips the containers a canceled update did not stop.
+//
+// Parameters:
+//   - log: Session logger.
+//   - ctx: The canceled context.
+//   - containers: The containers to skip.
+//   - failed: Receives the skip of each container.
+//   - stopped: The containers stopped and removed so far.
+func skipCanceled(
+	log *zerolog.Logger,
+	ctx context.Context,
+	containers []*container.Container,
+	failed map[container.ContainerID]error,
+	stopped map[container.ContainerID]container.ContainerID,
+) {
+	for _, c := range containers {
+		if settled(c, failed, stopped) {
+			continue
+		}
+
+		log.Info().
+			Str("container", c.Name()).
+			Str("image", c.ImageName()).
+			Str("container_id", c.ID().ShortID()).
+			Msg("Skipped container stop due to context cancellation")
+
+		failed[c.ID()] = skipped(fmt.Errorf("stop skipped: %w", ctx.Err()))
+	}
 }
 
 // stopOne stops a single container, without the rest of its group, and
@@ -442,9 +497,6 @@ func heldBy(
 
 // keepMembers skips the members of a group that were left as they were.
 //
-// A member already stopped and removed is recreated, and one with an outcome
-// keeps it.
-//
 // Parameters:
 //   - group: The container, followed by the rest of its group.
 //   - failed: Receives the skip of each member left as it was.
@@ -455,13 +507,33 @@ func keepMembers(
 	stopped map[container.ContainerID]container.ContainerID,
 ) {
 	for _, member := range group[1:] {
-		_, removed := stopped[member.ID()]
-		_, recorded := failed[member.ID()]
-
-		if !removed && !recorded && member.ToRestart() {
+		if !settled(member, failed, stopped) && member.ToRestart() {
 			failed[member.ID()] = skipped(errGroupKept)
 		}
 	}
+}
+
+// settled reports whether a container needs no skip for the rest of its group.
+//
+// A container stopped and removed already is recreated, and one with an
+// outcome keeps it.
+//
+// Parameters:
+//   - c: The container.
+//   - failed: The error of each container that failed or was skipped.
+//   - stopped: The containers stopped and removed so far.
+//
+// Returns:
+//   - bool: True when c was removed or has an outcome.
+func settled(
+	c *container.Container,
+	failed map[container.ContainerID]error,
+	stopped map[container.ContainerID]container.ContainerID,
+) bool {
+	_, removed := stopped[c.ID()]
+	_, recorded := failed[c.ID()]
+
+	return removed || recorded
 }
 
 // splitReaching splits the members of a group by how they reach its first

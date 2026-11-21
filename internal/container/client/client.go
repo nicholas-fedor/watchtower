@@ -579,9 +579,9 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 // configuration option, and restarting ones with the include-restarting
 // configuration option. This lists the rest of those states and paused
 // containers, so a container that joins a recreated container is found in any
-// state. Podman has no restarting state. Only the containers in another
-// container's namespace are inspected, along with those the list reports
-// without a network mode, as Podman before version 6 lists every container.
+// state. Only the containers in another container's namespace are inspected,
+// along with those the list reports without a network mode, as Podman before
+// version 6 lists every container.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -591,24 +591,32 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 //   - error: Non-nil if listing or an inspect fails for a reason other than
 //     the container being gone.
 func (c *Client) ListNetworkDependents(ctx context.Context) ([]*container.Container, error) {
-	// The states the update lists are left out. Podman's lack of a
-	// restarting state matters only for the listing below.
+	// The states the update lists are left out. The list is read without a
+	// status filter, since Podman rejects a filter for the restarting state
+	// it does not have, and Watchtower may not know it manages Podman, for
+	// example a remote Podman host.
 	listed := buildListFilterArgs(c.ClientOptions, false)["status"]
-	statuses := slices.DeleteFunc([]string{"paused", "created", "exited", "restarting"}, func(status string) bool {
-		return listed[status]
+	unlistedStates := slices.DeleteFunc([]dockerContainer.ContainerState{
+		dockerContainer.StatePaused,
+		dockerContainer.StateCreated,
+		dockerContainer.StateExited,
+		dockerContainer.StateRestarting,
+	}, func(state dockerContainer.ContainerState) bool {
+		return listed[string(state)]
 	})
 
-	unlisted, err := c.api.ContainerList(ctx, dockerClient.ContainerListOptions{
-		All:     true,
-		Filters: statusFilter(slices.Contains(statuses, "restarting") && c.isPodmanRuntime(ctx), statuses...),
-	})
+	all, err := c.api.ContainerList(ctx, dockerClient.ContainerListOptions{All: true})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
-	candidates := make([]dockerContainer.Summary, 0, len(unlisted.Items))
+	candidates := make([]dockerContainer.Summary, 0, len(all.Items))
 
-	for _, summary := range unlisted.Items {
+	for _, summary := range all.Items {
+		if !slices.Contains(unlistedStates, summary.State) {
+			continue
+		}
+
 		mode := dockerContainer.NetworkMode(summary.HostConfig.NetworkMode)
 
 		// Podman before version 6 leaves the network mode out of its

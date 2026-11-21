@@ -25,7 +25,7 @@ A container is monitored only if it passes every filter in the chain. The filter
 !!! Note
     - If an image name pattern is configured, then Watchtower will exclusively manage only the respective container(s).
     - If a container name is provided as an argument, then Watchtower will exclusively manage only the specified container(s).
-    - A container these filters exclude is still recreated when it joins the network of a container Watchtower recreates (see [Containers Sharing a Recreated Container's Network](../../advanced-features/linked-containers/index.md#containers_sharing_a_recreated_containers_network)).
+    - A container these filters exclude is still recreated when it joins the network of a container Watchtower recreates, with the exceptions listed in [Containers Sharing a Recreated Container's Network](../../advanced-features/linked-containers/index.md#containers_sharing_a_recreated_containers_network).
 
 !!! Note "All criteria must be satisfied"
     A container must pass **every** filter in the chain to be monitored. If any single filter rejects it, the container is excluded.

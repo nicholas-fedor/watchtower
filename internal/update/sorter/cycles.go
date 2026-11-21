@@ -19,6 +19,24 @@ type cycleFinder struct {
 	stack []string
 }
 
+// newCycleFinder returns a finder for the cycles of a graph.
+//
+// Parameters:
+//   - adjacency: The outgoing edges of each node.
+//
+// Returns:
+//   - *cycleFinder: A finder with no node visited yet.
+func newCycleFinder(adjacency map[string][]string) *cycleFinder {
+	return &cycleFinder{
+		adjacency: adjacency,
+		index:     make(map[string]int, len(adjacency)),
+		lowLink:   make(map[string]int, len(adjacency)),
+		onStack:   make(map[string]bool, len(adjacency)),
+		inCycle:   make(map[string]bool),
+		stack:     make([]string, 0, len(adjacency)),
+	}
+}
+
 // visit searches the graph depth-first from node and records the members of
 // each multi-node component whose root it finishes.
 //

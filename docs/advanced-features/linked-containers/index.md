@@ -159,7 +159,7 @@ This includes containers Watchtower would otherwise leave alone:
 - A container excluded from monitoring, such as one without the enable label or in another instance's scope.
 - A container skipped because of a circular dependency or a dependency on itself.
 
-A monitored container that joins the network is restarted as a dependent of the container it joins instead (see [Restarting Dependent Containers](#restarting_dependent_containers)), so its lifecycle hooks run and the remove-volumes configuration option applies to it.
+Any other monitored container that joins the network is restarted as a dependent of the container it joins instead (see [Restarting Dependent Containers](#restarting_dependent_containers)), so its lifecycle hooks run and the remove-volumes configuration option applies to it.
 
 Watchtower never recreates these containers this way:
 
