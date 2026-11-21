@@ -25,6 +25,7 @@ var (
 // FromContainer extracts and sanitizes the network configuration from a container.
 //
 // It handles all network modes, including host, and supports both legacy and modern API versions.
+// A container that joins another container's network namespace gets no networks of its own.
 //
 // Parameters:
 //   - sourceContainer: Container to extract config from.
@@ -66,6 +67,14 @@ func FromContainer(log *zerolog.Logger,
 		Str("network_mode", string(networkMode)).
 		Bool("is_host", isHostNetwork).
 		Msg("Evaluated network mode")
+
+	// Podman 5 reports the networks of the container whose namespace this one
+	// joins and rejects them when the replacement is created with them.
+	if sourceContainer.NetworkContainer() != "" {
+		clog.Debug().Msg("Container joins another container's network, so it has no networks of its own")
+
+		return config
+	}
 
 	// Process each network endpoint
 	for networkName, sourceEndpoint := range containerInfo.NetworkSettings.Networks {

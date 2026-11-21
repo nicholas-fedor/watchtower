@@ -69,6 +69,10 @@ const (
 	// ContainerUpdateFailed is logged when a container's stop, recreation or
 	// pre-update command fails while it is being updated.
 	ContainerUpdateFailed = "Could not update container"
+	// ContainerRebindFailed is logged when a container that joins the network
+	// namespace of a recreated container cannot be recreated to join the new
+	// one.
+	ContainerRebindFailed = "Could not reconnect container to the network of a recreated container"
 	// SelfUpdateSkippedRunOnce is logged when a run-once session leaves
 	// Watchtower's own container alone.
 	SelfUpdateSkippedRunOnce = "Skipping Watchtower self-update in run-once mode"

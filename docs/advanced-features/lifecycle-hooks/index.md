@@ -552,6 +552,8 @@ flowchart TD
 | **Post-update** | Individual containers successfully updated | Immediately after starting new container | Command defined + hooks enabled + update successful                  | New container running              |
 | **Post-check**  | Per filtered container                     | End of update cycle                      | Command defined + hooks enabled                                      | Ignored                            |
 
+A container recreated only because it joins the network of a container Watchtower recreates runs no pre-update or post-update command. Its check commands still run when Watchtower monitors it. A pre-update command that skips a container in that network can keep the container it joins from being updated, since removing that container would cut the skipped one's network (see [Containers Sharing a Recreated Container's Network](../linked-containers/index.md#containers_sharing_a_recreated_containers_network)).
+
 ### Exit Code Handling
 
 Hook execution results are evaluated based on exit codes, with different behaviors per hook type:

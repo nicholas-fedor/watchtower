@@ -555,12 +555,23 @@
     },
     {
       "data": {
+        "container": "torrent",
+        "error": "failed to create container: Conflict. The container name \"/torrent\" is already in use",
+        "image": "org/torrent:latest",
+        "network_container": "vpn"
+      },
+      "level": "debug",
+      "message": "Could not reconnect container to the network of a recreated container",
+      "time": "2026-10-07T12:00:59Z"
+    },
+    {
+      "data": {
         "container": "watchtower",
         "orchestrator_id": "0dd0dd000000"
       },
-      "level": "debug",
+      "level": "info",
       "message": "Starting Watchtower ephemeral self-update",
-      "time": "2026-10-07T12:00:59Z"
+      "time": "2026-10-07T12:01:00Z"
     },
     {
       "data": {
@@ -570,9 +581,9 @@
         "source_container": "watchtower",
         "source_id": "c0ffee000000"
       },
-      "level": "info",
+      "level": "warning",
       "message": "Failed to clean up ephemeral orchestrator after start failure",
-      "time": "2026-10-07T12:01:00Z"
+      "time": "2026-10-07T12:01:01Z"
     },
     {
       "data": {
@@ -580,9 +591,9 @@
         "error": "no image info available",
         "image": "org/app:latest"
       },
-      "level": "warning",
+      "level": "error",
       "message": "Could not update container. Its configuration cannot be recreated",
-      "time": "2026-10-07T12:01:01Z"
+      "time": "2026-10-07T12:01:02Z"
     },
     {
       "data": {

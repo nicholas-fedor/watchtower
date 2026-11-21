@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"slices"
 	"strings"
 	"sync"
 
@@ -32,14 +31,10 @@ const (
 	maxCopyFileStoreBytes = 16 << 20
 	// unixFilePermMask keeps owner/group/other bits and drops setuid, setgid, and sticky.
 	unixFilePermMask = 0o777
-	// bindStringMinParts is source and destination in a HostConfig.Binds entry.
-	bindStringMinParts = 2
 	// injectRootPath is the extraction point for injected files. The daemon requires
 	// it to name an existing directory, and the archive extractor creates any absent
 	// parent of the archived member, so injecting at the root matches Docker Compose.
 	injectRootPath = "/"
-	// bindReadOnlyOption is the HostConfig.Binds option that marks a bind read-only.
-	bindReadOnlyOption = "ro"
 	// userNSSecurityOption is the daemon security option reported under --userns-remap.
 	userNSSecurityOption = "name=userns"
 )
@@ -376,8 +371,8 @@ func mostSpecificMount(info *dockerContainer.InspectResponse, filePath string) (
 	}
 
 	for _, bind := range info.HostConfig.Binds {
-		if dest := bindDestination(bind); dest != "" {
-			consider(dest, bindIsReadOnly(bind))
+		if parsed, ok := container.ParseBind(bind); ok {
+			consider(parsed.Destination, parsed.ReadOnly())
 		}
 	}
 
@@ -450,38 +445,6 @@ func pathIsUnderMount(filePath, mountDest string) bool {
 	}
 
 	return strings.HasPrefix(path.Clean(filePath), path.Clean(mountDest)+"/")
-}
-
-// bindDestination returns the container path from a Unix bind string.
-//
-// Parameters:
-//   - bind: HostConfig.Binds entry in source:destination[:options] form.
-//
-// Returns:
-//   - string: Container destination, or empty if the bind is malformed.
-func bindDestination(bind string) string {
-	parts := strings.Split(bind, ":")
-	if len(parts) < bindStringMinParts {
-		return ""
-	}
-
-	return parts[1]
-}
-
-// bindIsReadOnly reports whether a Unix bind string marks the mount read-only.
-//
-// Parameters:
-//   - bind: HostConfig.Binds entry in source:destination[:options] form.
-//
-// Returns:
-//   - bool: True when the options include ro.
-func bindIsReadOnly(bind string) bool {
-	parts := strings.Split(bind, ":")
-	if len(parts) < bindStringMinParts+1 {
-		return false
-	}
-
-	return slices.Contains(strings.Split(parts[bindStringMinParts], ","), bindReadOnlyOption)
 }
 
 // Capture reads labeled files from the source container into memory.

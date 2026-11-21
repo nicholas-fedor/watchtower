@@ -94,6 +94,7 @@ var legacyTemplateMessages = []string{
 	logging.UpdateFailed,
 	logging.UpdateCheckFailed,
 	logging.ImagePullFailed,
+	logging.ContainerRebindFailed,
 	logging.EphemeralSelfUpdateStarting,
 	logging.OrchestratorCleanupFailed,
 	logging.ConfigNotRecreatable,
@@ -216,6 +217,13 @@ func goldenEntryData(message string) map[string]any {
 			"container": "app",
 			"image":     "org/app:latest",
 			"error":     "pre-update command failed: exit code 1",
+		}
+	case logging.ContainerRebindFailed:
+		return map[string]any{
+			"container":         "torrent",
+			"image":             "org/torrent:latest",
+			"network_container": "vpn",
+			"error":             "failed to create container: Conflict. The container name \"/torrent\" is already in use",
 		}
 	case logging.UnresolvedDependsOn:
 		return map[string]any{"container": "app", "depends_on": "missing-db"}

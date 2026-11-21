@@ -43,9 +43,16 @@ type Params struct {
 	GitComposeStash     bool                    // Save and restore local Compose project files around checkout.
 }
 
-// detachedCallBudget is the time a detached Docker call gets beyond the
-// container stop timeout.
-const detachedCallBudget = 30 * time.Second
+// Bounds for Docker calls that run detached from the update's cancellation.
+const (
+	// detachedCallBudget is the time a detached Docker call gets beyond the
+	// container stop timeout.
+	detachedCallBudget = 30 * time.Second
+
+	// minCreateStartTimeout is the shortest bound for creating and starting
+	// a replacement container, which can be slow on busy hosts.
+	minCreateStartTimeout = 5 * time.Minute
+)
 
 // DetachedTimeout returns the bound for Docker calls that run detached from the
 // update session, such as restoring a container after a failed update or
@@ -60,6 +67,18 @@ const detachedCallBudget = 30 * time.Second
 //   - time.Duration: The bound for detached Docker calls.
 func (p Params) DetachedTimeout() time.Duration {
 	return detachedBound(p.Timeout)
+}
+
+// CreateStartTimeout returns the bound for creating and starting a
+// replacement container detached from the update's cancellation.
+//
+// The create and start calls can be slow on busy hosts, so they get the longer
+// of 5 minutes and [Params.DetachedTimeout].
+//
+// Returns:
+//   - time.Duration: The bound for the create and start calls.
+func (p Params) CreateStartTimeout() time.Duration {
+	return max(p.DetachedTimeout(), minCreateStartTimeout)
 }
 
 // DetachedStopTimeout returns the bound for detached Docker calls that stop

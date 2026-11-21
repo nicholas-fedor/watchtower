@@ -18,6 +18,9 @@ const (
 	DependsOn = "com.centurylinklabs.watchtower.depends-on"
 	// ContainerChain accumulates container IDs across Watchtower self-updates, comma-separated.
 	ContainerChain = "com.centurylinklabs.watchtower.container-chain"
+	// KeptVolumes records as JSON the anonymous volumes that a recreation mounted by name, so a later recreation can
+	// mount them anonymously again.
+	KeptVolumes = "com.centurylinklabs.watchtower.kept-volumes"
 	// ZodiacOriginalImage stores the original image name for Zodiac compatibility.
 	ZodiacOriginalImage = "com.centurylinklabs.zodiac.original-image"
 	// Scope defines a unique monitoring scope for this Watchtower instance.

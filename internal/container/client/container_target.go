@@ -69,7 +69,7 @@ func startTargetContainer(
 	}
 
 	message := logging.StartedNewContainer
-	if sourceContainer.IsLinkedToRestarting() {
+	if sourceContainer.RestartsForAnother() {
 		message = logging.StartedLinkedContainer
 	}
 

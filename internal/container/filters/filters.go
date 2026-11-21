@@ -27,6 +27,7 @@ type Filter func(FilterableContainer) bool
 type FilterableContainer interface {
 	Name() string                       // Container name.
 	IsWatchtower() bool                 // Check if Watchtower instance.
+	IsJobRun() bool                     // Check if a run of a Docker Engine job.
 	Enabled() (bool, bool)              // Enabled status and presence.
 	Scope() (string, bool)              // Scope value and presence.
 	NormalizedScope() string            // Scope, or "none" when unset or empty.
@@ -138,11 +139,6 @@ func excludeOldWatchtowerFilterChain(baseFilter Filter) Filter {
 // excludeJobRunsFilterChain wraps a base filter so that it rejects the
 // containers Docker Engine runs for a job.
 //
-// The engine creates each run and removes it after a success. It keeps a
-// failed run for the job's history. A run that Watchtower recreated or
-// restarted would run outside the job's schedule. A recreated failed run would
-// lose its exit status and logs.
-//
 // Parameters:
 //   - baseFilter: Base filter to chain.
 //
@@ -151,7 +147,7 @@ func excludeOldWatchtowerFilterChain(baseFilter Filter) Filter {
 //     filter.
 func excludeJobRunsFilterChain(baseFilter Filter) Filter {
 	return func(c FilterableContainer) bool {
-		if _, ok := c.GetLabel(labels.JobID); ok {
+		if c.IsJobRun() {
 			return false
 		}
 

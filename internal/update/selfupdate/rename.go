@@ -137,7 +137,7 @@ func (r *Rename) Abort(
 		return cause
 	}
 
-	removeFailedReplacement(r.log, ctx, client, r.source, newContainerID, config)
+	RemoveFailedReplacement(r.log, ctx, client, r.source, newContainerID, config)
 
 	if r.originalName == "" {
 		return cause
@@ -229,22 +229,23 @@ func renameToOldName(
 	return true, nil
 }
 
-// removeFailedReplacement stops and removes a Watchtower replacement that
-// failed to start, so its predecessor can take the original name back.
+// RemoveFailedReplacement stops and removes a replacement that failed, so the
+// container it was created from can take its name back.
 //
 // It does nothing for an empty container ID. The removal keeps ctx's values
 // but not its cancellation or deadline, and gets the stop timeout plus 30
 // seconds, using the source's own stop timeout when it is longer, since the
-// replacement copies it. A failure is logged at debug only.
+// replacement copies it. A replacement already gone counts as removed. A
+// failure is logged at debug only.
 //
 // Parameters:
-//   - log: Logger that names the self-update.
-//   - ctx: The self-update's context.
+//   - log: Logger that names the source container.
+//   - ctx: The update's context.
 //   - client: Container client for the removal.
 //   - source: The container the replacement was created from.
 //   - newContainerID: ID of the failed replacement.
 //   - config: Update options. The stop waits up to the stop timeout.
-func removeFailedReplacement(
+func RemoveFailedReplacement(
 	log *zerolog.Logger,
 	ctx context.Context,
 	client ReplacementRemover,
@@ -259,7 +260,7 @@ func removeFailedReplacement(
 	clogVal := log.With().Str("new_id", newContainerID.ShortID()).Logger()
 	clog := &clogVal
 
-	clog.Debug().Msg("Removing failed Watchtower replacement")
+	clog.Debug().Msg("Removing failed replacement")
 
 	cleanupCtx, cancel := context.WithTimeout(
 		context.WithoutCancel(ctx),
@@ -271,7 +272,7 @@ func removeFailedReplacement(
 	if err != nil {
 		clog.Debug().
 			Err(err).
-			Msg("Failed to inspect failed Watchtower replacement")
+			Msg("Failed to inspect failed replacement")
 
 		return
 	}
@@ -280,6 +281,6 @@ func removeFailedReplacement(
 	if err != nil && !cerrdefs.IsNotFound(err) {
 		clog.Debug().
 			Err(err).
-			Msg("Failed to remove failed Watchtower replacement")
+			Msg("Failed to remove failed replacement")
 	}
 }

@@ -489,6 +489,114 @@ func TestDependencyGraph_Sort(t *testing.T) {
 	})
 }
 
+// TestDependencyGraph_PlaceRebound verifies where rebound containers are
+// placed in the restart order. A rebound container directly follows the
+// container whose network it joins, while the plan keeps its order. A
+// dependency on Watchtower never moves a container after it, since its
+// self-update hands over to a new process. When only a dependency cycle is
+// left, a member of the cycle is released first, so a container that waits
+// for the cycle still follows the member it names.
+func TestDependencyGraph_PlaceRebound(t *testing.T) {
+	t.Parallel()
+
+	// rebound marks containers as rebound to the network namespace of
+	// provider and returns them with the joiners map PlaceRebound takes.
+	rebound := func(provider *container.Container, containers ...*container.Container) (
+		[]*container.Container, map[container.ContainerID][]*container.Container,
+	) {
+		for _, c := range containers {
+			c.SetRebinding(true)
+		}
+
+		return containers, map[container.ContainerID][]*container.Container{provider.ID(): containers}
+	}
+
+	tests := []struct {
+		name string
+		// deployment lists every container. The first ones named by plan
+		// restart, and the containers named by joining are rebound to the
+		// first container of plan.
+		deployment []deployed
+		plan       []string
+		joining    []string
+		// monitored makes the rebound containers members of the graph, as
+		// a monitor-only container is, so their labels resolve.
+		monitored bool
+		want      []string
+	}{
+		{
+			name: "follows the container it joins while the plan keeps its order",
+			deployment: []deployed{
+				{name: "vpn"},
+				{name: "db"},
+				{name: "app", networkMode: "container:vpn"},
+			},
+			plan:    []string{"vpn", "db"},
+			joining: []string{"app"},
+			want:    []string{"vpn", "app", "db"},
+		},
+		{
+			name: "keeps Watchtower last when a rebound container depends on it",
+			deployment: []deployed{
+				{name: "vpn"},
+				{name: "watchtower", watchtower: true},
+				{name: "monitor", networkMode: "container:vpn", dependsOn: "watchtower"},
+			},
+			plan:      []string{"vpn", "watchtower"},
+			joining:   []string{"monitor"},
+			monitored: true,
+			want:      []string{"vpn", "monitor", "watchtower"},
+		},
+		{
+			// a and b take each other's volumes. d takes a's volumes, so it
+			// still follows a, although it comes first among the rebound
+			// containers.
+			name: "releases a cycle before the container that waits for it",
+			deployment: []deployed{
+				{name: "vpn"},
+				{name: "d", networkMode: "container:vpn", volumesFrom: []string{"a"}},
+				{name: "a", networkMode: "container:vpn", volumesFrom: []string{"b"}},
+				{name: "b", networkMode: "container:vpn", volumesFrom: []string{"a"}},
+			},
+			plan:    []string{"vpn"},
+			joining: []string{"d", "a", "b"},
+			want:    []string{"vpn", "a", "d", "b"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			containers := deploy(tt.deployment...)
+			plan := pick(containers, tt.plan...)
+			monitored, unmonitored := plan, pick(containers, tt.joining...)
+
+			if tt.monitored {
+				monitored, unmonitored = containers, nil
+			}
+
+			graph, err := NewDependencyGraph(newTestLogger(t), monitored, unmonitored, false)
+			require.NoError(t, err)
+
+			joiners, byProvider := rebound(plan[0], pick(containers, tt.joining...)...)
+
+			assert.Equal(t, tt.want, containerNames(graph.PlaceRebound(plan, joiners, byProvider)))
+		})
+	}
+
+	t.Run("returns the plan when nothing is rebound", func(t *testing.T) {
+		t.Parallel()
+
+		plan := deploy(deployed{name: "vpn"}, deployed{name: "db"})
+
+		graph, err := NewDependencyGraph(newTestLogger(t), plan, nil, false)
+		require.NoError(t, err)
+
+		assert.Equal(t, plan, graph.PlaceRebound(plan, nil, nil))
+	})
+}
+
 // TestDependencyGraph_ServiceNames verifies that a link naming a Compose
 // service resolves to every replica of the service, whether the name is bare
 // or hyphenated. A name shared by several projects resolves to the service of

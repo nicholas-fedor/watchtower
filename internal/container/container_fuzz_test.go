@@ -34,3 +34,37 @@ func FuzzNormalizeContainerName(f *testing.F) {
 		}
 	})
 }
+
+// FuzzParseBind verifies that ParseBind never panics. It also checks that a
+// parsed entry has a non-empty source and a destination without a colon and
+// rebuilds the input. Seeds cover host paths, volumes, options, a Windows
+// drive letter, and entries without a source or destination.
+func FuzzParseBind(f *testing.F) {
+	f.Add("/host/config.yaml:/app/config.yaml:ro")
+	f.Add("cache:/data")
+	f.Add(`C:\data:/data:rw,z`)
+	f.Add("nocolon")
+	f.Add("::")
+	f.Add("C:")
+	f.Add("")
+
+	f.Fuzz(func(t *testing.T, bind string) {
+		got, ok := ParseBind(bind)
+		if !ok {
+			return
+		}
+
+		if got.Source == "" || got.Destination == "" || strings.Contains(got.Destination, ":") {
+			t.Fatalf("ParseBind(%q) = %+v", bind, got)
+		}
+
+		rebuilt := got.Source + ":" + got.Destination
+		if got.Options != "" || strings.HasSuffix(bind, ":") {
+			rebuilt += ":" + got.Options
+		}
+
+		if rebuilt != bind {
+			t.Fatalf("ParseBind(%q) = %+v, which rebuilds %q", bind, got, rebuilt)
+		}
+	})
+}

@@ -79,6 +79,8 @@ Invalid regex patterns are treated as literal strings for exact matching.
 | `^web-.*`     | Any name starting with `web-`    |
 | `.*-prod$`    | Any name ending with `-prod`     |
 
+A targeted update also recreates the containers that join the network of a container it recreates, which the image and container filters do not have to match (see [Containers Sharing a Recreated Container's Network](../../../advanced-features/linked-containers/index.md#containers_sharing_a_recreated_containers_network)).
+
 ### Timeout
 
 The `timeout` parameter overrides the per-request timeout for this update.
