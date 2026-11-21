@@ -70,7 +70,7 @@ require (
 	github.com/docker/docker-credential-helpers v0.9.13 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/secrets-engine/client v0.2.2 // indirect
-	github.com/docker/secrets-engine/x v0.8.5 // indirect
+	github.com/docker/secrets-engine/x v0.10.0 // indirect
 	github.com/eclipse/paho.golang v0.23.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
