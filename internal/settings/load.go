@@ -815,5 +815,14 @@ func validate(log *zerolog.Logger, cfg Config) error {
 			Msg("Combining monitor-only and no-pull might result in no updates")
 	}
 
+	// Without include-stopped, every listed container is running, so no
+	// replacement is ever revived.
+	if cfg.Client.ReviveStopped && !cfg.Client.IncludeStopped {
+		log.Warn().
+			Bool("revive_stopped", cfg.Client.ReviveStopped).
+			Bool("include_stopped", cfg.Client.IncludeStopped).
+			Msg("Revive-stopped has no effect without include-stopped")
+	}
+
 	return nil
 }

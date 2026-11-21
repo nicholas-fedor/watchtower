@@ -16,11 +16,13 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/git/semver"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/settings/config/client"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/registry"
 	"github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/settings/flags/spec"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 )
 
 // newNopLogger returns a discarded logger for Load and validate tests.
@@ -893,12 +895,14 @@ func TestReadOptionalFile(t *testing.T) {
 	})
 }
 
+// TestValidate verifies that validate rejects incompatible settings and warns
+// about settings that cannot take effect together.
 func TestValidate(t *testing.T) {
-	t.Run("ok", func(t *testing.T) {
-		require.NoError(t, validate(newNopLogger(), Config{}))
-	})
+	t.Parallel()
 
 	t.Run("rolling and monitor-only", func(t *testing.T) {
+		t.Parallel()
+
 		err := validate(newNopLogger(), Config{
 			Update: update.Update{
 				RollingRestart: true,
@@ -908,15 +912,50 @@ func TestValidate(t *testing.T) {
 		require.ErrorIs(t, err, errRollingRestartWithMonitorOnly)
 	})
 
-	t.Run("monitor-only and no-pull warns", func(t *testing.T) {
-		err := validate(newNopLogger(), Config{
-			Update: update.Update{
-				MonitorOnly: true,
-				NoPull:      true,
+	tests := []struct {
+		name  string
+		cfg   Config
+		warns []string
+	}{
+		{
+			name: "ok",
+			cfg:  Config{},
+		},
+		{
+			name: "monitor-only and no-pull warns",
+			cfg: Config{
+				Update: update.Update{
+					MonitorOnly: true,
+					NoPull:      true,
+				},
 			},
+			warns: []string{"Combining monitor-only and no-pull might result in no updates"},
+		},
+		{
+			name:  "revive-stopped without include-stopped warns",
+			cfg:   Config{Client: client.Client{ReviveStopped: true}},
+			warns: []string{"Revive-stopped has no effect without include-stopped"},
+		},
+		{
+			name: "revive-stopped with include-stopped",
+			cfg:  Config{Client: client.Client{ReviveStopped: true, IncludeStopped: true}},
+		},
+		{
+			name: "include-stopped alone",
+			cfg:  Config{Client: client.Client{IncludeStopped: true}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			log, logs := logcapture.NewJSON(zerolog.DebugLevel)
+
+			require.NoError(t, validate(log, tt.cfg))
+			assert.Equal(t, tt.warns, logcapture.Messages(t, logs.String(), "warn"))
 		})
-		require.NoError(t, err)
-	})
+	}
 }
 
 // Test_flagValues_reads verifies that flagValues reads each kind of setting
