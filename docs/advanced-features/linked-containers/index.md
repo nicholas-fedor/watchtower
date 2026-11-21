@@ -213,6 +213,9 @@ It starts the shared container again if it was running, then recreates the joini
 The joining container that could not be stopped keeps its place in the restored network and starts again if it was running, while those not reached yet are skipped.
 On Podman, a paused joining container cannot be stopped, so the shared container stays as it is.
 
+When the removal of the shared container fails but the daemon removed it anyway, its replacement counts as done.
+If Watchtower cannot tell whether it was removed, it keeps the replacement and reports the shared container as failed, since removing the replacement could leave neither container.
+
 Without rolling restarts, a container that joins another's network and is not stopped keeps the container it joins running too, so Watchtower reports that container as not updated.
 
 Watchtower reports a container it cannot recreate as "Could not reconnect container to the network of a recreated container" and lists it as failed, also when it does not monitor that container.

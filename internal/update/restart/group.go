@@ -8,6 +8,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	cerrdefs "github.com/containerd/errdefs"
+
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/selfupdate"
@@ -22,6 +24,9 @@ var (
 	// errGroupKept indicates that a container was left as it was because the container whose network its group
 	// joins was not replaced.
 	errGroupKept = errors.New("left in place with the container whose network its group joins")
+	// errReplacementKept indicates that a container whose removal failed could not be inspected, so its
+	// replacement was kept.
+	errReplacementKept = errors.New("could not tell whether the container was removed, so its replacement was kept")
 )
 
 // networkGroups splits containers in restart order into groups.
@@ -134,7 +139,11 @@ func stopGroup(
 // replacement exists leaves the container in place. When one of these steps
 // fails after the replacement exists, the replacement is undone:
 //   - stopping a member that joins another member
-//   - removing the container
+//   - removing the container, when the container still exists
+//
+// A container the daemon removed although its removal failed counts as
+// removed. When it cannot be inspected either, the replacement is kept and the
+// container fails, since removing the replacement could leave neither.
 //
 // The replacement is then removed. The container takes its name back and
 // starts again if it was running. Members already removed are recreated
@@ -242,12 +251,25 @@ func stopNetworkGroup(
 	}
 
 	// A container already gone counts as removed, since its replacement
-	// exists.
+	// exists. So does one the daemon removed although the removal failed,
+	// such as when the removal outlasted its bound.
 	err = stopAndRemove(log, ctx, head, client, config)
 	if err != nil && !errors.Is(err, errContainerGone) {
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, reaching, config, err)
+		exists, inspectErr := stillExists(ctx, client, head, config)
 
-		return
+		switch {
+		case inspectErr != nil:
+			// Removing the replacement could leave neither container, so
+			// it stays for the container to be recovered by hand.
+			failed[head.ID()] = fmt.Errorf("%w: %w", errReplacementKept, errors.Join(err, inspectErr))
+
+			return
+		case exists:
+			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, reaching, config, err)
+
+			return
+		default:
+		}
 	}
 
 	stopped[head.ID()] = newID
@@ -322,6 +344,36 @@ func restoreReplaced(
 	log.Debug().Msg("Restored container after its replacement failed")
 
 	return cause
+}
+
+// stillExists reports whether a container whose removal failed still exists.
+//
+// The inspect keeps ctx's values but not its cancellation and gets the stop
+// timeout plus 30 seconds.
+//
+// Parameters:
+//   - ctx: The update's context.
+//   - client: Container client for Docker operations.
+//   - c: The container whose removal failed.
+//   - config: Update options holding the stop timeout.
+//
+// Returns:
+//   - bool: True when the daemon still has c.
+//   - error: The inspect's error when it cannot tell, nil otherwise.
+func stillExists(ctx context.Context, client Client, c *container.Container, config updateParams.Params) (bool, error) {
+	inspectCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
+	defer cancel()
+
+	_, err := client.GetContainer(inspectCtx, c.ID())
+
+	switch {
+	case err == nil:
+		return true, nil
+	case cerrdefs.IsNotFound(err):
+		return false, nil
+	default:
+		return false, err //nolint:wrapcheck // The client's error already names the failed inspect.
+	}
 }
 
 // stopMembers stops members of a group in reverse order.

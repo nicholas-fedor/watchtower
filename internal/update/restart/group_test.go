@@ -82,11 +82,14 @@ func TestNetworkGroups(t *testing.T) {
 // also removes the replacement. The others already removed are recreated
 // against the restored container. A container gone before it steps aside is
 // skipped. A failed rename aside leaves the group as it was. A container gone
-// after its replacement exists counts as removed.
+// after its replacement exists counts as removed, as does one the daemon
+// removed although its removal failed. When such a container cannot be
+// inspected, its replacement is kept.
 func TestStopContainersInReversedOrder_networkGroup(t *testing.T) {
 	t.Parallel()
 
 	createErr := errors.New("create failed")
+	inspectErr := errors.New("inspect failed")
 	removeErr := errors.New("remove failed")
 	renameErr := errors.New("rename failed")
 	stopErr := errors.New("stop failed")
@@ -156,6 +159,7 @@ func TestStopContainersInReversedOrder_networkGroup(t *testing.T) {
 					client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
 					client.EXPECT().StopAndRemoveContainer(mock.Anything, torrent, mock.Anything).Return(nil).Once(),
 					client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(removeErr).Once(),
+					client.EXPECT().GetContainer(mock.Anything, vpn.ID()).Return(vpn, nil).Once(),
 					client.EXPECT().GetContainer(mock.Anything, container.ContainerID("new-vpn")).Return(replacement, nil).Once(),
 					client.EXPECT().StopAndRemoveContainer(mock.Anything, replacement, mock.Anything).Return(nil).Once(),
 					client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").Return(nil).Once(),
@@ -233,6 +237,42 @@ func TestStopContainersInReversedOrder_networkGroup(t *testing.T) {
 			wantStopped: map[container.ContainerID]container.ContainerID{"chain-id": "", "torrent-id": "", "vpn-id": "new-vpn"},
 		},
 		{
+			name: "container removed although its removal failed counts as removed",
+			expect: func(client *mockRestart.MockClient, vpn, torrent, chain *container.Container) {
+				client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+				client.EXPECT().DiscardCopyFiles(vpn.ID()).Return().Once()
+				mock.InOrder(
+					client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
+					client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+					client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
+					client.EXPECT().StopAndRemoveContainer(mock.Anything, torrent, mock.Anything).Return(nil).Once(),
+					client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(removeErr).Once(),
+					client.EXPECT().GetContainer(mock.Anything, vpn.ID()).Return(nil, cerrdefs.ErrNotFound).Once(),
+				)
+			},
+			wantStopped: map[container.ContainerID]container.ContainerID{"chain-id": "", "torrent-id": "", "vpn-id": "new-vpn"},
+		},
+		{
+			// Removing the replacement could leave neither container, so it
+			// stays and vpn fails.
+			name: "container that cannot be inspected after a failed removal keeps its replacement",
+			expect: func(client *mockRestart.MockClient, vpn, torrent, chain *container.Container) {
+				client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+				client.EXPECT().DiscardCopyFiles(vpn.ID()).Return().Once()
+				mock.InOrder(
+					client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
+					client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+					client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
+					client.EXPECT().StopAndRemoveContainer(mock.Anything, torrent, mock.Anything).Return(nil).Once(),
+					client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(removeErr).Once(),
+					client.EXPECT().GetContainer(mock.Anything, vpn.ID()).Return(nil, inspectErr).Once(),
+				)
+			},
+			wantStopped:  map[container.ContainerID]container.ContainerID{"chain-id": "", "torrent-id": ""},
+			wantErrs:     []error{errReplacementKept, removeErr, inspectErr},
+			wantOutcomes: []container.ContainerID{"vpn-id"},
+		},
+		{
 			name: "failed restore is reported with the cause",
 			expect: func(client *mockRestart.MockClient, vpn, _, _ *container.Container) {
 				mock.InOrder(
@@ -308,6 +348,7 @@ func TestStopContainersInReversedOrder_networkGroupNameNotRestored(t *testing.T)
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, torrent, mock.Anything).Return(nil).Once(),
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(errors.New("remove failed")).Once(),
+		client.EXPECT().GetContainer(mock.Anything, vpn.ID()).Return(vpn, nil).Once(),
 		client.EXPECT().GetContainer(mock.Anything, container.ContainerID("new-vpn")).Return(replacement, nil).Once(),
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, replacement, mock.Anything).Return(nil).Once(),
 		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").Return(errors.New("rename failed")).Once(),
