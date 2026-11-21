@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update golang.org/x/exp digest to 8801fbd by @renovate[bot] in [#3990](https://github.com/nicholas-fedor/watchtower/pull/3990)
 - Update github.com/moby/extensions digest to fb779cf by @renovate[bot] in [#3989](https://github.com/nicholas-fedor/watchtower/pull/3989)
 - Update module github.com/huandu/xstrings to v1.6.4 by @renovate[bot] in [#3986](https://github.com/nicholas-fedor/watchtower/pull/3986)
 - Update module github.com/klauspost/compress to v1.20.5 by @renovate[bot] in [#3987](https://github.com/nicholas-fedor/watchtower/pull/3987)
