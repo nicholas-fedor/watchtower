@@ -454,40 +454,68 @@ func TestStopContainersInReversedOrder_networkGroupStopFails(t *testing.T) {
 	assert.ErrorContains(t, failed[gateway.ID()], "vpn")
 }
 
-// TestStopContainersInReversedOrder_networkGroupPausedJoiner verifies that a
-// paused container joining vpn, which Podman refuses to stop, keeps vpn in
-// place without being started, since Docker and Podman refuse to start a
-// paused container. It is skipped, so vpn's failure alone reports the cause.
-// The strict mock fails on a start of the paused container.
+// TestStopContainersInReversedOrder_networkGroupPausedJoiner verifies a paused
+// container joining vpn whose stop fails, which keeps vpn in place. Its state
+// is read again before it is started. Still paused, as when Podman refuses
+// the stop, it is left as it is, since Docker and Podman refuse to start a
+// paused container. Stopped, as when Docker stops it but its removal fails,
+// it starts again. Either way it is skipped, so vpn's failure alone reports
+// the cause. The strict mock fails on any other start.
 func TestStopContainersInReversedOrder_networkGroupPausedJoiner(t *testing.T) {
 	t.Parallel()
 
-	group := newNetworkGroup()
-	vpn, chain := group[0], group[2]
-	paused := rebound("torrent", "vpn", containerfixture.WithContainerState(dockerContainer.State{Running: true, Paused: true}))
-	group[1] = paused
-	replacement := modelfixture.Container(containerfixture.WithID("new-vpn"))
-	stopErr := errors.New("container is running or paused, refusing to clean up")
+	tests := []struct {
+		name string
+		// now is the joining container's state when it is read again.
+		now dockerContainer.State
+		// wantStart reports whether it starts again.
+		wantStart bool
+	}{
+		{name: "still paused after a refused stop", now: dockerContainer.State{Running: true, Paused: true}},
+		{name: "stopped before its removal failed", now: dockerContainer.State{Status: "exited"}, wantStart: true},
+	}
 
-	client := mockRestart.NewMockClient(t)
-	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
-	client.EXPECT().DiscardCopyFiles(paused.ID()).Return().Once()
-	mock.InOrder(
-		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
-		client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
-		client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
-		client.EXPECT().StopAndRemoveContainer(mock.Anything, paused, mock.Anything).Return(stopErr).Once(),
-		client.EXPECT().GetContainer(mock.Anything, container.ContainerID("new-vpn")).Return(replacement, nil).Once(),
-		client.EXPECT().StopAndRemoveContainer(mock.Anything, replacement, mock.Anything).Return(nil).Once(),
-		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").Return(nil).Once(),
-		client.EXPECT().StartContainerByID(mock.Anything, vpn.ID()).Return(nil).Once(),
-	)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	failed, _ := stopContainersInReversedOrder(newTestLogger(t), t.Context(), group, client, updateParams.Params{})
+			group := newNetworkGroup()
+			vpn, chain := group[0], group[2]
+			paused := rebound("torrent", "vpn",
+				containerfixture.WithContainerState(dockerContainer.State{Running: true, Paused: true}))
+			group[1] = paused
+			current := rebound("torrent", "vpn", containerfixture.WithContainerState(tt.now))
+			replacement := modelfixture.Container(containerfixture.WithID("new-vpn"))
+			stopErr := errors.New("stop or removal failed")
 
-	require.ErrorIs(t, failed[paused.ID()], stopErr)
-	assert.True(t, isSkip(failed[paused.ID()]))
-	require.ErrorIs(t, failed[vpn.ID()], errRebindNotStopped)
+			client := mockRestart.NewMockClient(t)
+			client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+			client.EXPECT().DiscardCopyFiles(paused.ID()).Return().Once()
+
+			calls := []*mock.Call{
+				client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
+				client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+				client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
+				client.EXPECT().StopAndRemoveContainer(mock.Anything, paused, mock.Anything).Return(stopErr).Once(),
+				client.EXPECT().GetContainer(mock.Anything, container.ContainerID("new-vpn")).Return(replacement, nil).Once(),
+				client.EXPECT().StopAndRemoveContainer(mock.Anything, replacement, mock.Anything).Return(nil).Once(),
+				client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").Return(nil).Once(),
+				client.EXPECT().StartContainerByID(mock.Anything, vpn.ID()).Return(nil).Once(),
+				client.EXPECT().GetContainer(mock.Anything, paused.ID()).Return(current, nil).Once(),
+			}
+			if tt.wantStart {
+				calls = append(calls, client.EXPECT().StartContainerByID(mock.Anything, paused.ID()).Return(nil).Once())
+			}
+
+			mock.InOrder(calls...)
+
+			failed, _ := stopContainersInReversedOrder(newTestLogger(t), t.Context(), group, client, updateParams.Params{})
+
+			require.ErrorIs(t, failed[paused.ID()], stopErr)
+			assert.True(t, isSkip(failed[paused.ID()]))
+			require.ErrorIs(t, failed[vpn.ID()], errRebindNotStopped)
+		})
+	}
 }
 
 // TestStopContainersInReversedOrder_networkGroupWithWaitingJoiner verifies
