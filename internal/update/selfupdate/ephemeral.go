@@ -454,7 +454,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	if err != nil {
 		// A stop timeout set on the container takes precedence over the 30
 		// seconds passed to the stop, so the removal's bound follows the longer.
-		removeFailedReplacement(clog, ctx, client, oldContainer, newContainerID,
+		RemoveFailedReplacement(clog, ctx, client, oldContainer, newContainerID,
 			updateParams.Params{Timeout: orchestratorStopTimeout})
 
 		if !oldGone {

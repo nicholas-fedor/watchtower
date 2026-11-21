@@ -1,6 +1,8 @@
 package implicitrestart
 
 import (
+	"slices"
+
 	"github.com/rs/zerolog"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
@@ -108,4 +110,237 @@ func Reconcile(
 	}
 
 	return restart
+}
+
+// Rebind marks the containers that join the network namespace of a container
+// in plan as rebinding and returns plan with them placed in it.
+//
+// A container is rebound whether it is running or stopped, including one that
+// is monitor-only or not monitored. A container that joins a rebound container
+// is rebound in turn.
+// Watchtower containers, runs of Docker Engine jobs, excluded containers and
+// containers already in plan are never rebound. Neither are the containers that join a Watchtower
+// container, whose self-update replaces it after this process hands over.
+//
+// Each container comes after the containers its host config names, such as
+// the one whose namespace it joins. It also comes after those it depends on
+// in graph.
+// Docker resolves the host config's containers when it creates a container,
+// so they must exist again by then. Otherwise a rebound container directly
+// follows the container whose namespace it joins, while plan keeps its order.
+//
+// Parameters:
+//   - log: Process logger.
+//   - graph: The scan's dependency graph.
+//   - plan: Containers to restart, in restart order.
+//   - candidates: Containers that may be rebound, in the order to consider them.
+//   - excluded: Container IDs that must not be rebound.
+//
+// Returns:
+//   - []*container.Container: plan with the rebound containers placed in it.
+func Rebind(
+	log *zerolog.Logger,
+	graph *sorter.DependencyGraph,
+	plan, candidates []*container.Container,
+	excluded map[container.ContainerID]struct{},
+) []*container.Container {
+	joiners, rebound := markRebound(log, plan, candidates, excluded)
+
+	return placeRebound(graph, plan, rebound, joiners)
+}
+
+// markRebound marks the candidates that join the network namespace of a
+// container in plan, directly or through other marked candidates, as
+// rebinding.
+//
+// Every container of plan and every marked candidate that joins one of these
+// containers names it by name in its network mode afterwards.
+//
+// Each marked candidate's network mode is set to name the container it joins,
+// so that its replacement joins that container's replacement.
+//
+// Parameters:
+//   - log: Process logger.
+//   - plan: Containers to restart.
+//   - candidates: Containers that may be rebound, in the order to consider them.
+//   - excluded: Container IDs that must not be rebound.
+//
+// Returns:
+//   - map[container.ContainerID][]*container.Container: For each container,
+//     the marked candidates that join its namespace, in candidate order.
+//   - []*container.Container: The marked candidates.
+func markRebound(
+	log *zerolog.Logger,
+	plan, candidates []*container.Container,
+	excluded map[container.ContainerID]struct{},
+) (map[container.ContainerID][]*container.Container, []*container.Container) {
+	// The plan's containers are never marked.
+	seen := make(map[container.ContainerID]bool, len(plan))
+	for _, c := range plan {
+		seen[c.ID()] = true
+	}
+
+	joiners := make(map[container.ContainerID][]*container.Container)
+
+	// Docker stores a network mode that names another container by that
+	// container's ID. A container that joins a recreated container's
+	// namespace keeps the removed ID and loses its network unless it is
+	// recreated after it, naming the container by name. The scan replaces the
+	// ID with the name, unless it could not inspect the container.
+	// The queue holds the plan, followed by each marked candidate in turn.
+	providers := slices.Clone(plan)
+
+	for i := 0; i < len(providers); i++ {
+		provider := providers[i]
+
+		// The self-update replaces Watchtower's container after this process
+		// hands over, too late to recreate a container against it.
+		if provider.IsWatchtower() {
+			continue
+		}
+
+		// A container of plan that joins the provider is recreated after it
+		// too, so its network mode must name the provider rather than the
+		// ID the replacement makes stale.
+		for _, c := range plan {
+			if c.JoinsNetworkOf(provider) {
+				c.SetNetworkContainer(provider.Name())
+			}
+		}
+
+		for _, c := range candidates {
+			_, skip := excluded[c.ID()]
+			if skip || seen[c.ID()] || c.IsWatchtower() || c.IsJobRun() || !c.JoinsNetworkOf(provider) {
+				continue
+			}
+
+			seen[c.ID()] = true
+			c.SetRebinding(true)
+
+			c.SetNetworkContainer(provider.Name())
+
+			log.Debug().
+				Str("container", c.Name()).
+				Str("network_container", provider.Name()).
+				Msg("Marked container for rebinding to a recreated network container")
+
+			joiners[provider.ID()] = append(joiners[provider.ID()], c)
+			providers = append(providers, c)
+		}
+	}
+
+	return joiners, providers[len(plan):]
+}
+
+// placeRebound returns plan with the rebound containers placed in it.
+//
+// Each container is placed after the containers of plan and rebound that its
+// host config names and that it depends on in graph. A container is placed as
+// soon as those are, so a rebound container directly follows the container
+// whose namespace it joins unless it waits for another, while plan keeps its
+// order otherwise. Containers in a dependency cycle keep their order at the
+// end.
+//
+// Parameters:
+//   - graph: The scan's dependency graph.
+//   - plan: Containers to restart, in restart order.
+//   - rebound: The rebound containers.
+//   - joiners: For each container, the rebound containers that join its
+//     namespace.
+//
+// Returns:
+//   - []*container.Container: The containers of plan and rebound, in restart
+//     order.
+func placeRebound(
+	graph *sorter.DependencyGraph,
+	plan, rebound []*container.Container,
+	joiners map[container.ContainerID][]*container.Container,
+) []*container.Container {
+	if len(rebound) == 0 {
+		return plan
+	}
+
+	members := slices.Concat(plan, rebound)
+
+	isMember := make(map[container.ContainerID]bool, len(members))
+	for _, c := range members {
+		isMember[c.ID()] = true
+	}
+
+	// pending counts each container's dependencies not placed yet, and
+	// dependents lists the containers waiting on each.
+	pending := make(map[container.ContainerID]int, len(members))
+	dependents := make(map[container.ContainerID][]*container.Container, len(members))
+
+	depend := func(c, dependency *container.Container) {
+		pending[c.ID()]++
+		dependents[dependency.ID()] = append(dependents[dependency.ID()], c)
+	}
+
+	for _, c := range members {
+		for _, dependent := range graph.Dependents(c) {
+			if isMember[dependent.ID()] {
+				depend(dependent, c)
+			}
+		}
+
+		// The graph orders plan already, so a container of plan needs only
+		// the rebound containers its host config names.
+		others := rebound
+		if c.IsRebinding() {
+			others = members
+		}
+
+		for _, target := range c.CreateConfigTargets(others) {
+			depend(c, target)
+		}
+	}
+
+	// A rebound container waits from the start. A container of plan waits
+	// once its turn came before its dependencies were placed.
+	waiting := make(map[container.ContainerID]bool, len(members))
+	for _, c := range rebound {
+		waiting[c.ID()] = true
+	}
+
+	result := make([]*container.Container, 0, len(members))
+	placed := make(map[container.ContainerID]bool, len(members))
+
+	var place func(c *container.Container)
+
+	place = func(c *container.Container) {
+		placed[c.ID()] = true
+		result = append(result, c)
+
+		for _, dependent := range dependents[c.ID()] {
+			pending[dependent.ID()]--
+		}
+
+		// The containers that join c come first, then the others c freed.
+		for _, next := range slices.Concat(joiners[c.ID()], dependents[c.ID()]) {
+			if !placed[next.ID()] && waiting[next.ID()] && pending[next.ID()] == 0 {
+				place(next)
+			}
+		}
+	}
+
+	for _, c := range plan {
+		if placed[c.ID()] {
+			continue
+		}
+
+		if pending[c.ID()] == 0 {
+			place(c)
+		} else {
+			waiting[c.ID()] = true
+		}
+	}
+
+	for _, c := range members {
+		if !placed[c.ID()] {
+			place(c)
+		}
+	}
+
+	return result
 }

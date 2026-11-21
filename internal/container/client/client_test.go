@@ -400,6 +400,26 @@ func TestClient(t *testing.T) {
 			})
 		})
 
+		t.Run("removing a rebound container with remove-volumes", func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("should keep its volumes for the replacement", func(t *testing.T) {
+				t.Parallel()
+
+				api := newDockerAPI(t)
+				api.EXPECT().ContainerRemove(mock.Anything, mockContainerID, dockerClient.ContainerRemoveOptions{Force: true}).
+					Return(dockerClient.ContainerRemoveResult{}, nil).Once()
+
+				rebound := modelfixture.Container(containerfixture.WithContainerState(dockerContainer.State{Running: false}))
+				rebound.SetRebinding(true)
+
+				client := &Client{log: newTestLogger(t), api: api, RemoveVolumes: true}
+
+				err := client.StopAndRemoveContainer(t.Context(), rebound, time.Second)
+				require.NoError(t, err)
+			})
+		})
+
 		t.Run("stopping a container with AutoRemove enabled", func(t *testing.T) {
 			t.Parallel()
 
@@ -715,7 +735,7 @@ func TestClient(t *testing.T) {
 					require.NoError(t, err)
 
 					networkMode := c.ContainerInfo().HostConfig.NetworkMode
-					assert.Equal(t, fixtureNetSupplierContainerName, networkMode.ConnectedContainer())
+					assert.Equal(t, container.NormalizeContainerName(fixtureNetSupplierContainerName), networkMode.ConnectedContainer())
 				})
 			})
 
@@ -1853,6 +1873,154 @@ func TestListLabeledContainers(t *testing.T) {
 			assert.Equal(t, fixtureStopped.id, labeled[0].ID())
 		})
 	}
+}
+
+// TestListNetworkDependents verifies that the containers that join another
+// container's network namespace are listed in every state the update's own
+// listing leaves out. Paused containers are always listed, stopped ones
+// without the include-stopped configuration option, and restarting ones
+// without the include-restarting configuration option except on Podman,
+// which has no restarting state. Dependents are matched by the listed network
+// mode or by inspect where the list leaves the network mode out, as Podman
+// before version 6 does.
+func TestListNetworkDependents(t *testing.T) {
+	t.Parallel()
+
+	supplier := modelfixture.Container(
+		containerfixture.WithName(fixtureNetSupplierContainerName),
+		containerfixture.WithID(string(fixtureNetSupplier.id)),
+	)
+
+	t.Run("lists the states the update leaves out", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name    string
+			options ClientOptions
+			// podman reports whether detection found Podman.
+			podman bool
+			want   dockerClient.Filters
+		}{
+			{
+				name: "Docker",
+				want: statusFilters("paused", "created", "exited", "restarting"),
+			},
+			{
+				name:   "Podman",
+				podman: true,
+				want:   statusFilters("paused", "created", "exited"),
+			},
+			{
+				name:    "include-stopped and include-restarting",
+				options: ClientOptions{IncludeStopped: true, IncludeRestarting: true},
+				want:    statusFilters("paused"),
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				api := newDockerAPI(t)
+				api.EXPECT().ContainerList(mock.Anything, dockerClient.ContainerListOptions{All: true, Filters: tt.want}).
+					Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
+						networkSummary(fixtureNetConsumer.id, "container:"+string(fixtureNetSupplier.id)),
+						networkSummary(fixtureStopped.id, "default"),
+					}}, nil).Once()
+				expectContainerFixtures(t, api, fixtureNetConsumer)
+
+				client := &Client{
+					ClientOptions:   tt.options,
+					log:             newTestLogger(t),
+					api:             api,
+					runtimeDetected: true,
+					podmanRuntime:   tt.podman,
+				}
+
+				got, err := client.ListNetworkDependents(t.Context())
+				require.NoError(t, err)
+				require.Len(t, got, 1)
+				assert.Equal(t, fixtureNetConsumer.id, got[0].ID())
+				assert.True(t, got[0].JoinsNetworkOf(supplier))
+			})
+		}
+	})
+
+	// Only the dependent gets the full inspect of its image. The strict mock
+	// fails on an image inspect for the other container.
+	t.Run("network mode missing from the list is read by inspect", func(t *testing.T) {
+		t.Parallel()
+
+		api := newDockerAPI(t)
+		api.EXPECT().ContainerList(mock.Anything, mock.Anything).
+			Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
+				networkSummary(fixtureNetConsumer.id, ""),
+				networkSummary(fixtureStopped.id, ""),
+			}}, nil).Once()
+		expectContainerFixture(t, api, fixtureNetConsumer)
+		expectContainerFixture(t, api, fixtureStopped)
+		expectContainerFixtures(t, api, fixtureNetConsumer)
+
+		client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true}
+
+		got, err := client.ListNetworkDependents(t.Context())
+		require.NoError(t, err)
+		require.Len(t, got, 1)
+		assert.Equal(t, fixtureNetConsumer.id, got[0].ID())
+	})
+
+	t.Run("failed listing", func(t *testing.T) {
+		t.Parallel()
+
+		api := newDockerAPI(t)
+		api.EXPECT().ContainerList(mock.Anything, mock.Anything).
+			Return(dockerClient.ContainerListResult{}, errors.New("daemon unavailable")).Once()
+
+		client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true}
+
+		_, err := client.ListNetworkDependents(t.Context())
+		require.ErrorIs(t, err, errListContainersFailed)
+	})
+
+	// A container gone since the list is left out, while any other failure
+	// to read a network mode fails the listing.
+	t.Run("failed inspect of a missing network mode", func(t *testing.T) {
+		t.Parallel()
+
+		inspectErr := errors.New("daemon unavailable")
+
+		api := newDockerAPI(t)
+		api.EXPECT().ContainerList(mock.Anything, mock.Anything).
+			Return(dockerClient.ContainerListResult{Items: []dockerContainer.Summary{
+				networkSummary("gone-id", ""),
+				networkSummary(fixtureStopped.id, ""),
+			}}, nil).Once()
+		api.EXPECT().ContainerInspect(mock.Anything, "gone-id", dockerClient.ContainerInspectOptions{}).
+			Return(dockerClient.ContainerInspectResult{}, notFoundError("No such container: gone-id")).Once()
+		api.EXPECT().ContainerInspect(mock.Anything, string(fixtureStopped.id), dockerClient.ContainerInspectOptions{}).
+			Return(dockerClient.ContainerInspectResult{}, inspectErr).Once()
+
+		client := &Client{log: newTestLogger(t), api: api, runtimeDetected: true}
+
+		_, err := client.ListNetworkDependents(t.Context())
+		require.ErrorIs(t, err, errListContainersFailed)
+		require.ErrorIs(t, err, inspectErr)
+	})
+}
+
+// networkSummary returns a container list entry with the given network mode.
+//
+// Parameters:
+//   - id: Container ID.
+//   - mode: Network mode the list reports.
+//
+// Returns:
+//   - dockerContainer.Summary: The list entry.
+func networkSummary(id container.ContainerID, mode string) dockerContainer.Summary {
+	summary := dockerContainer.Summary{ID: string(id)}
+	summary.HostConfig.NetworkMode = mode
+
+	return summary
 }
 
 // TestCreateFailureNamedOnce verifies that a failed create, through

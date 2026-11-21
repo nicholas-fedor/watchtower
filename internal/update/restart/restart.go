@@ -62,12 +62,6 @@ var (
 const (
 	// defaultHealthCheckTimeout defines the default timeout for waiting for container health checks.
 	defaultHealthCheckTimeout = 5 * time.Minute
-
-	// defaultCreateStartTimeout defines the minimum timeout for container create
-	// and start operations during restart. It guards against slow hosts where
-	// Docker API calls can exceed the bound of other detached calls, which is
-	// the stop timeout plus 30 seconds.
-	defaultCreateStartTimeout = 5 * time.Minute
 )
 
 // Run stops and recreates the containers an update session restarts, and
@@ -76,8 +70,11 @@ const (
 // The containers must be in dependency order. With rolling restarts, each
 // container is stopped and recreated before the next one. Otherwise every
 // stale container is marked for update, then every container stops in reverse
-// order before any is recreated in order. A container the session left
-// untouched on purpose is recorded as skipped. One example is a container whose
+// order before any is recreated in order. A container that others join is
+// replaced before they are removed, so a failed replacement leaves them
+// joined to the restored container. Without rolling restarts, this needs a
+// host config that names no container earlier in the list. A container the
+// session left untouched on purpose is recorded as skipped. One example is a container whose
 // pre-update hook asked to skip it. Any other failure is recorded as failed.
 // The old images of replaced containers are added to cleanupImageInfos.
 //
@@ -112,7 +109,7 @@ func Run(
 			cleanupImageInfos,
 			progress,
 		)
-		recordRestartOutcomes(log, progress, failed)
+		recordRestartOutcomes(log, progress, containers, failed, config)
 
 		return err
 	}
@@ -123,14 +120,14 @@ func Run(
 		}
 	}
 
-	failedStop, stoppedImages := stopContainersInReversedOrder(
+	failedStop, stopped := stopContainersInReversedOrder(
 		log,
 		ctx,
 		containers,
 		client,
 		config,
 	)
-	recordRestartOutcomes(log, progress, failedStop)
+	recordRestartOutcomes(log, progress, containers, failedStop, config)
 
 	failedStart := restartContainersInSortedOrder(
 		log,
@@ -138,11 +135,11 @@ func Run(
 		containers,
 		client,
 		config,
-		stoppedImages,
+		stopped,
 		cleanupImageInfos,
 		progress,
 	)
-	recordRestartOutcomes(log, progress, failedStart)
+	recordRestartOutcomes(log, progress, containers, failedStart, config)
 
 	return nil
 }
@@ -151,6 +148,9 @@ func Run(
 //
 // It processes containers sequentially in forward order, stopping and restarting each as needed,
 // collecting cleaned image info for stale containers only to ensure proper cleanup.
+// A container is stopped and recreated with the rest of its group, the rebound
+// containers that join its network namespace and the containers placed
+// between them, so a cancellation never leaves one of them removed.
 // The function checks for context cancellation at the start of each iteration to enable
 // prompt exit when the context is canceled.
 //
@@ -185,108 +185,50 @@ func performRollingRestart(
 		Strs("processing_order", containerNames).
 		Msg("Starting performRollingRestart")
 
-	// Process containers in forward order to respect dependency chains.
-	for i := range containers {
-		// Check for context cancellation to enable prompt exit when context is canceled.
-		select {
-		case <-ctx.Done():
-			// Handle the current container that was not processed due to cancellation.
-			c := containers[i]
-			log.Info().
-				Str("container", c.Name()).
-				Str("image", c.ImageName()).
-				Str("container_id", c.ID().ShortID()).
-				Msg("Skipped container restart due to context cancellation")
-			failed[c.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
+	groups := networkGroups(containers)
 
-			// Handle remaining containers that were not processed due to cancellation.
-			for j := i + 1; j < len(containers); j++ {
-				untouched := containers[j]
-				log.Info().
-					Str("container", untouched.Name()).
-					Str("image", untouched.ImageName()).
-					Str("container_id", untouched.ID().ShortID()).
-					Msg("Skipped container restart due to context cancellation")
-				failed[untouched.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
+	// Process containers in forward order to respect dependency chains.
+	for g, group := range groups {
+		// Check for context cancellation to enable prompt exit when context is canceled.
+		if ctx.Err() != nil {
+			for _, remaining := range groups[g:] {
+				for _, untouched := range remaining {
+					log.Info().
+						Str("container", untouched.Name()).
+						Str("image", untouched.ImageName()).
+						Str("container_id", untouched.ID().ShortID()).
+						Msg("Skipped container restart due to context cancellation")
+					failed[untouched.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
+				}
 			}
 
 			return failed, fmt.Errorf("rolling restart canceled: %w", ctx.Err())
-		default:
 		}
 
-		c := containers[i]
-		if !c.ToRestart() {
+		if !group[0].ToRestart() {
 			continue
 		}
 
-		fields := map[string]any{
-			"container": c.Name(),
-			"image":     c.ImageName(),
+		for _, c := range group {
+			if c.IsStale() && progress != nil {
+				progress.MarkForUpdate(log, c.ID())
+			}
 		}
 
-		log.Debug().
-			Fields(fields).
-			Msg("Processing container for rolling restart")
+		// The groups before this one are recreated already, so none can hold
+		// a container this group's create config names.
+		stopped := make(map[container.ContainerID]container.ContainerID, len(group))
+		stopGroup(log, ctx, group, nil, client, config, failed, stopped)
 
-		// Mark for update if stale
-		if c.IsStale() && progress != nil {
-			progress.MarkForUpdate(log, c.ID())
-		}
+		for _, c := range group {
+			created, wasStopped := stopped[c.ID()]
+			if !recreates(c, wasStopped) {
+				continue
+			}
 
-		// Stop the container, handling any errors. A Watchtower container is not
-		// stopped here, and restartStaleContainer replaces it.
-		_, err := stopStaleContainer(log, ctx, c, client, config)
-		if err != nil {
-			failed[c.ID()] = err
-		} else {
-			newContainerID, renamed, err := restartStaleContainer(log,
-				ctx,
-				c,
-				client,
-				config,
-			)
+			err := replaceContainer(log, ctx, c, created, client, config, cleanupImageInfos, progress)
 			if err != nil {
 				failed[c.ID()] = err
-			} else {
-				// Record the recreated container in progress.
-				if progress != nil {
-					progress.RecordRestart(log, c, newContainerID)
-				}
-
-				// Wait for the container to become healthy if it has a health check.
-				// An ephemeral self-update returns no container ID, because the
-				// orchestrator creates the new container after this process stops.
-				if newContainerID != "" {
-					waitErr := client.WaitForContainerHealthy(
-						ctx,
-						newContainerID,
-						defaultHealthCheckTimeout,
-					)
-					if waitErr != nil {
-						log.Warn().
-							Err(waitErr).
-							Fields(fields).
-							Msg("Failed to wait for container to become healthy")
-
-						// Don't fail the update, just log the warning
-					}
-				}
-
-				if c.IsStale() && !renamed {
-					// Only collect cleaned image info for stale containers that were not renamed. The new
-					// Watchtower container removes a renamed predecessor and its image.
-					cleanup.AddImage(
-						cleanupImageInfos,
-						c.ImageID(),
-						c.ImageName(),
-						c.Name(),
-						c.ID(),
-					)
-
-					log.Debug().
-						Fields(fields).
-						Msg("Updated container")
-				}
 			}
 		}
 	}
@@ -294,10 +236,123 @@ func performRollingRestart(
 	return failed, nil
 }
 
+// replaceContainer recreates and starts one container of a rolling restart,
+// then waits for it to become healthy.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - c: Container to replace, already stopped unless it is Watchtower's own.
+//   - created: The replacement when it was created before c was stopped, or
+//     empty to create it.
+//   - client: Container client for Docker operations.
+//   - config: Update options controlling restart behavior.
+//   - cleanupImageInfos: Collects the image of an updated container for cleanup.
+//   - progress: Progress tracker to update with new container IDs.
+//
+// Returns:
+//   - error: Non-nil when the container could not be recreated or started.
+func replaceContainer(
+	log *zerolog.Logger,
+	ctx context.Context,
+	c *container.Container,
+	created container.ContainerID,
+	client Client,
+	config updateParams.Params,
+	cleanupImageInfos *[]cleanup.RemovedImageInfo,
+	progress *state.Progress,
+) error {
+	fields := map[string]any{
+		"container": c.Name(),
+		"image":     c.ImageName(),
+	}
+
+	log.Debug().
+		Fields(fields).
+		Msg("Processing container for rolling restart")
+
+	newContainerID, renamed, err := restartStaleContainer(log,
+		ctx,
+		c,
+		created,
+		client,
+		config,
+	)
+	if err != nil {
+		return err
+	}
+
+	recordReplacement(log, c, newContainerID, renamed, cleanupImageInfos, progress)
+
+	// Wait for the container to become healthy if it has a health check.
+	// An ephemeral self-update returns no container ID, because the
+	// orchestrator creates the new container after this process stops. A
+	// replacement left stopped runs no health check.
+	if newContainerID != "" && replacementStarts(c, config) {
+		waitErr := client.WaitForContainerHealthy(
+			ctx,
+			newContainerID,
+			defaultHealthCheckTimeout,
+		)
+		if waitErr != nil {
+			log.Warn().
+				Err(waitErr).
+				Fields(fields).
+				Msg("Failed to wait for container to become healthy")
+
+			// Don't fail the update, just log the warning
+		}
+	}
+
+	return nil
+}
+
+// recordReplacement records a container's replacement in progress and adds
+// the old image of an updated container to the images to remove.
+//
+// A Watchtower container left under its old name keeps its image, because the
+// new instance removes that container and its image itself.
+//
+// Parameters:
+//   - log: Session logger.
+//   - c: The container that was replaced.
+//   - newContainerID: ID of the replacement, empty after an ephemeral
+//     self-update handoff.
+//   - renamed: Whether c is a Watchtower container left under its old name.
+//   - cleanupImageInfos: Images to remove after the session.
+//   - progress: Session progress, nil to record nothing.
+func recordReplacement(
+	log *zerolog.Logger,
+	c *container.Container,
+	newContainerID container.ContainerID,
+	renamed bool,
+	cleanupImageInfos *[]cleanup.RemovedImageInfo,
+	progress *state.Progress,
+) {
+	if progress != nil {
+		progress.RecordRestart(log, c, newContainerID)
+	}
+
+	log.Debug().
+		Str("container", c.Name()).
+		Str("image", c.ImageName()).
+		Msg("Restarted container")
+
+	if c.IsStale() && !renamed {
+		cleanup.AddImage(cleanupImageInfos, c.ImageID(), c.ImageName(), c.Name(), c.ID())
+	}
+}
+
 // stopContainersInReversedOrder stops containers in reverse order.
 //
-// It stops each container, tracking stopped images and errors, to prepare for restarts while
-// respecting dependency order.
+// It stops each container, tracking the stopped containers and errors, to prepare for restarts while
+// respecting dependency order. A container followed by the rebound containers
+// that join its network namespace is replaced first, so a failed replacement
+// leaves them in place or recreates them against the restored container. A
+// container whose host config names a container earlier in the list is
+// stopped after its rebound containers instead. A group that a container
+// which could not be stopped still joins is left as it is. Its first
+// container fails and the rest are skipped.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
@@ -307,35 +362,33 @@ func performRollingRestart(
 //
 // Returns:
 //   - map[container.ContainerID]error: Map of container IDs to errors for failed stops.
-//   - []cleanup.RemovedImageInfo: Slice of cleaned image info for stopped containers.
+//   - map[container.ContainerID]container.ContainerID: Each stopped and removed
+//     container with the replacement already created for it, empty when
+//     none was created.
 func stopContainersInReversedOrder(
 	log *zerolog.Logger,
 	ctx context.Context,
 	containers []*container.Container,
 	client Client,
 	config updateParams.Params,
-) (map[container.ContainerID]error, []cleanup.RemovedImageInfo) {
+) (map[container.ContainerID]error, map[container.ContainerID]container.ContainerID) {
 	failed := make(map[container.ContainerID]error, len(containers))
-	stopped := make([]cleanup.RemovedImageInfo, 0, len(containers))
+	stopped := make(map[container.ContainerID]container.ContainerID, len(containers))
 
-	// Stop containers in reverse order to avoid breaking dependencies.
-	for i, v := range slices.Backward(containers) {
-		c := v
+	groups := networkGroups(containers)
+
+	// Stop containers in reverse order to avoid breaking dependencies. The
+	// groups are contiguous, so the containers before a group end where it
+	// starts.
+	start := len(containers)
+
+	for _, group := range slices.Backward(groups) {
+		start -= len(group)
 
 		// Check for context cancellation to avoid additional work when context is canceled.
-		// First, log and track the current container, then iterate remaining containers.
+		// The current group and the ones before it are skipped.
 		if ctx.Err() != nil {
-			// Handle the current container that was not processed due to cancellation.
-			log.Info().
-				Str("container", c.Name()).
-				Str("image", c.ImageName()).
-				Str("container_id", c.ID().ShortID()).
-				Msg("Skipped container stop due to context cancellation")
-			failed[c.ID()] = skipped(fmt.Errorf("stop skipped: %w", ctx.Err()))
-
-			// Handle remaining containers that were not processed due to cancellation.
-			for j := i - 1; j >= 0; j-- {
-				untouched := containers[j]
+			for _, untouched := range slices.Backward(containers[:start+len(group)]) {
 				log.Info().
 					Str("container", untouched.Name()).
 					Str("image", untouched.ImageName()).
@@ -347,29 +400,22 @@ func stopContainersInReversedOrder(
 			return failed, stopped
 		}
 
-		fields := map[string]any{
-			"container": c.Name(),
-			"image":     c.ImageName(),
+		// A container after the group that could not be stopped still joins
+		// a member, so removing that member would cut its network. The group
+		// stays as it is, and its head then holds the namespace it joins in
+		// turn.
+		later := containers[start+len(group):]
+
+		held := slices.IndexFunc(later, func(c *container.Container) bool {
+			return holdsMember(group, c, failed[c.ID()])
+		})
+		if held >= 0 {
+			heldBy(group, later[held], failed[later[held].ID()], failed, stopped)
+
+			continue
 		}
 
-		stoppedNow, err := stopStaleContainer(log, ctx, c, client, config)
-		if err != nil {
-			failed[c.ID()] = err
-		} else if stoppedNow {
-			stopped = append(
-				stopped,
-				cleanup.RemovedImageInfo{
-					ImageID:       c.ImageID(),
-					ContainerID:   c.ID(),
-					ImageName:     c.ImageName(),
-					ContainerName: c.Name(),
-				},
-			)
-
-			log.Debug().
-				Fields(fields).
-				Msg("Stopped container")
-		}
+		stopGroup(log, ctx, group, containers[:start], client, config, failed, stopped)
 	}
 
 	return failed, stopped
@@ -380,22 +426,56 @@ func stopContainersInReversedOrder(
 // A container the update deliberately left untouched is recorded as skipped
 // and any other as failed. A container that failed in an earlier phase stays
 // failed when a later phase skips it. Each failure is logged once at error
-// level as "Could not update container" with the container, its image and the
-// error. That line is the failure's only report to notifications.
+// level with the container, its image and the error. That line is the
+// failure's only report to notifications. It is "Could not update container"
+// for a container the update recreates. A rebound container, which may be one
+// the session does not monitor, gets "Could not reconnect container to the
+// network of a recreated container".
 //
 // Parameters:
 //   - log: Process logger.
 //   - progress: Session progress to update.
+//   - containers: The containers being restarted, which name the failures.
 //   - outcomes: The error of each container that was not stopped or restarted.
-func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcomes map[container.ContainerID]error) {
+//   - config: Update options, read for the status of a rebound container the
+//     session does not hold.
+func recordRestartOutcomes(
+	log *zerolog.Logger,
+	progress *state.Progress,
+	containers []*container.Container,
+	outcomes map[container.ContainerID]error,
+	config updateParams.Params,
+) {
+	byID := make(map[container.ContainerID]*container.Container, len(containers))
+	for _, c := range containers {
+		byID[c.ID()] = c
+	}
+
 	failed := make(map[container.ContainerID]error, len(outcomes))
 	skips := make(map[container.ContainerID]error)
+	rebound := make(map[container.ContainerID]*container.Container)
 
-	for id, err := range outcomes {
+	for containerID, err := range outcomes {
 		if isSkip(err) {
-			skips[id] = err
-		} else {
-			failed[id] = err
+			skips[containerID] = err
+
+			continue
+		}
+
+		failed[containerID] = err
+
+		c, ok := byID[containerID]
+		if !ok || !c.IsRebinding() {
+			continue
+		}
+
+		rebound[containerID] = c
+
+		// A failed rebound container that the session does not hold, such
+		// as an unmonitored one, is added so that the report, the metrics
+		// and every notification count it.
+		if _, held := (*progress)[containerID]; !held {
+			progress.AddFailed(log, c, err, config)
 		}
 	}
 
@@ -406,6 +486,17 @@ func recordRestartOutcomes(log *zerolog.Logger, progress *state.Progress, outcom
 	// each failure, in container ID order so notifications list them the same
 	// way every time.
 	for _, containerID := range slices.Sorted(maps.Keys(failed)) {
+		if c, ok := rebound[containerID]; ok {
+			log.Error().
+				Err(failed[containerID]).
+				Str("container", c.Name()).
+				Str("image", c.ImageName()).
+				Str("network_container", c.NetworkContainer()).
+				Msg(logging.ContainerRebindFailed)
+
+			continue
+		}
+
 		status, ok := (*progress)[containerID]
 		if !ok {
 			continue
@@ -468,8 +559,48 @@ func stopStaleContainer(
 		Fields(fields).
 		Msg("Stopping container for restart")
 
-	// Verify configuration for linked containers to ensure restart compatibility.
-	if c.IsLinkedToRestarting() {
+	err := prepareStop(log, ctx, c, client, config)
+	if err != nil {
+		return false, err
+	}
+
+	err = stopAndRemove(log, ctx, c, client, config)
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+// prepareStop readies a container to be stopped and recreated.
+//
+// It checks that the container can be recreated and runs its pre-update hook.
+// It then stores the container's copy files.
+//
+// Parameters:
+//   - log: Session logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - c: Container to stop.
+//   - client: Container client for Docker operations.
+//   - config: Update options specifying lifecycle hooks.
+//
+// Returns:
+//   - error: A skip when the pre-update hook skips the container, another
+//     error when a step fails, and nil otherwise.
+func prepareStop(
+	log *zerolog.Logger,
+	ctx context.Context,
+	c *container.Container,
+	client Client,
+	config updateParams.Params,
+) error {
+	fields := map[string]any{
+		"container": c.Name(),
+		"image":     c.ImageName(),
+	}
+
+	// Verify configuration for linked and rebound containers to ensure restart compatibility.
+	if c.RestartsForAnother() {
 		err := c.VerifyConfiguration()
 		if err != nil {
 			log.Debug().
@@ -477,12 +608,12 @@ func stopStaleContainer(
 				Fields(fields).
 				Msg("Failed to verify container configuration")
 
-			return false, fmt.Errorf("%w: %w", errVerifyConfigFailed, err)
+			return fmt.Errorf("%w: %w", errVerifyConfigFailed, err)
 		}
 	}
 
 	// Execute pre-update lifecycle hooks if enabled, checking for skip conditions.
-	if config.LifecycleHooks {
+	if runsUpdateHooks(c, config) {
 		skipUpdate, err := hooks.ExecutePreUpdateCommand(log,
 			ctx,
 			client,
@@ -496,7 +627,7 @@ func stopStaleContainer(
 				Fields(fields).
 				Msg("Pre-update command execution failed")
 
-			return false, err //nolint:wrapcheck // The hook's error already names the failed pre-update command.
+			return err //nolint:wrapcheck // The hook's error already names the failed pre-update command.
 		}
 
 		if skipUpdate {
@@ -504,7 +635,7 @@ func stopStaleContainer(
 				Fields(fields).
 				Msg("Skipping container due to pre-update exit code 75")
 
-			return false, skipped(errSkipUpdate)
+			return skipped(errSkipUpdate)
 		}
 	}
 
@@ -515,39 +646,76 @@ func stopStaleContainer(
 			Fields(fields).
 			Msg("Failed to snapshot copy-file paths")
 
-		return false, fmt.Errorf("snapshot copy-file paths: %w", err)
+		return fmt.Errorf("snapshot copy-file paths: %w", err)
 	}
 
-	// Stop the container with the configured timeout.
-	err = client.StopAndRemoveContainer(
-		ctx,
-		c,
-		config.Timeout,
-	)
-	if err != nil {
-		// Nothing recreates the container after a failed stop, so drop its snapshot.
-		client.DiscardCopyFiles(c.ID())
+	return nil
+}
 
-		// The container was removed or replaced after the scan. Recreating it
-		// from the scan's inspect data would bring back a removed container.
-		if cerrdefs.IsNotFound(err) {
-			log.Debug().
-				Err(err).
-				Fields(fields).
-				Msg("Container no longer exists, skipping it")
-
-			return false, skipped(fmt.Errorf("%w: %w", errContainerGone, err))
-		}
-
-		log.Debug().
-			Err(err).
-			Fields(fields).
-			Msg("Failed to stop container")
-
-		return false, err //nolint:wrapcheck // The client's error already names the failed stop or removal.
+// stopAndRemove stops and removes a container whose copy files are stored.
+//
+// A container that no longer exists is skipped, so it is not recreated from
+// the scan's inspect data.
+//
+// Parameters:
+//   - log: Session logger.
+//   - ctx: Context for cancellation and timeouts.
+//   - c: Container to stop.
+//   - client: Container client for Docker operations.
+//   - config: Update options specifying the stop timeout.
+//
+// Returns:
+//   - error: A skip when the container no longer exists, the client's error
+//     when the stop or removal fails, and nil otherwise.
+func stopAndRemove(
+	log *zerolog.Logger,
+	ctx context.Context,
+	c *container.Container,
+	client Client,
+	config updateParams.Params,
+) error {
+	err := client.StopAndRemoveContainer(ctx, c, config.Timeout)
+	if err == nil {
+		return nil
 	}
 
-	return true, nil
+	return abandonStop(log, client, c, err, "Failed to stop container")
+}
+
+// abandonStop handles a step that failed before a container's removal.
+//
+// Nothing recreates the container, so its stored copy files are dropped. A
+// container the daemon no longer has was removed after the scan and is
+// skipped, since recreating it from the scan's inspect data would bring back
+// a removed container.
+//
+// Parameters:
+//   - log: Session logger.
+//   - client: Container client for Docker operations.
+//   - c: The container whose step failed.
+//   - err: The client's error.
+//   - failure: The debug message for any failure other than a missing
+//     container.
+//
+// Returns:
+//   - error: A skip when c no longer exists, err otherwise.
+func abandonStop(log *zerolog.Logger, client Client, c *container.Container, err error, failure string) error {
+	client.DiscardCopyFiles(c.ID())
+
+	event := log.Debug().
+		Err(err).
+		Str("container", c.Name()).
+		Str("image", c.ImageName())
+
+	if cerrdefs.IsNotFound(err) {
+		event.Msg("Container no longer exists, skipping it")
+
+		return skipped(fmt.Errorf("%w: %w", errContainerGone, err))
+	}
+
+	event.Msg(failure)
+
+	return err
 }
 
 // restartContainersInSortedOrder restarts stopped containers.
@@ -561,7 +729,8 @@ func stopStaleContainer(
 //   - containers: List of containers to restart.
 //   - client: Container client for Docker operations.
 //   - config: Update options controlling restart behavior.
-//   - stoppedImages: Slice of cleaned image info for previously stopped containers.
+//   - stopped: Each stopped container with the replacement already created
+//     for it, empty when none was created.
 //   - cleanupImageInfos: Pointer to slice to collect cleaned image info for deferred cleanup.
 //   - progress: Progress tracker to update with new container IDs.
 //
@@ -573,13 +742,11 @@ func restartContainersInSortedOrder(
 	containers []*container.Container,
 	client Client,
 	config updateParams.Params,
-	stoppedImages []cleanup.RemovedImageInfo,
+	stopped map[container.ContainerID]container.ContainerID,
 	cleanupImageInfos *[]cleanup.RemovedImageInfo,
 	progress *state.Progress,
 ) map[container.ContainerID]error {
 	failed := make(map[container.ContainerID]error, len(containers))
-	// Track renamed containers to skip cleanup.
-	renamedContainers := make(map[container.ContainerID]bool)
 
 	// Restart containers in sorted order to respect dependency chains.
 	for i := range containers {
@@ -589,21 +756,8 @@ func restartContainersInSortedOrder(
 			continue
 		}
 
-		fields := map[string]any{
-			"container": c.Name(),
-			"image":     c.ImageName(),
-		}
-
-		// Check if container was previously stopped by looking in stoppedImages slice.
-		wasStopped := false
-
-		for _, sc := range stoppedImages {
-			if sc.ContainerID == c.ID() {
-				wasStopped = true
-
-				break
-			}
-		}
+		created, wasStopped := stopped[c.ID()]
+		recreate := recreates(c, wasStopped)
 
 		// Skip other Watchtower containers, and every Watchtower container while
 		// self-updates are disabled. A Watchtower container restarted with a
@@ -617,62 +771,36 @@ func restartContainersInSortedOrder(
 		// stop phase. restartStaleContainer uses a detached context for create/start,
 		// so continue recreating stopped (and self-update) instances. Containers that
 		// were never stopped can be skipped safely.
-		if ctx.Err() != nil && !c.IsWatchtower() && !wasStopped {
-			log.Info().
+		if ctx.Err() != nil {
+			clog := log.With().
 				Str("container", c.Name()).
 				Str("image", c.ImageName()).
 				Str("container_id", c.ID().ShortID()).
-				Msg("Skipped container restart due to context cancellation")
-			failed[c.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
+				Logger()
+
+			if !recreate {
+				clog.Info().Msg("Skipped container restart due to context cancellation")
+
+				failed[c.ID()] = skipped(fmt.Errorf("restart skipped: %w", ctx.Err()))
+
+				continue
+			}
+
+			clog.Info().Msg("Parent context canceled. Continuing restart of stopped container")
+		}
+
+		if !recreate {
+			continue
+		}
+
+		newContainerID, renamed, err := restartStaleContainer(log, ctx, c, created, client, config)
+		if err != nil {
+			failed[c.ID()] = err
 
 			continue
 		}
 
-		if ctx.Err() != nil && (c.IsWatchtower() || wasStopped) {
-			log.Info().
-				Fields(fields).
-				Str("container_id", c.ID().ShortID()).
-				Msg("Parent context canceled. Continuing restart of stopped container")
-		}
-
-		// Restart Watchtower containers regardless of stoppedImages, as they are renamed.
-		// Otherwise, restart only containers that were previously stopped.
-		if c.IsWatchtower() || wasStopped {
-			newContainerID, renamed, err := restartStaleContainer(log,
-				ctx,
-				c,
-				client,
-				config,
-			)
-			if err != nil {
-				failed[c.ID()] = err
-			} else {
-				// Record the recreated container in progress.
-				if progress != nil {
-					progress.RecordRestart(log, c, newContainerID)
-				}
-
-				log.Debug().
-					Fields(fields).
-					Msg("Restarted container")
-
-				if renamed {
-					renamedContainers[c.ID()] = true
-				}
-				// Only collect cleaned image info for stale containers that were
-				// not renamed. The new Watchtower container removes a renamed
-				// predecessor and its image.
-				if c.IsStale() && !renamedContainers[c.ID()] {
-					cleanup.AddImage(
-						cleanupImageInfos,
-						c.ImageID(),
-						c.ImageName(),
-						c.Name(),
-						c.ID(),
-					)
-				}
-			}
-		}
+		recordReplacement(log, c, newContainerID, renamed, cleanupImageInfos, progress)
 	}
 
 	return failed
@@ -686,6 +814,8 @@ func restartContainersInSortedOrder(
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - sourceContainer: Container to restart.
+//   - created: The replacement when it was created before sourceContainer
+//     was stopped, empty to create it here.
 //   - client: Container client for Docker operations.
 //   - config: Update options controlling restart and lifecycle hooks.
 //
@@ -698,21 +828,14 @@ func restartStaleContainer(
 	log *zerolog.Logger,
 	ctx context.Context,
 	sourceContainer *container.Container,
+	created container.ContainerID,
 	client Client,
 	config updateParams.Params,
 ) (container.ContainerID, bool, error) {
 	// Create a detached context to survive parent context cancellation.
 	// This ensures container cleanup and update operations complete even if the
 	// parent context is canceled during the restart process.
-	// The create and start calls can be slow on busy hosts. They get the stop
-	// timeout plus 30 seconds when that is longer than 5 minutes, and 5 minutes
-	// otherwise.
-	detachedTimeout := max(config.DetachedTimeout(), defaultCreateStartTimeout)
-
-	detachedCtx, cancelDetached := context.WithTimeout(
-		context.WithoutCancel(ctx),
-		detachedTimeout,
-	)
+	detachedCtx, cancelDetached := context.WithTimeout(context.WithoutCancel(ctx), config.CreateStartTimeout())
 
 	defer cancelDetached()
 
@@ -762,24 +885,27 @@ func restartStaleContainer(
 		}
 	}
 
-	// Create the new container with updated configuration.
-	newContainerID, err := client.CreateContainer(detachedCtx, sourceContainer)
-	if err != nil {
-		log.Debug().
-			Err(err).
-			Fields(fields).
-			Msg("Failed to create container")
+	// Create the new container with updated configuration, unless it was
+	// created before the source container was stopped.
+	newContainerID := created
+	if newContainerID == "" {
+		var err error
 
-		err = rename.Abort(ctx, client, "", config, err)
+		newContainerID, err = client.CreateContainer(detachedCtx, sourceContainer)
+		if err != nil {
+			log.Debug().
+				Err(err).
+				Fields(fields).
+				Msg("Failed to create container")
 
-		return "", rename.Renamed(), err
+			err = rename.Abort(ctx, client, "", config, err)
+
+			return "", rename.Renamed(), err
+		}
 	}
 
-	// Start the new container based on restart settings:
-	//   - Watchtower containers bypass the NoRestart check
-	//   - All containers (including Watchtower) start only if they were running or ReviveStopped is enabled
-	if (!config.NoRestart || sourceContainer.IsWatchtower()) && (sourceContainer.IsRunning() || config.ReviveStopped) {
-		err = startReplacement(log, detachedCtx, client, sourceContainer, newContainerID, config, fields)
+	if replacementStarts(sourceContainer, config) {
+		err := startReplacement(log, detachedCtx, client, sourceContainer, newContainerID, config, fields)
 		if err != nil {
 			// A Watchtower container renamed for this self-update still runs
 			// this process, and it takes its original name back.
@@ -792,6 +918,55 @@ func restartStaleContainer(
 	rename.Retire(detachedCtx, client)
 
 	return newContainerID, rename.Renamed(), nil
+}
+
+// recreates reports whether the restart phase recreates a container.
+//
+// A container stopped and removed by the stop phase is recreated. Watchtower's
+// own container is not stopped there because its self-update replaces it.
+//
+// Parameters:
+//   - c: A container marked for restart.
+//   - wasStopped: Whether the stop phase stopped and removed c.
+//
+// Returns:
+//   - bool: True when the restart phase recreates c.
+func recreates(c *container.Container, wasStopped bool) bool {
+	return wasStopped || c.IsWatchtower()
+}
+
+// runsUpdateHooks reports whether a container's pre- and post-update hooks
+// run.
+//
+// A rebound container is not updated, so its hooks do not run.
+//
+// Parameters:
+//   - c: The container being restarted.
+//   - config: Update options controlling lifecycle hooks.
+//
+// Returns:
+//   - bool: True when lifecycle hooks are enabled and c is not rebound.
+func runsUpdateHooks(c *container.Container, config updateParams.Params) bool {
+	return config.LifecycleHooks && !c.IsRebinding()
+}
+
+// replacementStarts reports whether a container's replacement is started.
+//
+// A replacement starts when its container was running or with the
+// revive-stopped configuration option. A rebound container keeps its state,
+// so revive-stopped does not start it. The no-restart configuration option
+// leaves every replacement stopped except Watchtower's own.
+//
+// Parameters:
+//   - c: The container the replacement is created from.
+//   - config: Update options controlling restart behavior.
+//
+// Returns:
+//   - bool: True when the replacement is started.
+func replacementStarts(c *container.Container, config updateParams.Params) bool {
+	revive := config.ReviveStopped && !c.IsRebinding()
+
+	return (!config.NoRestart || c.IsWatchtower()) && (c.IsRunning() || revive)
 }
 
 // startReplacement starts the replacement container and runs its post-update
@@ -838,7 +1013,7 @@ func startReplacement(
 		Msg(logging.StartedNewContainer)
 
 	// Run post-update lifecycle hooks for restarting containers if enabled.
-	if sourceContainer.ToRestart() && config.LifecycleHooks {
+	if sourceContainer.ToRestart() && runsUpdateHooks(sourceContainer, config) {
 		log.Debug().
 			Fields(fields).
 			Msg("Executing post-update command")

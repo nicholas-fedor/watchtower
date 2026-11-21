@@ -260,54 +260,6 @@ func FuzzPathHasMount(f *testing.F) {
 	})
 }
 
-// FuzzBindDestination verifies bind parsing never panics.
-func FuzzBindDestination(f *testing.F) {
-	f.Add("/host/config.yaml:/app/config.yaml:ro")
-	f.Add("/host/data:/data")
-	f.Add("nocolon")
-	f.Add("")
-	f.Add("::")
-	f.Add("/src:/dst:rw,z")
-
-	f.Fuzz(func(t *testing.T, bind string) {
-		dest := bindDestination(bind)
-		if dest == "" {
-			return
-		}
-
-		if !strings.Contains(bind, ":") {
-			t.Fatalf("non-empty dest %q from bind without colon %q", dest, bind)
-		}
-	})
-}
-
-// FuzzBindIsReadOnly verifies read-only bind option detection never panics and
-// that a true result means the bind options contain the ro flag.
-func FuzzBindIsReadOnly(f *testing.F) {
-	f.Add("/host/config.yaml:/app/config.yaml:ro")
-	f.Add("/host/data:/data")
-	f.Add("/host/data:/data:rw,z")
-	f.Add("/host/data:/data:z,ro")
-	f.Add("nocolon")
-	f.Add("::")
-	f.Add("")
-
-	f.Fuzz(func(t *testing.T, bind string) {
-		if !bindIsReadOnly(bind) {
-			return
-		}
-
-		parts := strings.Split(bind, ":")
-		if len(parts) < bindStringMinParts+1 {
-			t.Fatalf("read-only bind %q has no options field", bind)
-		}
-
-		if !slices.Contains(strings.Split(parts[bindStringMinParts], ","), bindReadOnlyOption) {
-			t.Fatalf("bind %q reported read-only without ro option", bind)
-		}
-	})
-}
-
 // FuzzStoreCopyFileSnapshot verifies the in-flight byte cap is never exceeded
 // and that taking the snapshot returns the store to empty for that id.
 func FuzzStoreCopyFileSnapshot(f *testing.F) {

@@ -81,6 +81,14 @@ func (c fuzzableContainer) IsWatchtower() bool {
 	return c.watchtower
 }
 
+// IsJobRun reports whether the fake carries Docker Engine's job label, as the
+// model decides it.
+func (c fuzzableContainer) IsJobRun() bool {
+	_, ok := c.GetLabel(labels.JobID)
+
+	return ok
+}
+
 var _ FilterableContainer = fuzzableContainer{}
 
 // labelMap turns parsed label pairs into a container's labels. A container

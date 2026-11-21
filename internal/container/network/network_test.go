@@ -30,6 +30,24 @@ const testShortID = "abc123def456"
 func Test_getNetworkConfig(t *testing.T) {
 	t.Parallel()
 
+	t.Run("with another container's network namespace", func(t *testing.T) {
+		t.Parallel()
+
+		// Podman 5 reports the networks of the container whose namespace this
+		// one joins and rejects a create that names them.
+		container := modelfixture.Container(
+			containerfixture.WithNetworkMode("container:vpn"),
+			containerfixture.WithNetworkSettings(map[string]*dockerNetwork.EndpointSettings{
+				"podman": {NetworkID: "podman_network_id"},
+			}),
+		)
+
+		config := FromContainer(newTestLogger(t), container, "1.41")
+
+		require.NotNil(t, config)
+		assert.Empty(t, config.EndpointsConfig)
+	})
+
 	t.Run("with bridge network mode", func(t *testing.T) {
 		t.Parallel()
 

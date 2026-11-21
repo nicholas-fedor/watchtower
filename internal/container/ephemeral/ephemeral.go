@@ -478,12 +478,12 @@ func socketBindForPath(sourceHostConfig *dockerContainer.HostConfig, socketPath 
 
 	if sourceHostConfig != nil {
 		for _, bind := range sourceHostConfig.Binds {
-			_, containerPath, ok := parseBindMount(bind)
+			parsed, ok := container.ParseBind(bind)
 			if !ok {
 				continue
 			}
 
-			containerPath = path.Clean(containerPath)
+			containerPath := path.Clean(parsed.Destination)
 
 			provides := containerPath == cleanSocket ||
 				strings.HasPrefix(cleanSocket, strings.TrimSuffix(containerPath, "/")+"/")
@@ -802,9 +802,7 @@ func prepareTLSCertBinds(
 	tlsFiles := []string{"ca.pem", "cert.pem", "key.pem"}
 
 	for _, bind := range sourceHostConfig.Binds {
-		// Parse the bind mount string, stripping mount options (e.g., :ro, :rw)
-		// from the container path to ensure correct path comparisons.
-		hostPath, containerPath, ok := parseBindMount(bind)
+		parsed, ok := container.ParseBind(bind)
 		if !ok {
 			continue
 		}
@@ -812,8 +810,8 @@ func prepareTLSCertBinds(
 		// Check if this bind mount is for TLS certificates.
 		// We check if the container path matches or is a parent of the cert path.
 		for _, tlsFile := range tlsFiles {
-			if strings.Contains(containerPath, tlsFile) ||
-				strings.Contains(hostPath, tlsFile) {
+			if strings.Contains(parsed.Destination, tlsFile) ||
+				strings.Contains(parsed.Source, tlsFile) {
 				certBinds = append(certBinds, bind)
 
 				break
@@ -821,8 +819,8 @@ func prepareTLSCertBinds(
 		}
 
 		// Also check if the entire cert directory is mounted.
-		if certPath != "" && (containerPath == certPath ||
-			strings.HasPrefix(containerPath, certPath+"/")) {
+		if certPath != "" && (parsed.Destination == certPath ||
+			strings.HasPrefix(parsed.Destination, certPath+"/")) {
 			// Avoid duplicates.
 			if !containsBind(certBinds, bind) {
 				certBinds = append(certBinds, bind)
@@ -831,56 +829,6 @@ func prepareTLSCertBinds(
 	}
 
 	return certBinds
-}
-
-// parseBindMount parses a bind mount string in "host_path:container_path[:options]" format.
-//
-// Parameters:
-//   - bind: The bind mount string to parse.
-//
-// Returns:
-//   - string: The host-side path.
-//   - string: The container-side path (without mount options).
-//   - bool: True if parsing succeeded.
-func parseBindMount(bind string) (string, string, bool) {
-	// Detect Windows drive-letter pattern (e.g., "C:" where len >= 2 and second rune is ':').
-	// In that case, locate the separator colon after the drive-letter (index > 1).
-	// Otherwise, use the first ':' as the separator.
-	var sepIdx int
-
-	if len(bind) >= 2 && bind[1] == ':' {
-		// Windows drive-letter detected.
-		// Find separator after drive letter.
-		sepIdx = strings.Index(bind[2:], ":")
-		if sepIdx != -1 {
-			sepIdx += 2 // adjust for offset into bind[2:]
-		}
-	} else {
-		sepIdx = strings.Index(bind, ":")
-	}
-
-	if sepIdx == -1 {
-		return "", "", false
-	}
-
-	hostPath := bind[:sepIdx]
-	containerAndOpts := bind[sepIdx+1:]
-
-	// Both parts must be non-empty.
-	if hostPath == "" || containerAndOpts == "" {
-		return "", "", false
-	}
-
-	// Strip mount options (e.g., :ro, :rw) from the container path.
-	// Format is "host:container[:options]" where options come after a third colon.
-	containerPath, _, _ := strings.Cut(containerAndOpts, ":")
-
-	// Container path must be non-empty after stripping options.
-	if containerPath == "" {
-		return "", "", false
-	}
-
-	return hostPath, containerPath, true
 }
 
 // containsBind checks if a bind mount string is already present in the slice.

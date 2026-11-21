@@ -201,6 +201,50 @@ func (_c *MockFilterableContainer_ImageName_Call) RunAndReturn(run func() string
 	return _c
 }
 
+// IsJobRun provides a mock function for the type MockFilterableContainer
+func (_mock *MockFilterableContainer) IsJobRun() bool {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsJobRun")
+	}
+
+	var r0 bool
+	if returnFunc, ok := ret.Get(0).(func() bool); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	return r0
+}
+
+// MockFilterableContainer_IsJobRun_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsJobRun'
+type MockFilterableContainer_IsJobRun_Call struct {
+	*mock.Call
+}
+
+// IsJobRun is a helper method to define mock.On call
+func (_e *MockFilterableContainer_Expecter) IsJobRun() *MockFilterableContainer_IsJobRun_Call {
+	return &MockFilterableContainer_IsJobRun_Call{Call: _e.mock.On("IsJobRun")}
+}
+
+func (_c *MockFilterableContainer_IsJobRun_Call) Run(run func()) *MockFilterableContainer_IsJobRun_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockFilterableContainer_IsJobRun_Call) Return(b bool) *MockFilterableContainer_IsJobRun_Call {
+	_c.Call.Return(b)
+	return _c
+}
+
+func (_c *MockFilterableContainer_IsJobRun_Call) RunAndReturn(run func() bool) *MockFilterableContainer_IsJobRun_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // IsWatchtower provides a mock function for the type MockFilterableContainer
 func (_mock *MockFilterableContainer) IsWatchtower() bool {
 	ret := _mock.Called()

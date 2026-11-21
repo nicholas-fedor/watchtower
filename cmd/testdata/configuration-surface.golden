@@ -139,6 +139,7 @@ container labels:
   com.centurylinklabs.watchtower.git-repo
   com.centurylinklabs.watchtower.git-semver-policy
   com.centurylinklabs.watchtower.git-watch
+  com.centurylinklabs.watchtower.kept-volumes
   com.centurylinklabs.watchtower.lifecycle.gid
   com.centurylinklabs.watchtower.lifecycle.post-check
   com.centurylinklabs.watchtower.lifecycle.post-check-timeout

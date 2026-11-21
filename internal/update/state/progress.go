@@ -275,8 +275,11 @@ func (m Progress) SetReportMeta(log *zerolog.Logger, containerID container.Conta
 // RecordRestart records that a container was recreated as newID.
 //
 // A container whose image was not updated is marked restarted. An updated
-// container keeps its updated state. A container the progress does not hold
-// is skipped.
+// container keeps its updated state. A container the scan skipped, failed or
+// found a newer image for keeps that state, since its recreation changes
+// neither its image nor why the scan reported it. A monitor-only container
+// with a newer image is still listed as stale, for example. A container the
+// progress does not hold is skipped.
 //
 // Parameters:
 //   - log: Process logger.
@@ -289,7 +292,15 @@ func (m Progress) RecordRestart(log *zerolog.Logger, c *container.Container, new
 
 	m.SetNewContainerID(log, c.ID(), newID)
 
-	if !c.IsStale() {
+	if c.IsStale() {
+		return
+	}
+
+	status := m[c.ID()]
+	reported := status.state == SkippedState || status.state == FailedState
+	newerImage := status.newImage != "" && status.newImage != status.oldImage
+
+	if !reported && !newerImage {
 		m.MarkRestarted(log, c.ID())
 	}
 }

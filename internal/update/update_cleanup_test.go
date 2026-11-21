@@ -164,7 +164,16 @@ func TestUpdateAction_Cleanup(t *testing.T) {
 			t.Run("should collect one entry per container for deferred cleanup", func(t *testing.T) {
 				t.Parallel()
 
-				client := mockUpdate.CreateFakeClient(getCommonTestData(), false, false)
+				// The containers run, so each replacement is started and
+				// waited on.
+				testData := getCommonTestData()
+				for i, c := range testData.Containers {
+					testData.Containers[i] = mockUpdate.CreateMockContainerWithConfig(
+						string(c.ID()), c.Name(), c.ImageName(), true, false, time.Now(), c.ContainerInfo().Config,
+					)
+				}
+
+				client := mockUpdate.CreateFakeClient(testData, false, false)
 				client.TestData.Staleness = map[string]bool{
 					"test-container-01": true,
 					"test-container-02": true,

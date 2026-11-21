@@ -18,6 +18,7 @@ import (
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
+	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerClient "github.com/moby/moby/client"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
@@ -445,7 +446,7 @@ func TestGetSourceContainer(t *testing.T) {
 	t.Run("container has network mode requiring resolution", func(t *testing.T) {
 		t.Parallel()
 
-		t.Run("should resolve network container name", func(t *testing.T) {
+		t.Run("should resolve network container name without its leading slash", func(t *testing.T) {
 			t.Parallel()
 
 			const parentID = "parent-container-id"
@@ -460,8 +461,44 @@ func TestGetSourceContainer(t *testing.T) {
 			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
 			require.NotNil(t, c)
-			assert.Equal(t, dockerContainer.NetworkMode("container:/parent-container"), c.ContainerInfo().HostConfig.NetworkMode)
+			assert.Equal(t, dockerContainer.NetworkMode("container:parent-container"), c.ContainerInfo().HostConfig.NetworkMode)
 		})
+	})
+
+	t.Run("container has network mode naming a removed container", func(t *testing.T) {
+		t.Parallel()
+
+		// A running container without its network is worth a warning. A
+		// stopped one stays as it is until it is recreated, so it is logged
+		// at debug and keeps the removed container's ID.
+		for _, running := range []bool{true, false} {
+			t.Run(fmt.Sprintf("running %t", running), func(t *testing.T) {
+				t.Parallel()
+
+				const parentID = "removed-container-id"
+
+				api := newDockerAPI(t)
+				expectInspect(api, testContainerID, sourceInspect("/torrent", running, &dockerContainer.HostConfig{
+					NetworkMode: dockerContainer.NetworkMode("container:" + parentID),
+				}), nil)
+				expectMissing(api, parentID)
+				expectTestImage(api)
+
+				log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
+
+				c, err := getSourceContainer(log, t.Context(), api, testContainerID, nil)
+				require.NoError(t, err)
+				assert.Equal(t, dockerContainer.NetworkMode("container:"+parentID), c.ContainerInfo().HostConfig.NetworkMode)
+
+				wantLevel := "debug"
+				if running {
+					wantLevel = "warn"
+				}
+
+				assert.Equal(t, []string{wantLevel},
+					logcapture.Levels(t, logBuf.String(), "Unable to resolve network container"))
+			})
+		}
 	})
 
 	t.Run("container has volumes-from requiring resolution", func(t *testing.T) {
@@ -519,6 +556,27 @@ func TestGetSourceContainer(t *testing.T) {
 			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
 			require.NoError(t, err)
 			assert.Equal(t, []string{"nextcloud-app:rw", "nextcloud-db"}, c.ContainerInfo().HostConfig.VolumesFrom)
+		})
+
+		t.Run("should record the mount destinations of the resolved sources", func(t *testing.T) {
+			t.Parallel()
+
+			api := newDockerAPI(t)
+			expectInspect(api, testContainerID, sourceInspect("/nextcloud-nginx", true, volumesFrom(appID+":ro", missingID)), nil)
+			expectInspect(api, appID, dockerContainer.InspectResponse{
+				ID:   appID,
+				Name: "/nextcloud-app",
+				Mounts: []dockerContainer.MountPoint{
+					{Type: dockerMount.TypeVolume, Name: "app-data", Destination: "/var/www/html/"},
+					{Type: dockerMount.TypeBind, Source: "/srv/config", Destination: "/config"},
+				},
+			}, nil)
+			expectMissing(api, missingID)
+			expectTestImage(api)
+
+			c, err := getSourceContainer(newTestLogger(t), t.Context(), api, testContainerID, nil)
+			require.NoError(t, err)
+			assert.Equal(t, []string{"/var/www/html", "/config"}, c.VolumesFromDestinations())
 		})
 
 		t.Run("should rewrite resolved volumes-from entries and leave unresolved IDs", func(t *testing.T) {
@@ -798,6 +856,24 @@ func Test_stopSourceContainer(t *testing.T) {
 
 			c := modelfixture.Container()
 			c.SetLinkedToRestarting(true)
+
+			log, logbuf := logcapture.New(zerolog.InfoLevel)
+
+			err := stopSourceContainer(log, t.Context(), api, c, 10*time.Second)
+			require.NoError(t, err)
+			assert.Contains(t, logbuf.String(), "Stopping linked container")
+		})
+
+		// A rebound container keeps its image, so notifications must not
+		// call it stale.
+		t.Run("should log 'Stopping linked container' for a rebound container", func(t *testing.T) {
+			t.Parallel()
+
+			api := newDockerAPI(t)
+			expectStop(api, mockContainerID, 10, nil)
+
+			c := modelfixture.Container()
+			c.SetRebinding(true)
 
 			log, logbuf := logcapture.New(zerolog.InfoLevel)
 

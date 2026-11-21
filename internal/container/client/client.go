@@ -572,6 +572,78 @@ func (c *Client) ListLabeledContainers(ctx context.Context, label string) ([]*co
 	return inspectListedContainers(c.logger(), ctx, c.api, listOptions, nil)
 }
 
+// ListNetworkDependents returns the containers that join another container's
+// network namespace and that the update's own listing leaves out.
+//
+// The update lists running containers, stopped ones with the include-stopped
+// configuration option, and restarting ones with the include-restarting
+// configuration option. This lists the rest of those states and paused
+// containers, so a container that joins a recreated container is found in any
+// state. Podman has no restarting state. Only the containers in another
+// container's namespace are inspected, along with those the list reports
+// without a network mode, as Podman before version 6 lists every container.
+//
+// Parameters:
+//   - ctx: Context for cancellation and timeout control.
+//
+// Returns:
+//   - []*container.Container: The dependents, in list order.
+//   - error: Non-nil if listing or an inspect fails for a reason other than
+//     the container being gone.
+func (c *Client) ListNetworkDependents(ctx context.Context) ([]*container.Container, error) {
+	// The states the update lists are left out. Podman's lack of a
+	// restarting state matters only for the listing below.
+	listed := buildListFilterArgs(c.ClientOptions, false)["status"]
+	statuses := slices.DeleteFunc([]string{"paused", "created", "exited", "restarting"}, func(status string) bool {
+		return listed[status]
+	})
+
+	unlisted, err := c.api.ContainerList(ctx, dockerClient.ContainerListOptions{
+		All:     true,
+		Filters: statusFilter(slices.Contains(statuses, "restarting") && c.isPodmanRuntime(ctx), statuses...),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
+	}
+
+	candidates := make([]dockerContainer.Summary, 0, len(unlisted.Items))
+
+	for _, summary := range unlisted.Items {
+		mode := dockerContainer.NetworkMode(summary.HostConfig.NetworkMode)
+
+		// Podman before version 6 leaves the network mode out of its
+		// container list. A plain inspect reads it, so only a dependent gets
+		// the full inspect of its image and volumes-from sources below.
+		if mode == "" {
+			inspected, err := c.api.ContainerInspect(ctx, summary.ID, dockerClient.ContainerInspectOptions{})
+			if cerrdefs.IsNotFound(err) {
+				continue
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
+			}
+
+			if inspected.Container.HostConfig != nil {
+				mode = inspected.Container.HostConfig.NetworkMode
+			}
+		}
+
+		if mode.IsContainer() {
+			candidates = append(candidates, summary)
+		}
+	}
+
+	dependents, err := inspectSummaries(c.logger(), ctx, c.api, candidates, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return slices.DeleteFunc(dependents, func(dependent *container.Container) bool {
+		return dependent.NetworkContainer() == ""
+	}), nil
+}
+
 // GetContainer fetches detailed information about a specific container by its ID.
 //
 // Parameters:
@@ -726,7 +798,8 @@ func (c *Client) StopContainer(ctx context.Context, target *container.Container,
 //
 // AutoRemove containers that were running are left for Docker to delete after
 // stop. Non-running AutoRemove containers are removed explicitly so the name
-// is available for recreation.
+// is available for recreation. The remove-volumes configuration option does
+// not apply to a container whose replacement keeps its anonymous volumes.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
@@ -742,7 +815,7 @@ func (c *Client) StopAndRemoveContainer(ctx context.Context, target *container.C
 		c.api,
 		target,
 		timeout,
-		c.RemoveVolumes,
+		c.RemoveVolumes && !target.KeepsAnonymousVolumes(),
 	)
 	if err != nil {
 		c.logger().Debug().

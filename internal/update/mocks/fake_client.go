@@ -31,37 +31,39 @@ type FakeClient struct {
 // It defines container states, staleness, and fake operation results.
 // Counter fields use atomic.Int32 for thread-safe concurrent access.
 type TestData struct {
-	IsContainerStaleError     error                                          // Error to return from IsContainerStale (for testing).
-	ListContainersError       error                                          // Error to return from ListContainers (for testing).
-	StopContainerError        error                                          // Error to return from StopContainer (for testing).
-	StartContainerError       error                                          // Error to return from StartContainer (for testing).
-	StartContainerByIDError   error                                          // Error to return from StartContainerByID (for testing).
-	CreateContainerError      error                                          // Error to return from CreateContainer (for testing).
-	RemoveImageError          error                                          // Error to return from RemoveImageByID (for testing).
-	LastStartedContainer      *container.Container                           // Last container passed to StartContainer.
-	SetRestartPolicyCtx       context.Context                                // Last context passed to SetRestartPolicy.
-	CreateContainerCtx        context.Context                                // Last context passed to CreateContainer.
-	RenameContainerCtx        context.Context                                // Last context passed to RenameContainer.
-	StartContainerByIDCtx     context.Context                                // Last context passed to StartContainerByID.
-	GetContainerCtx           context.Context                                // Last context passed to GetContainer.
-	StopAndRemoveContainerCtx context.Context                                // Last context passed to StopAndRemoveContainer.
-	GetImageDiskUsageError    error                                          // Error to return from GetImageDiskUsage.
-	ContainersByID            map[container.ContainerID]*container.Container // Map of containers by ID.
-	Staleness                 map[string]bool                                // Map of container names to staleness status.
-	ImageAnnotations          map[string]oci.Annotations                     // OCI annotations returned per image reference.
-	LastStopAndRemoveID       container.ContainerID                          // ID of the last container passed to StopAndRemoveContainer.
-	LastCreatedContainerID    container.ContainerID                          // ID returned by the last successful CreateContainer call.
-	LastRenameTarget          string                                         // Last new name passed to RenameContainer.
-	NameOfContainerToKeep     string                                         // Name of the container to avoid stopping.
-	LastContainerChain        string                                         // Last container chain passed to CreateEphemeralOrchestrator.
-	LastStartedContainerID    container.ContainerID                          // ID returned by the last successful StartContainer call.
-	SetRestartPolicyID        container.ContainerID                          // Last container ID passed to SetRestartPolicy.
-	RenameTargets             []string                                       // Ordered list of rename targets.
-	Containers                []*container.Container                         // List of mock containers.
-	FailedImageIDs            []container.ImageID                            // List of image IDs that should fail removal.
-	StopOrder                 []string                                       // Order in which containers were stopped.
-	CreateOrder               []string                                       // Order in which containers were created.
-	StartOrder                []string                                       // Order in which containers were started.
+	IsContainerStaleError      error                                          // Error to return from IsContainerStale (for testing).
+	ListContainersError        error                                          // Error to return from ListContainers (for testing).
+	StopContainerError         error                                          // Error to return from StopContainer (for testing).
+	StartContainerError        error                                          // Error to return from StartContainer (for testing).
+	StartContainerByIDError    error                                          // Error to return from StartContainerByID (for testing).
+	CreateContainerError       error                                          // Error to return from CreateContainer (for testing).
+	RemoveImageError           error                                          // Error to return from RemoveImageByID (for testing).
+	LastStartedContainer       *container.Container                           // Last container passed to StartContainer.
+	SetRestartPolicyCtx        context.Context                                // Last context passed to SetRestartPolicy.
+	CreateContainerCtx         context.Context                                // Last context passed to CreateContainer.
+	RenameContainerCtx         context.Context                                // Last context passed to RenameContainer.
+	StartContainerByIDCtx      context.Context                                // Last context passed to StartContainerByID.
+	GetContainerCtx            context.Context                                // Last context passed to GetContainer.
+	StopAndRemoveContainerCtx  context.Context                                // Last context passed to StopAndRemoveContainer.
+	GetImageDiskUsageError     error                                          // Error to return from GetImageDiskUsage.
+	ListNetworkDependentsError error                                          // Error to return from ListNetworkDependents.
+	ContainersByID             map[container.ContainerID]*container.Container // Map of containers by ID.
+	Staleness                  map[string]bool                                // Map of container names to staleness status.
+	ImageAnnotations           map[string]oci.Annotations                     // OCI annotations returned per image reference.
+	LastStopAndRemoveID        container.ContainerID                          // ID of the last container passed to StopAndRemoveContainer.
+	LastCreatedContainerID     container.ContainerID                          // ID returned by the last successful CreateContainer call.
+	LastRenameTarget           string                                         // Last new name passed to RenameContainer.
+	NameOfContainerToKeep      string                                         // Name of the container to avoid stopping.
+	LastContainerChain         string                                         // Last container chain passed to CreateEphemeralOrchestrator.
+	LastStartedContainerID     container.ContainerID                          // ID returned by the last successful StartContainer call.
+	SetRestartPolicyID         container.ContainerID                          // Last container ID passed to SetRestartPolicy.
+	RenameTargets              []string                                       // Ordered list of rename targets.
+	Containers                 []*container.Container                         // List of mock containers.
+	NetworkDependents          []*container.Container                         // Containers returned by ListNetworkDependents.
+	FailedImageIDs             []container.ImageID                            // List of image IDs that should fail removal.
+	StopOrder                  []string                                       // Order in which containers were stopped.
+	CreateOrder                []string                                       // Order in which containers were created.
+	StartOrder                 []string                                       // Order in which containers were started.
 	// OperationOrder records client method names in call order for handoff sequencing assertions.
 	OperationOrder               []string
 	LastRestartPolicy            dockerContainer.RestartPolicy  // Last policy passed to SetRestartPolicy.
@@ -83,6 +85,7 @@ type TestData struct {
 	ListContainersCount          atomic.Int32                   // Number of times ListContainers was called.
 	RemoveContainerCount         atomic.Int32                   // Number of times RemoveContainer was called.
 	GetImageDiskUsageCount       atomic.Int32                   // Number of times GetImageDiskUsage was called.
+	ListNetworkDependentsCount   atomic.Int32                   // Number of times ListNetworkDependents was called.
 	LastCleanup                  bool                           // Last cleanup flag passed to CreateEphemeralOrchestrator.
 }
 
@@ -217,6 +220,22 @@ func (client FakeClient) ListLabeledContainers(ctx context.Context, label string
 	}
 
 	return labeled, nil
+}
+
+// ListNetworkDependents returns the NetworkDependents in
+// TestData, or ListNetworkDependentsError.
+func (client FakeClient) ListNetworkDependents(ctx context.Context) ([]*container.Container, error) {
+	client.TestData.ListNetworkDependentsCount.Add(1)
+
+	if err := client.checkContextCancellation(ctx); err != nil {
+		return nil, err
+	}
+
+	if client.TestData.ListNetworkDependentsError != nil {
+		return nil, client.TestData.ListNetworkDependentsError
+	}
+
+	return client.TestData.NetworkDependents, nil
 }
 
 // StopContainer simulates stopping a container by marking it in the Stopped map.

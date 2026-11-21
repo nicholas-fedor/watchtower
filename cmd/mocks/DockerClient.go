@@ -1021,6 +1021,68 @@ func (_c *MockDockerClient_ListLabeledContainers_Call) RunAndReturn(run func(ctx
 	return _c
 }
 
+// ListNetworkDependents provides a mock function for the type MockDockerClient
+func (_mock *MockDockerClient) ListNetworkDependents(ctx context.Context) ([]*container.Container, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNetworkDependents")
+	}
+
+	var r0 []*container.Container
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) ([]*container.Container, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) []*container.Container); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*container.Container)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDockerClient_ListNetworkDependents_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNetworkDependents'
+type MockDockerClient_ListNetworkDependents_Call struct {
+	*mock.Call
+}
+
+// ListNetworkDependents is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockDockerClient_Expecter) ListNetworkDependents(ctx any) *MockDockerClient_ListNetworkDependents_Call {
+	return &MockDockerClient_ListNetworkDependents_Call{Call: _e.mock.On("ListNetworkDependents", ctx)}
+}
+
+func (_c *MockDockerClient_ListNetworkDependents_Call) Run(run func(ctx context.Context)) *MockDockerClient_ListNetworkDependents_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDockerClient_ListNetworkDependents_Call) Return(containers []*container.Container, err error) *MockDockerClient_ListNetworkDependents_Call {
+	_c.Call.Return(containers, err)
+	return _c
+}
+
+func (_c *MockDockerClient_ListNetworkDependents_Call) RunAndReturn(run func(ctx context.Context) ([]*container.Container, error)) *MockDockerClient_ListNetworkDependents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Ping provides a mock function for the type MockDockerClient
 func (_mock *MockDockerClient) Ping(ctx context.Context) error {
 	ret := _mock.Called(ctx)

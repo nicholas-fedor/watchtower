@@ -18,8 +18,11 @@ import (
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/reportfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
@@ -121,7 +124,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			RunOnce: true,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, "", client, params)
 		require.NoError(t, err)
 		assert.False(t, renamed)
 		assert.Equal(t, int32(0), client.TestData.RenameContainerCount.Load())
@@ -159,7 +162,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			RunOnce: false,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, "", client, params)
 		require.NoError(t, err)
 		assert.True(t, renamed)
 		assert.Equal(t, int32(1), client.TestData.RenameContainerCount.Load())
@@ -197,7 +200,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			RunOnce: false,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, "", client, params)
 		require.NoError(t, err)
 		assert.True(t, renamed)
 		assert.Equal(t, int32(0), client.TestData.RenameContainerCount.Load())
@@ -236,7 +239,7 @@ func Test_restartStaleContainer(t *testing.T) {
 			Cleanup:             true,
 		}
 		testContainer := client.TestData.Containers[0]
-		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, client, params)
+		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), testContainer, "", client, params)
 		require.NoError(t, err)
 		assert.True(t, renamed)
 		assert.Empty(t, newID)
@@ -277,19 +280,19 @@ func TestDetachedContext(t *testing.T) {
 			{
 				name:            "positive timeout below minimum creates context with minimum deadline",
 				timeout:         30 * time.Second,
-				expectedTimeout: defaultCreateStartTimeout,
+				expectedTimeout: 5 * time.Minute,
 				description:     "When Timeout plus 30 seconds is below the 5 minute minimum, the detached context uses the minimum",
 			},
 			{
 				name:            "zero timeout creates context with minimum deadline",
 				timeout:         0,
-				expectedTimeout: defaultCreateStartTimeout,
+				expectedTimeout: 5 * time.Minute,
 				description:     "When Timeout is zero, the detached context uses the 5 minute minimum",
 			},
 			{
 				name:            "negative timeout creates context with minimum deadline",
 				timeout:         -1 * time.Second,
-				expectedTimeout: defaultCreateStartTimeout,
+				expectedTimeout: 5 * time.Minute,
 				description:     "When Timeout is negative, the detached context uses the 5 minute minimum",
 			},
 		}
@@ -338,6 +341,7 @@ func TestDetachedContext(t *testing.T) {
 				newID, renamed, err := restartStaleContainer(newTestLogger(t),
 					context.WithValue(t.Context(), callerKey{}, "caller"),
 					testContainer,
+					"",
 					client,
 					params,
 				)
@@ -437,6 +441,7 @@ func TestDetachedContext(t *testing.T) {
 				_, renamed, err = restartStaleContainer(newTestLogger(t),
 					parentCtx,
 					testContainer,
+					"",
 					client,
 					params,
 				)
@@ -533,6 +538,7 @@ func TestDetachedContext(t *testing.T) {
 				_, renamed, err = restartStaleContainer(newTestLogger(t),
 					parentCtx,
 					testContainer,
+					"",
 					client,
 					params,
 				)
@@ -660,6 +666,7 @@ func TestDetachedContext(t *testing.T) {
 					_, _, err := restartStaleContainer(newTestLogger(t),
 						t.Context(),
 						client.TestData.Containers[0],
+						"",
 						client,
 						params,
 					)
@@ -740,6 +747,7 @@ func TestDetachedContext(t *testing.T) {
 				_, renamed, err = restartStaleContainer(newTestLogger(t),
 					parentCtx,
 					testContainer,
+					"",
 					client,
 					params,
 				)
@@ -817,6 +825,7 @@ func TestDetachedContext(t *testing.T) {
 			_, renamed, err := restartStaleContainer(newTestLogger(t),
 				parentCtx,
 				testContainer,
+				"",
 				client,
 				params,
 			)
@@ -876,6 +885,7 @@ func TestDetachedContext(t *testing.T) {
 			newID, renamed, err := restartStaleContainer(newTestLogger(t),
 				t.Context(),
 				testContainer,
+				"",
 				client,
 				params,
 			)
@@ -1377,10 +1387,10 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 		)
 
 		// Pretend the stop phase already removed all three.
-		stoppedImages := []cleanup.RemovedImageInfo{
-			{ContainerID: containers[0].ID(), ImageID: containers[0].ImageID(), ImageName: containers[0].ImageName(), ContainerName: containers[0].Name()},
-			{ContainerID: containers[1].ID(), ImageID: containers[1].ImageID(), ImageName: containers[1].ImageName(), ContainerName: containers[1].Name()},
-			{ContainerID: containers[2].ID(), ImageID: containers[2].ImageID(), ImageName: containers[2].ImageName(), ContainerName: containers[2].Name()},
+		stopped := map[container.ContainerID]container.ContainerID{
+			containers[0].ID(): "",
+			containers[1].ID(): "",
+			containers[2].ID(): "",
 		}
 
 		ctx, cancel := context.WithCancel(t.Context())
@@ -1395,7 +1405,7 @@ func TestRestartContainersInSortedOrderCancelRecovery(t *testing.T) {
 			containers,
 			client,
 			updateParams.Params{Timeout: 0},
-			stoppedImages,
+			stopped,
 			&cleanup,
 			&progress,
 		)
@@ -1873,6 +1883,56 @@ func Test_performRollingRestart(t *testing.T) {
 		})
 	})
 
+	t.Run("rename-based self-update", func(t *testing.T) {
+		t.Parallel()
+
+		// The stop phase leaves Watchtower's own container running for its
+		// self-update, which renames it and creates its replacement.
+		t.Run("should replace the Watchtower container", func(t *testing.T) {
+			t.Parallel()
+
+			watchtower := mockUpdate.CreateMockContainerWithConfig(
+				"watchtower",
+				"/watchtower",
+				"watchtower:latest",
+				true,
+				false,
+				time.Now(),
+				&dockerContainer.Config{
+					Labels: map[string]string{
+						"com.centurylinklabs.watchtower": "true",
+					},
+				},
+			)
+			watchtower.SetStale(true)
+
+			client := mockUpdate.CreateFakeClient(
+				&mockUpdate.TestData{
+					Containers: []*container.Container{watchtower},
+					Staleness:  map[string]bool{"watchtower": true},
+				},
+				false,
+				false,
+			)
+
+			var cleanupImageInfos []cleanup.RemovedImageInfo
+
+			failed, err := performRollingRestart(newTestLogger(t),
+				t.Context(),
+				[]*container.Container{watchtower},
+				client,
+				updateParams.Params{RollingRestart: true},
+				&cleanupImageInfos,
+				nil,
+			)
+
+			require.NoError(t, err)
+			assert.Empty(t, failed)
+			assert.Equal(t, int32(1), client.TestData.RenameContainerCount.Load())
+			assert.Equal(t, int32(1), client.TestData.CreateContainerCount.Load())
+		})
+	})
+
 	t.Run("ephemeral self-update", func(t *testing.T) {
 		t.Parallel()
 
@@ -2176,7 +2236,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			CreateContainer(mock.Anything, source).
 			Return("", clientErr)
 
-		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
+		_, _, err := restartStaleContainer(newTestLogger(t), t.Context(), source, "", client, updateParams.Params{})
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 	})
@@ -2199,6 +2259,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			newTestLogger(t),
 			t.Context(),
 			source,
+			"",
 			client,
 			updateParams.Params{ReviveStopped: true},
 		)
@@ -2217,7 +2278,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			RenameContainer(mock.Anything, source, source.OldName()).
 			Return(clientErr)
 
-		_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
+		_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, "", client, updateParams.Params{})
 		require.Same(t, clientErr, err)
 		require.EqualError(t, err, text)
 		assert.False(t, renamed)
@@ -2238,6 +2299,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 			newTestLogger(t),
 			t.Context(),
 			source,
+			"",
 			client,
 			updateParams.Params{EphemeralSelfUpdate: true},
 		)
@@ -2275,7 +2337,7 @@ func TestRestartStaleContainer_AlreadyRenamedStartFails(t *testing.T) {
 	client.EXPECT().GetContainer(mock.Anything, newID).Return(failed, nil).Once()
 	client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Duration(0)).Return(nil).Once()
 
-	newContainerID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, client, updateParams.Params{})
+	newContainerID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, "", client, updateParams.Params{})
 	require.Same(t, startErr, err)
 	assert.Empty(t, newContainerID)
 	assert.True(t, renamed, "the source keeps its old name")
@@ -2309,7 +2371,7 @@ func TestRecordRestartOutcomes(t *testing.T) {
 	progress.AddScanned(&nop, skipping, skippingImage, updateParams.Params{})
 	outcomes[skipping.ID()] = skipped(errors.New("pre-update command asked to skip"))
 
-	recordRestartOutcomes(log, &progress, outcomes)
+	recordRestartOutcomes(log, &progress, nil, outcomes, updateParams.Params{})
 
 	report := progress.Report(&nop)
 	assert.Len(t, report.Failed(), len(wantNames))
@@ -2331,4 +2393,121 @@ func TestRecordRestartOutcomes(t *testing.T) {
 	}
 
 	assert.Equal(t, wantNames, gotNames, "one line per failure, in container ID order")
+}
+
+// newRebindingContainer returns a container marked for rebinding to the
+// network container vpn, with pre-update and post-update commands, running or
+// stopped.
+//
+// Parameters:
+//   - running: Whether the container is running.
+//
+// Returns:
+//   - *container.Container: The rebinding container.
+func newRebindingContainer(running bool) *container.Container {
+	return rebound("torrent", "vpn",
+		containerfixture.WithContainerState(dockerContainer.State{Running: running}),
+		containerfixture.WithLabels(map[string]string{
+			labels.LifecyclePreUpdate:  "/pre-update.sh",
+			labels.LifecyclePostUpdate: "/post-update.sh",
+		}),
+	)
+}
+
+// rebound returns a rebound container named name, with the ID name-id, that
+// joins the network namespace of the container named provider.
+func rebound(name, provider string, updates ...containerfixture.Update) *container.Container {
+	c := modelfixture.Container(append([]containerfixture.Update{
+		containerfixture.WithName("/" + name),
+		containerfixture.WithID(name + "-id"),
+		containerfixture.WithNetworkMode("container:" + provider),
+	}, updates...)...)
+	c.SetRebinding(true)
+
+	return c
+}
+
+// TestStopStaleContainer_rebinding verifies that a rebound container is
+// stopped and removed without its pre-update command, because it is not
+// updated. The strict mock fails on any command execution.
+func TestStopStaleContainer_rebinding(t *testing.T) {
+	t.Parallel()
+
+	c := newRebindingContainer(true)
+	client := mockRestart.NewMockClient(t)
+	client.EXPECT().SnapshotCopyFiles(mock.Anything, c).Return(nil).Once()
+	client.EXPECT().StopAndRemoveContainer(mock.Anything, c, mock.Anything).Return(nil).Once()
+
+	stopped, err := stopStaleContainer(newTestLogger(t), t.Context(), c, client, updateParams.Params{LifecycleHooks: true})
+	require.NoError(t, err)
+	assert.True(t, stopped)
+}
+
+// TestRestartStaleContainer_rebinding verifies that a rebound container is
+// recreated in the state it was in, without its post-update command.
+func TestRestartStaleContainer_rebinding(t *testing.T) {
+	t.Parallel()
+
+	params := updateParams.Params{LifecycleHooks: true, ReviveStopped: true}
+
+	t.Run("running container starts again", func(t *testing.T) {
+		t.Parallel()
+
+		c := newRebindingContainer(true)
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().CreateContainer(mock.Anything, c).Return(container.ContainerID("new-id"), nil).Once()
+		client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("new-id")).Return(nil).Once()
+
+		newID, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), c, "", client, params)
+		require.NoError(t, err)
+		assert.False(t, renamed)
+		assert.Equal(t, container.ContainerID("new-id"), newID)
+	})
+
+	t.Run("stopped container stays stopped with revive-stopped", func(t *testing.T) {
+		t.Parallel()
+
+		c := newRebindingContainer(false)
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().CreateContainer(mock.Anything, c).Return(container.ContainerID("new-id"), nil).Once()
+
+		newID, _, err := restartStaleContainer(newTestLogger(t), t.Context(), c, "", client, params)
+		require.NoError(t, err)
+		assert.Equal(t, container.ContainerID("new-id"), newID)
+	})
+}
+
+// TestRecordRestartOutcomes_rebinding verifies that a failed rebind is
+// reported as a failed reconnection to its network container, also for a
+// container the session did not scan. Such a container is added to the
+// report as failed, so every report surface counts and names it.
+func TestRecordRestartOutcomes_rebinding(t *testing.T) {
+	t.Parallel()
+
+	log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
+	c := newRebindingContainer(true)
+	progress := state.Progress{}
+
+	recordRestartOutcomes(log, &progress, []*container.Container{c}, map[container.ContainerID]error{
+		c.ID(): errors.New("failed to create container: name in use"),
+	}, updateParams.Params{})
+
+	report := progress.Report(log)
+	require.Len(t, report.Failed(), 1)
+	assert.Equal(t, c.ID(), report.Failed()[0].ID())
+	assert.Equal(t, "failed to create container: name in use", report.Failed()[0].Error())
+
+	var reported []logcapture.Entry
+
+	for _, entry := range logcapture.Entries[logcapture.Entry](t, logBuf.String()) {
+		if entry["level"] == "error" {
+			reported = append(reported, entry)
+		}
+	}
+
+	require.Len(t, reported, 1)
+	assert.Equal(t, logging.ContainerRebindFailed, reported[0]["message"])
+	assert.Equal(t, "torrent", reported[0]["container"])
+	assert.Equal(t, "vpn", reported[0]["network_container"])
+	assert.Equal(t, "failed to create container: name in use", reported[0]["error"])
 }

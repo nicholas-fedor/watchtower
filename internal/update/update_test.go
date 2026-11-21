@@ -18,6 +18,8 @@ import (
 	gitConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/git"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
+	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
@@ -346,5 +348,125 @@ func TestPlanRestarts(t *testing.T) {
 
 		require.ErrorIs(t, err, errSortDependenciesFailed)
 		assert.Nil(t, restarts)
+	})
+}
+
+// TestPlanRestarts_rebinds verifies that the containers sharing the network
+// namespace of a container to restart are rebound after it, stopped ones
+// included, whether they are unmonitored, monitor-only or skipped by the
+// dependency phase. The stopped ones are
+// listed only when something restarts.
+func TestPlanRestarts_rebinds(t *testing.T) {
+	t.Parallel()
+
+	// joining returns a container in the network namespace of vpn.
+	joining := func(name string, containerLabels map[string]string) *container.Container {
+		return modelfixture.Container(
+			containerfixture.WithName("/"+name),
+			containerfixture.WithID(name+"-id"),
+			containerfixture.WithNetworkMode("container:vpn"),
+			containerfixture.WithLabels(containerLabels),
+		)
+	}
+
+	t.Run("rebinds unmonitored, monitor-only and stopped dependents", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := skipTestContainer("vpn-id", "vpn", nil)
+		vpn.SetStale(true)
+
+		excluded := joining("excluded", nil)
+		monitorOnly := joining("monitor-only", map[string]string{labels.MonitorOnly: "true"})
+		stopped := joining("stopped", nil)
+		other := skipTestContainer("other-id", "other", nil)
+
+		all := []*container.Container{vpn, other, excluded, monitorOnly}
+		monitored := []*container.Container{vpn, monitorOnly}
+
+		log := newTestLogger(t)
+		graph, err := sorter.NewDependencyGraph(log, monitored, []*container.Container{other, excluded}, false)
+		require.NoError(t, err)
+
+		client := mockUpdate.NewMockClient(t)
+		client.EXPECT().ListNetworkDependents(mock.Anything).
+			Return([]*container.Container{stopped}, nil).Once()
+
+		restarts, err := planRestarts(log, t.Context(), client, updateParams.Params{},
+			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, all, monitored, nil)
+		require.NoError(t, err)
+
+		assert.Equal(t, []*container.Container{vpn, excluded, monitorOnly, stopped}, restarts)
+
+		for _, c := range []*container.Container{excluded, monitorOnly, stopped} {
+			assert.True(t, c.IsRebinding(), c.Name())
+		}
+
+		assert.False(t, vpn.IsRebinding())
+	})
+
+	t.Run("rebinds a dependent the dependency phase skipped", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := skipTestContainer("vpn-id", "vpn", nil)
+		vpn.SetStale(true)
+
+		cyclic := joining("cyclic", nil)
+		monitored := []*container.Container{vpn, cyclic}
+
+		log := newTestLogger(t)
+		graph, err := sorter.NewDependencyGraph(log, monitored, nil, false)
+		require.NoError(t, err)
+
+		client := mockUpdate.NewMockClient(t)
+		client.EXPECT().ListNetworkDependents(mock.Anything).Return(nil, nil).Once()
+
+		// The session passes a cycle member in skipped. It keeps the image
+		// it runs, so it is still rebound rather than left on a removed
+		// namespace.
+		restarts, err := planRestarts(log, t.Context(), client, updateParams.Params{},
+			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored,
+			map[container.ContainerID]struct{}{cyclic.ID(): {}})
+		require.NoError(t, err)
+
+		assert.Equal(t, []*container.Container{vpn, cyclic}, restarts)
+		assert.True(t, cyclic.IsRebinding())
+	})
+
+	t.Run("lists no stopped dependents without restarts", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := skipTestContainer("vpn-id", "vpn", nil)
+		monitored := []*container.Container{vpn}
+
+		log := newTestLogger(t)
+		graph, err := sorter.NewDependencyGraph(log, monitored, nil, false)
+		require.NoError(t, err)
+
+		// The strict mock fails on a call to ListNetworkDependents.
+		restarts, err := planRestarts(log, t.Context(), mockUpdate.NewMockClient(t), updateParams.Params{},
+			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored, nil)
+		require.NoError(t, err)
+		assert.Empty(t, restarts)
+	})
+
+	t.Run("a failed listing ends the plan", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := skipTestContainer("vpn-id", "vpn", nil)
+		vpn.SetStale(true)
+
+		monitored := []*container.Container{vpn}
+		listErr := errors.New("failed to list containers: daemon unavailable")
+
+		log := newTestLogger(t)
+		graph, err := sorter.NewDependencyGraph(log, monitored, nil, false)
+		require.NoError(t, err)
+
+		client := mockUpdate.NewMockClient(t)
+		client.EXPECT().ListNetworkDependents(mock.Anything).Return(nil, listErr).Once()
+
+		_, err = planRestarts(log, t.Context(), client, updateParams.Params{},
+			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored, nil)
+		require.ErrorIs(t, err, listErr)
 	})
 }
