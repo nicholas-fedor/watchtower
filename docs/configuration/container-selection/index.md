@@ -23,7 +23,7 @@ Environment Variable: WATCHTOWER_REVIVE_STOPPED
 ```
 
 !!! Note
-    Requires `--include-stopped`.
+    Requires the [include-stopped](#include_stopped_containers) configuration option. Without it, Watchtower updates no stopped containers, so this option has no effect. Watchtower logs a warning at startup when it is set alone.
 
 ## Include Restarting Containers
 
