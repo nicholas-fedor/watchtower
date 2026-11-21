@@ -87,16 +87,7 @@ func NewDependencyGraph(
 	containers, unmonitored []*container.Container,
 	useComposeDependsOn bool,
 ) (*DependencyGraph, error) {
-	members := make([]*container.Container, 0, len(containers))
-	watchtowers := make([]*container.Container, 0, 1)
-
-	for _, c := range containers {
-		if c.IsWatchtower() {
-			watchtowers = append(watchtowers, c)
-		} else {
-			members = append(members, c)
-		}
-	}
+	members, watchtowers := splitWatchtowers(containers)
 
 	return newDependencyGraph(
 		log,
@@ -230,14 +221,7 @@ func (g *DependencyGraph) CycleMembers() []*container.Container {
 		edges[g.identifiers[c]] = g.dependencies[c]
 	}
 
-	finder := &cycleFinder{
-		adjacency: edges,
-		index:     make(map[string]int, len(g.containers)),
-		lowLink:   make(map[string]int, len(g.containers)),
-		onStack:   make(map[string]bool, len(g.containers)),
-		stack:     make([]string, 0, len(g.containers)),
-		inCycle:   make(map[string]bool),
-	}
+	finder := newCycleFinder(edges)
 
 	// Start from the containers in the order given so the search is deterministic.
 	for _, c := range g.containers {
@@ -307,16 +291,7 @@ func (g *DependencyGraph) SelfDependencies() []*container.Container {
 //   - error: An error naming the cycle when the containers depend on each other
 //     in a cycle, or naming the container when one is outside the graph.
 func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []*container.Container) error {
-	ordered := make([]*container.Container, 0, len(containers))
-	watchtowers := make([]*container.Container, 0, 1)
-
-	for _, c := range containers {
-		if c.IsWatchtower() {
-			watchtowers = append(watchtowers, c)
-		} else {
-			ordered = append(ordered, c)
-		}
-	}
+	ordered, watchtowers := splitWatchtowers(containers)
 
 	containerMap, indegree, adjacency, normalizedMap, err := g.subgraph(ordered)
 	if err != nil {
@@ -332,6 +307,147 @@ func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []*container.Cont
 	copy(containers[len(sorted):], watchtowers)
 
 	return nil
+}
+
+// PlaceRebound returns plan with the rebound containers placed in it.
+//
+// Each container is placed after the containers of plan and rebound that its
+// host config names and that it depends on in the graph. Docker resolves the
+// host config's containers when it creates a container, so they must exist
+// again by then. A container is placed as
+// soon as those are, so a rebound container directly follows the container
+// whose namespace it joins unless it waits for another, while plan keeps its
+// order otherwise. When only containers in a dependency cycle remain, the
+// first container on a cycle is placed, so a container that waits for a cycle
+// still follows the members it depends on. Watchtower's own containers stay
+// last, as [DependencyGraph.Sort] places them, since their self-update hands
+// over to a new process.
+//
+// Parameters:
+//   - plan: Containers to restart, in the order [DependencyGraph.Sort] gives.
+//   - rebound: The rebound containers.
+//   - joiners: For each container, the rebound containers that join its
+//     namespace.
+//
+// Returns:
+//   - []*container.Container: The containers of plan and rebound, in restart
+//     order.
+func (g *DependencyGraph) PlaceRebound(
+	plan, rebound []*container.Container,
+	joiners map[container.ContainerID][]*container.Container,
+) []*container.Container {
+	if len(rebound) == 0 {
+		return plan
+	}
+
+	// Watchtower's own containers stay last, so nothing is placed after
+	// them.
+	ordered, watchtowers := splitWatchtowers(plan)
+
+	members := slices.Concat(ordered, rebound)
+	pending, dependents := g.reboundEdges(members, rebound)
+
+	// A rebound container waits from the start. A container of plan waits
+	// once its turn came before its dependencies were placed.
+	waiting := make(map[container.ContainerID]bool, len(members))
+	for _, c := range rebound {
+		waiting[c.ID()] = true
+	}
+
+	result := make([]*container.Container, 0, len(members))
+	placed := make(map[container.ContainerID]bool, len(members))
+
+	var place func(c *container.Container)
+
+	place = func(c *container.Container) {
+		placed[c.ID()] = true
+		result = append(result, c)
+
+		for _, dependent := range dependents[c.ID()] {
+			pending[dependent.ID()]--
+		}
+
+		// The containers that join c come first, then the others c freed.
+		for _, next := range slices.Concat(joiners[c.ID()], dependents[c.ID()]) {
+			if !placed[next.ID()] && waiting[next.ID()] && pending[next.ID()] == 0 {
+				place(next)
+			}
+		}
+	}
+
+	for _, c := range ordered {
+		if placed[c.ID()] {
+			continue
+		}
+
+		if pending[c.ID()] == 0 {
+			place(c)
+		} else {
+			waiting[c.ID()] = true
+		}
+	}
+
+	// Every container left waits, directly or through others, for a
+	// dependency cycle among the containers left.
+	for next := firstOnCycle(members, placed, dependents); next != nil; next = firstOnCycle(members, placed, dependents) {
+		place(next)
+	}
+
+	return append(result, watchtowers...)
+}
+
+// reboundEdges returns what each container waits for before PlaceRebound
+// places it.
+//
+// A container waits for the containers it depends on in graph and for the
+// rebound containers its host config names. A rebound container also waits
+// for the containers of the plan its host config names.
+//
+// Parameters:
+//   - members: The containers of the plan, followed by the rebound ones.
+//   - rebound: The rebound containers.
+//
+// Returns:
+//   - map[container.ContainerID]int: The number of containers each container
+//     waits for.
+//   - map[container.ContainerID][]*container.Container: For each container,
+//     the containers that wait for it.
+func (g *DependencyGraph) reboundEdges(
+	members, rebound []*container.Container,
+) (map[container.ContainerID]int, map[container.ContainerID][]*container.Container) {
+	isMember := make(map[container.ContainerID]bool, len(members))
+	for _, c := range members {
+		isMember[c.ID()] = true
+	}
+
+	pending := make(map[container.ContainerID]int, len(members))
+	dependents := make(map[container.ContainerID][]*container.Container, len(members))
+
+	depend := func(c, dependency *container.Container) {
+		pending[c.ID()]++
+		dependents[dependency.ID()] = append(dependents[dependency.ID()], c)
+	}
+
+	for _, c := range members {
+		for _, dependent := range g.Dependents(c) {
+			if isMember[dependent.ID()] {
+				depend(dependent, c)
+			}
+		}
+
+		// The graph orders plan already, so a container of plan needs only
+		// the rebound containers its host config names.
+		others := rebound
+		if c.IsRebinding() {
+			others = members
+		}
+
+		for _, target := range c.CreateConfigTargets(others) {
+			depend(c, target)
+		}
+	}
+
+	return pending, dependents
 }
 
 // subgraph returns the part of the graph between containers, in the form
@@ -402,4 +518,78 @@ func (g *DependencyGraph) addDependent(target, dependent *container.Container) {
 	if listed := g.dependents[target]; len(listed) == 0 || listed[len(listed)-1] != dependent {
 		g.dependents[target] = append(listed, dependent)
 	}
+}
+
+// firstOnCycle returns the first container of members that is not placed and
+// lies on a dependency cycle among the containers not placed.
+//
+// Parameters:
+//   - members: The containers to place, in order.
+//   - placed: The containers placed so far.
+//   - dependents: For each container, the containers that wait on it.
+//
+// Returns:
+//   - *container.Container: The container, or nil when none is left.
+func firstOnCycle(
+	members []*container.Container,
+	placed map[container.ContainerID]bool,
+	dependents map[container.ContainerID][]*container.Container,
+) *container.Container {
+	edges := make(map[string][]string, len(members))
+
+	for _, c := range members {
+		if placed[c.ID()] {
+			continue
+		}
+
+		for _, dependent := range dependents[c.ID()] {
+			if !placed[dependent.ID()] {
+				edges[string(c.ID())] = append(edges[string(c.ID())], string(dependent.ID()))
+			}
+		}
+	}
+
+	finder := newCycleFinder(edges)
+
+	for _, c := range members {
+		if _, visited := finder.index[string(c.ID())]; !visited && !placed[c.ID()] {
+			finder.visit(string(c.ID()))
+		}
+	}
+
+	for _, c := range members {
+		if !placed[c.ID()] && finder.inCycle[string(c.ID())] {
+			return c
+		}
+	}
+
+	return nil
+}
+
+// splitWatchtowers splits containers into Watchtower's own and the others.
+//
+// Watchtower's own containers are set aside and sorted last, since their
+// self-update hands over to a new process.
+//
+// Parameters:
+//   - containers: The containers to split, in order.
+//
+// Returns:
+//   - []*container.Container: The containers that are not Watchtower's, in
+//     order.
+//   - []*container.Container: Watchtower's own containers, in order.
+//
+//nolint:nonamedreturns // Same-type returns need names.
+func splitWatchtowers(containers []*container.Container) (others, watchtowers []*container.Container) {
+	others = make([]*container.Container, 0, len(containers))
+
+	for _, c := range containers {
+		if c.IsWatchtower() {
+			watchtowers = append(watchtowers, c)
+		} else {
+			others = append(others, c)
+		}
+	}
+
+	return others, watchtowers
 }

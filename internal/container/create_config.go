@@ -27,6 +27,7 @@ var (
 // GetCreateConfig generates a container configuration for recreation.
 //
 // It isolates runtime overrides from image defaults and sets the image name.
+// The labels map belongs to the caller, which may change it.
 //
 // Returns:
 //   - *dockerContainer.Config: Configuration for container creation.
@@ -69,6 +70,8 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 		clog.Warn().Msg("No image config available, using container config as-is")
 
 		config.Image = c.imageNameLocked()
+		// The labels are shared with the container's inspect data.
+		config.Labels = maps.Clone(config.Labels)
 
 		return &config
 	}
@@ -199,6 +202,11 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 		hostConfig.VolumesFrom = volumesFromCopy
 	}
 
+	// Recreation can rewrite binds and mounts, such as to keep a rebound
+	// container's anonymous volumes.
+	hostConfig.Binds = slices.Clone(hostConfig.Binds)
+	hostConfig.Mounts = slices.Clone(hostConfig.Mounts)
+
 	// Adjust link format for each entry (and drop invalid ones).
 	adjusted := make([]string, 0, len(hostConfig.Links))
 	for _, link := range hostConfig.Links {
@@ -253,6 +261,10 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 
 // VerifyConfiguration validates the container's metadata for recreation.
 //
+// A container rebound to a recreated container's network may lack image info,
+// since it is recreated from its own config and the image ID its inspect
+// reports.
+//
 // Returns:
 //   - error: Non-nil if metadata is missing or invalid, nil on success.
 func (c *Container) VerifyConfiguration() error {
@@ -260,7 +272,7 @@ func (c *Container) VerifyConfiguration() error {
 	defer c.mu.Unlock()
 
 	// Check for nil image info.
-	if c.imageInfo == nil {
+	if c.imageInfo == nil && !c.Rebinding {
 		c.Logger().Debug().
 			Str("container", "<unknown>").
 			Msg("No image info available")

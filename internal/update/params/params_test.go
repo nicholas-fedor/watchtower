@@ -62,6 +62,32 @@ func TestParams_DetachedTimeout(t *testing.T) {
 	}
 }
 
+// TestParams_CreateStartTimeout verifies that creating and starting a
+// replacement gets at least 5 minutes, and the detached bound when that is
+// longer.
+func TestParams_CreateStartTimeout(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		timeout time.Duration
+		want    time.Duration
+	}{
+		{name: "zero timeout", timeout: 0, want: 5 * time.Minute},
+		{name: "negative timeout", timeout: -time.Second, want: 5 * time.Minute},
+		{name: "default timeout", timeout: 30 * time.Second, want: 5 * time.Minute},
+		{name: "long timeout", timeout: 10 * time.Minute, want: 10*time.Minute + 30*time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, Params{Timeout: tt.timeout}.CreateStartTimeout())
+		})
+	}
+}
+
 // TestParams_DetachedStopTimeout verifies that the bound for detached
 // calls that stop a container follows the longer of the configured stop timeout
 // and the container's own, plus 30 seconds.

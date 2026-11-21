@@ -57,6 +57,10 @@ type Client interface {
 	GetImageAnnotations(ctx context.Context, imageRef string) oci.Annotations
 	// GetImageDiskUsage returns the daemon's image storage usage.
 	GetImageDiskUsage(ctx context.Context) (containerClient.ImageDiskUsage, error)
+	// ListNetworkDependents returns the containers that join another
+	// container's network namespace and that the session's listing left out,
+	// such as stopped and paused ones.
+	ListNetworkDependents(ctx context.Context) ([]*container.Container, error)
 }
 
 // stalenessCheck is the outcome of one container's staleness check, before
@@ -908,12 +912,15 @@ func skipFailedUpdateCheck(
 // it. The list leaves out the containers that Compose already recreated and
 // the no-restart Git builds. The containers the dependency phase skipped are
 // kept out of the sorts and the implicit restarts. They are placed after the
-// other monitored containers.
+// other monitored containers. A container that joins the network namespace of
+// a container on the list is rebound and placed after it, whether or not it
+// is monitored or running.
 //
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for cancellation and timeouts.
-//   - client: Container client for the Git image builds.
+//   - client: Container client for the Git image builds and the listing of
+//     stopped network dependents.
 //   - config: Update parameters.
 //   - gitSession: The session's Git monitor.
 //   - progress: Session progress that receives the rebuild results.
@@ -925,7 +932,8 @@ func skipFailedUpdateCheck(
 //
 // Returns:
 //   - []*container.Container: The containers to restart, in restart order.
-//   - error: Non-nil when a dependency sort fails.
+//   - error: Non-nil when a dependency sort or the listing of stopped network
+//     dependents fails.
 func planRestarts(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -984,6 +992,20 @@ func planRestarts(
 		Int("restart_count", len(allContainersToRestart)).
 		Msg("Prepared containers for restart")
 
+	// The Git rebuilds can recreate containers through Compose, so the
+	// containers outside the session's listing that may need rebinding are
+	// listed first. A failed
+	// listing then leaves every container as it was. The rebuilds only take
+	// containers out of the plan, so an empty plan stays empty.
+	var unlistedDependents []*container.Container
+
+	if len(allContainersToRestart) > 0 {
+		unlistedDependents, err = client.ListNetworkDependents(ctx)
+		if err != nil {
+			return nil, err //nolint:wrapcheck // The client's error already names the failed listing.
+		}
+	}
+
 	gitFailed := make(map[container.ContainerID]error)
 	gitSession.PrepareRebuilds(
 		log,
@@ -999,8 +1021,9 @@ func planRestarts(
 	// Work out the implicit restarts again without the failed rebuilds, which are no longer stale.
 	// Their dependents then stay running. The skipped containers stay out, as in the first pass.
 	// No-restart builds stay out because every container in the plan is stopped.
-	excluded := make(map[container.ContainerID]struct{}, len(skipped))
-	maps.Copy(excluded, gitSession.NoRestartBuiltIDs(config))
+	noRestartBuilds := gitSession.NoRestartBuiltIDs(config)
+	excluded := make(map[container.ContainerID]struct{}, len(skipped)+len(noRestartBuilds))
+	maps.Copy(excluded, noRestartBuilds)
 	maps.Copy(excluded, skipped)
 
 	allContainersToRestart = implicitrestart.Reconcile(
@@ -1016,6 +1039,18 @@ func planRestarts(
 	if err != nil {
 		return nil, sortFailed(log, "Failed to sort all containers to restart by dependencies", err)
 	}
+
+	// The containers that join the namespace of a container Compose applied
+	// are rebound too, so this comes before the applied ones are left out.
+	// A container the dependency phase skipped is still rebound, since it
+	// keeps the image it runs and would lose its network otherwise. A
+	// no-restart build keeps running as it is.
+	allContainersToRestart = implicitrestart.Rebind(log,
+		graph,
+		allContainersToRestart,
+		slices.Concat(allContainers, unlistedDependents),
+		noRestartBuilds,
+	)
 
 	// Compose already recreated the containers it applied. Do not recreate
 	// them again from their inspect data.

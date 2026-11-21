@@ -31,11 +31,19 @@ type Container struct {
 	// imageName is the image reference with its tag. It is resolved when the
 	// container is built and replaced by SetImageName.
 	imageName string
-	// mu guards containerInfo, imageName, LinkedToRestarting and Stale.
+	// volumesFromDestinations holds the cleaned mount destinations of the
+	// containers its volumes-from names, as they were when it was listed.
+	volumesFromDestinations []string
+	// mu guards containerInfo, imageName, volumesFromDestinations,
+	// LinkedToRestarting, Rebinding and Stale.
 	mu sync.RWMutex
 	// LinkedToRestarting reports whether the container restarts because a
 	// container it depends on restarts.
 	LinkedToRestarting bool
+	// Rebinding reports whether the container is recreated only to join the
+	// network namespace of a container that is recreated. A rebound container
+	// keeps its image and its running state and runs no lifecycle hooks.
+	Rebinding bool
 	// Stale reports whether the container's image is out of date and the
 	// container is to be updated.
 	Stale bool
@@ -85,6 +93,7 @@ func NewContainer(
 	// Initialize with default state.
 	c := &Container{
 		LinkedToRestarting: false,
+		Rebinding:          false,
 		Stale:              false,
 		normalizedName:     NormalizeContainerName(name),
 		containerInfo:      containerInfo,
@@ -124,6 +133,85 @@ func (c *Container) SetLinkedToRestarting(value bool) {
 	c.LinkedToRestarting = value
 }
 
+// IsRebinding reports whether the container is recreated only to join the
+// network namespace of a container that is recreated.
+//
+// Returns:
+//   - bool: True when the container is to be rebound.
+func (c *Container) IsRebinding() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.Rebinding
+}
+
+// SetRebinding sets whether the container is recreated only to join the
+// network namespace of a container that is recreated.
+//
+// Parameters:
+//   - value: New state value.
+func (c *Container) SetRebinding(value bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.Rebinding = value
+}
+
+// KeepsAnonymousVolumes reports whether the container's replacement mounts its
+// anonymous volumes, so removing the container must keep them.
+//
+// A rebound container keeps them. A running container with AutoRemove set
+// keeps none, because the daemon removes its anonymous volumes when it removes
+// the stopped container. Mounting one by name would create a new, empty named
+// volume.
+//
+// Returns:
+//   - bool: True when the replacement mounts the container's anonymous volumes.
+func (c *Container) KeepsAnonymousVolumes() bool {
+	return c.IsRebinding() && !c.RemovedOnStop()
+}
+
+// VolumesFromDestinations returns the mount destinations of the containers
+// its volumes-from names, as they were when the container was listed.
+//
+// They tell the volumes the container got from those containers from its own,
+// even after one of them is recreated with other volumes.
+//
+// Returns:
+//   - []string: The cleaned destinations, empty when none were recorded.
+func (c *Container) VolumesFromDestinations() []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.volumesFromDestinations
+}
+
+// SetVolumesFromDestinations records the mount destinations of the containers
+// its volumes-from names.
+//
+// Parameters:
+//   - destinations: The cleaned destinations.
+func (c *Container) SetVolumesFromDestinations(destinations []string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.volumesFromDestinations = destinations
+}
+
+// RemovedOnStop reports whether the daemon removes the container, with its
+// anonymous volumes, once it stops.
+//
+// That happens to a running container with AutoRemove set. A created or
+// exited one stays until it is removed.
+//
+// Returns:
+//   - bool: True when stopping the container removes it.
+func (c *Container) RemovedOnStop() bool {
+	info := c.ContainerInfo()
+
+	return info != nil && info.HostConfig != nil && info.HostConfig.AutoRemove && c.IsRunning()
+}
+
 // IsStale returns whether the container's image is outdated.
 //
 // Returns:
@@ -149,12 +237,25 @@ func (c *Container) SetStale(value bool) {
 // ToRestart determines if the container should be restarted.
 //
 // Returns:
-//   - bool: True if stale or linked to restarting, false otherwise.
+//   - bool: True if the container is stale or restarts because of another
+//     container, false otherwise.
 func (c *Container) ToRestart() bool {
+	return c.IsStale() || c.RestartsForAnother()
+}
+
+// RestartsForAnother reports whether the container is recreated because of
+// another container rather than for an update of its own.
+//
+// It is linked to a restarting container or rebound to the network namespace
+// of a recreated one.
+//
+// Returns:
+//   - bool: True when another container causes the recreation.
+func (c *Container) RestartsForAnother() bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.Stale || c.LinkedToRestarting
+	return c.LinkedToRestarting || c.Rebinding
 }
 
 // ContainerInfo returns the full Docker container metadata.
@@ -210,6 +311,22 @@ func (c *Container) IsRestarting() bool {
 	return info.State.Restarting
 }
 
+// IsPaused reports whether the container is paused.
+//
+// A paused container also reports itself as running.
+//
+// Returns:
+//   - bool: True if paused, false otherwise.
+func (c *Container) IsPaused() bool {
+	info := c.ContainerInfo()
+
+	if info == nil || info.State == nil {
+		return false
+	}
+
+	return info.State.Paused
+}
+
 // IsCreated checks if the container is in the Docker "created" state,
 // meaning it was successfully created but never started.
 //
@@ -243,6 +360,17 @@ func (c *Container) Name() string {
 //   - string: The container's old name.
 func (c *Container) OldName() string {
 	return watchtowerOldPrefix + c.ID().ShortID()
+}
+
+// ReplacedName returns the name a container takes while its replacement is
+// created under its own name.
+//
+// The name is the container's name followed by "-replaced-" and its short ID.
+//
+// Returns:
+//   - string: The container's name while it is being replaced.
+func (c *Container) ReplacedName() string {
+	return c.Name() + "-replaced-" + c.ID().ShortID()
 }
 
 // ImageID returns the ID of the container's image.

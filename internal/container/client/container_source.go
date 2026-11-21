@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"path"
 	"slices"
 	"strings"
 	"time"
@@ -102,15 +103,12 @@ func listSourceContainers(log *zerolog.Logger,
 // inspectListedContainers lists containers with the given list options and
 // inspects each one.
 //
-// A container removed between the list and its inspect is left out. A
-// container whose image inspect fails is kept without image info.
-//
 // Parameters:
 //   - log: Logger for list and inspect diagnostics.
 //   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - listOptions: Docker list options, such as the states and labels to list.
-//   - filter: Function to filter containers, or nil to keep every container.
+//   - filter: Function to filter containers, nil to keep every container.
 //
 // Returns:
 //   - []*container.Container: The inspected containers that pass the filter.
@@ -154,12 +152,37 @@ func inspectListedContainers(log *zerolog.Logger,
 		return nil, fmt.Errorf("%w: %w", errListContainersFailed, err)
 	}
 
-	// Convert and filter containers.
-	hostContainers := make([]*container.Container, 0, len(containers.Items))
-	// Reuse ImageInspect results when multiple containers share an image ID.
-	imageCache := make(map[string]*dockerImage.InspectResponse, len(containers.Items))
+	return inspectSummaries(log, ctx, api, containers.Items, filter)
+}
 
-	for _, runningContainer := range containers.Items {
+// inspectSummaries inspects each listed container.
+//
+// A container removed between the list and its inspect is left out. A
+// container whose image inspect fails is kept without image info.
+//
+// Parameters:
+//   - log: Logger for inspect diagnostics.
+//   - ctx: Context for cancellation and timeout control.
+//   - api: Docker API client.
+//   - summaries: The containers a list returned.
+//   - filter: Function to filter containers, nil to keep every container.
+//
+// Returns:
+//   - []*container.Container: The inspected containers that pass the filter.
+//   - error: Non-nil if an inspect fails for a reason other than the container
+//     being gone.
+func inspectSummaries(log *zerolog.Logger,
+	ctx context.Context,
+	api dockerClient.APIClient,
+	summaries []dockerContainer.Summary,
+	filter filters.Filter,
+) ([]*container.Container, error) {
+	// Convert and filter containers.
+	hostContainers := make([]*container.Container, 0, len(summaries))
+	// Reuse ImageInspect results when multiple containers share an image ID.
+	imageCache := make(map[string]*dockerImage.InspectResponse, len(summaries))
+
+	for _, runningContainer := range summaries {
 		c, err := getSourceContainer(log, ctx, api, container.ContainerID(runningContainer.ID), imageCache)
 		if err != nil {
 			// Log detailed error information for debugging container inspect failures
@@ -257,14 +280,24 @@ func getSourceContainer(log *zerolog.Logger,
 				dockerClient.ContainerInspectOptions{},
 			)
 			if err != nil {
-				clog.Warn().
+				// A container that is not running and joins a removed
+				// container stays as it is until it is recreated, so only a
+				// running one is worth a warning.
+				level := zerolog.DebugLevel
+				if containerInfo.State != nil && containerInfo.State.Running {
+					level = zerolog.WarnLevel
+				}
+
+				clog.WithLevel(level).
 					Err(err).
 					Str("container", container.NormalizeContainerName(containerInfo.Name)).
 					Str("network_container", netContainerID).
 					Msg("Unable to resolve network container")
 			} else {
+				// Docker accepts the inspect name with its leading slash, and
+				// Podman rejects it, so the name is written without it.
 				containerInfo.HostConfig.NetworkMode = dockerContainer.NetworkMode(
-					"container:" + parentResult.Container.Name,
+					"container:" + container.NormalizeContainerName(parentResult.Container.Name),
 				)
 				clog.Debug().
 					Str("container", container.NormalizeContainerName(containerInfo.Name)).
@@ -272,57 +305,66 @@ func getSourceContainer(log *zerolog.Logger,
 					Msg("Resolved network container name")
 			}
 		}
-
-		// Rewrite volumes-from IDs to names while the source still exists.
-		resolveVolumesFrom(ctx, api, clog, containerInfo)
 	}
 
-	imageInfo, err := resolveImageInspect(ctx, api, containerInfo.Image, imageCache)
-	if err != nil {
-		// A canceled or timed-out inspect ends the listing. Other failures, such
-		// as a removed image, leave the container without image info.
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, err
-		}
+	// Rewrite volumes-from IDs to names while the sources still exist.
+	inherited := resolveVolumesFrom(ctx, api, clog, containerInfo)
 
+	imageInfo, err := resolveImageInspect(ctx, api, containerInfo.Image, imageCache)
+
+	switch {
+	case errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded):
+		// A canceled or timed-out inspect ends the listing.
+		return nil, err
+	case err != nil:
+		// Other failures, such as a removed image, leave the container
+		// without image info.
 		clog.Debug().
 			Err(err).
 			Str("container", container.NormalizeContainerName(containerInfo.Name)).
 			Str("image", containerInfo.Image).
 			Msg("Failed to retrieve image info")
-
-		return container.NewContainer(log, containerInfo, nil), nil
+	default:
+		clog.Debug().
+			Str("image", containerInfo.Image).
+			Msg("Retrieved container and image info")
 	}
 
-	clog.Debug().
-		Str("image", containerInfo.Image).
-		Msg("Retrieved container and image info")
+	c := container.NewContainer(log, containerInfo, imageInfo)
+	c.SetVolumesFromDestinations(inherited)
 
-	return container.NewContainer(log, containerInfo, imageInfo), nil
+	return c, nil
 }
 
 // resolveVolumesFrom replaces each volumes-from source ID in an inspected
-// container's host config with that source container's name.
+// container's host config with that source container's name, and returns the
+// sources' mount destinations.
 //
 // Docker reports volumes-from sources by ID. The replacement names them
 // instead, so it still finds a source that an update has recreated under a new
-// ID. A source that cannot be inspected keeps its ID. A mode suffix such as :ro
-// or :rw stays on its entry.
+// ID. A source that cannot be inspected keeps its ID and adds no destinations.
+// A mode suffix such as :ro or :rw stays on its entry.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.
 //   - api: Docker API client.
 //   - clog: Logger for warn and debug output.
 //   - containerInfo: Inspected container whose volumes-from entries are rewritten.
+//
+// Returns:
+//   - []string: The cleaned mount destinations of the sources that were
+//     inspected.
 func resolveVolumesFrom(
 	ctx context.Context,
 	api dockerClient.APIClient,
 	clog *zerolog.Logger,
 	containerInfo *dockerContainer.InspectResponse,
-) {
+) []string {
 	if containerInfo.HostConfig == nil || len(containerInfo.HostConfig.VolumesFrom) == 0 {
-		return
+		return nil
 	}
+
+	var destinations []string
 
 	rewritten := slices.Clone(containerInfo.HostConfig.VolumesFrom)
 	containerName := container.NormalizeContainerName(containerInfo.Name)
@@ -361,9 +403,15 @@ func resolveVolumesFrom(
 			Str("container", containerName).
 			Str("volumes_from", resolved).
 			Msg("Resolved volumes-from container name")
+
+		for _, point := range sourceResult.Container.Mounts {
+			destinations = append(destinations, path.Clean(point.Destination))
+		}
 	}
 
 	containerInfo.HostConfig.VolumesFrom = rewritten
+
+	return destinations
 }
 
 // resolveImageInspect returns image inspect metadata, using imageCache when set.
@@ -509,7 +557,7 @@ func stopSourceContainer(log *zerolog.Logger,
 
 	// Log the stop attempt with the signal and configured timeout for clarity.
 	message := logging.StoppingContainer
-	if sourceContainer.IsLinkedToRestarting() {
+	if sourceContainer.RestartsForAnother() {
 		message = logging.StoppingLinkedContainer
 	}
 
@@ -594,32 +642,18 @@ func stopAndRemoveSourceContainer(log *zerolog.Logger,
 		Logger()
 	clog := &clogVal
 
-	// Capture running state before stop. AutoRemove only applies after a started container exits.
-	wasRunning := sourceContainer.IsRunning()
-
 	// Stop the container first.
 	err := stopSourceContainer(log, ctx, api, sourceContainer, timeout)
 	if err != nil {
 		return err
 	}
 
-	// HostConfig.AutoRemove removes a container after it stops. That only applies
-	// when the container was running and Docker handles cleanup after stop.
-	info := sourceContainer.ContainerInfo()
-	autoRemove := info != nil && info.HostConfig != nil && info.HostConfig.AutoRemove
-
-	// Skip explicit removal only when AutoRemove will run after stop. Never-started
-	// or already-stopped AutoRemove containers remain until removed explicitly and
-	// would otherwise block name reuse on recreate.
-	if autoRemove && wasRunning {
-		// Log that the container is skipped due to AutoRemove configuration.
+	// Never-started or already-stopped AutoRemove containers remain until
+	// removed explicitly and would otherwise block name reuse on recreate.
+	if sourceContainer.RemovedOnStop() {
 		clog.Debug().Msg("Skipping container removal due to AutoRemove configuration")
 
 		return nil
-	}
-
-	if autoRemove && !wasRunning {
-		clog.Debug().Msg("Removing non-running AutoRemove container explicitly")
 	}
 
 	// Proceed with explicit container removal, including volumes if specified.
@@ -654,7 +688,7 @@ func stopAndRemoveSourceContainer(log *zerolog.Logger,
 		// A container this call stopped may already be gone, removed by another
 		// process. A container that was not running was gone before this call
 		// acted on it, so report that.
-		if !wasRunning {
+		if !sourceContainer.IsRunning() {
 			clog.Debug().
 				Dur("elapsed", time.Since(startTime)).
 				Msg("Container not found during removal")

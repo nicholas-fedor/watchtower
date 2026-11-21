@@ -1417,17 +1417,25 @@ func TestProgressSetReportMeta(t *testing.T) {
 
 // TestProgressRecordRestart verifies that a recreated container gets its new
 // container ID. Only a container whose image was not updated is marked
-// restarted. An unknown container is skipped.
+// restarted. A container the scan skipped, failed or found a newer image for
+// keeps that state, so a monitor-only container with a newer image stays
+// stale. An unknown container is skipped.
 func TestProgressRecordRestart(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name      string
-		wantState State
+		state     State
+		newImage  container.ImageID
 		stale     bool
+		wantState State
 	}{
-		{name: "restarted with an updated dependency", stale: false, wantState: RestartedState},
-		{name: "updated to a new image", stale: true, wantState: UpdatedState},
+		{name: "restarted with an updated dependency", state: ScannedState, newImage: "img", wantState: RestartedState},
+		{name: "restarted with no known latest image", state: ScannedState, wantState: RestartedState},
+		{name: "updated to a new image", state: UpdatedState, stale: true, wantState: UpdatedState},
+		{name: "newer image not applied", state: ScannedState, newImage: "newer", wantState: ScannedState},
+		{name: "skipped by the scan", state: SkippedState, newImage: "img", wantState: SkippedState},
+		{name: "failed in the scan", state: FailedState, newImage: "img", wantState: FailedState},
 	}
 
 	for _, tt := range tests {
@@ -1436,7 +1444,12 @@ func TestProgressRecordRestart(t *testing.T) {
 
 			log := newTestLogger(t)
 			id := container.ContainerID("cont1")
-			progress := Progress{id: &ContainerStatus{containerID: id, state: UpdatedState}}
+			progress := Progress{id: &ContainerStatus{
+				containerID: id,
+				oldImage:    "img",
+				newImage:    tt.newImage,
+				state:       tt.state,
+			}}
 
 			c := modelfixture.Container(containerfixture.WithID(string(id)))
 			c.SetStale(tt.stale)

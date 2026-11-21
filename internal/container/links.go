@@ -1,7 +1,10 @@
 package container
 
 import (
+	"slices"
 	"strings"
+
+	dockerContainer "github.com/moby/moby/api/types/container"
 
 	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
@@ -52,6 +55,107 @@ func (c *Container) Links(useComposeDependsOn bool) ([]string, bool) {
 	links = appendUniqueLinks(links, volumesFromLinks(c))
 
 	return filterSelfReferences(links, c.Name())
+}
+
+// NetworkContainer returns the container whose network namespace c joins.
+//
+// It is the name or ID the network mode names, such as vpn for
+// --network container:vpn, without a leading slash. Inspecting a container
+// replaces the ID Docker stores with the name, when that container still
+// exists.
+//
+// Returns:
+//   - string: The container's name or ID, empty when c has a network of its
+//     own.
+func (c *Container) NetworkContainer() string {
+	info := c.ContainerInfo()
+	if info == nil || info.HostConfig == nil || !info.HostConfig.NetworkMode.IsContainer() {
+		return ""
+	}
+
+	return NormalizeContainerName(info.HostConfig.NetworkMode.ConnectedContainer())
+}
+
+// SetNetworkContainer sets the container whose network namespace the
+// replacement of c joins.
+//
+// A scan that cannot inspect the network container leaves its ID in the
+// network mode. Docker cannot resolve that ID once the network container is
+// recreated, so its name is set instead. SetNetworkContainer does nothing when
+// c has a network of its own.
+//
+// Parameters:
+//   - name: The network container's name, without a leading slash.
+func (c *Container) SetNetworkContainer(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.containerInfo == nil || c.containerInfo.HostConfig == nil ||
+		!c.containerInfo.HostConfig.NetworkMode.IsContainer() {
+		return
+	}
+
+	c.replaceInspectLocked(func(info *dockerContainer.InspectResponse) {
+		info.HostConfig.NetworkMode = dockerContainer.NetworkMode("container:" + name)
+	})
+}
+
+// JoinsNetworkOf reports whether c joins the network namespace of other.
+//
+// Parameters:
+//   - other: The container whose network namespace c may join.
+//
+// Returns:
+//   - bool: True when c's network mode names other by name or ID.
+func (c *Container) JoinsNetworkOf(other *Container) bool {
+	networkContainer := c.NetworkContainer()
+
+	return networkContainer != "" && other.isNamed(networkContainer)
+}
+
+// CreateConfigTargets returns the containers of others that c's host config
+// names.
+//
+// Docker resolves the network container, legacy links and volumes-from of a
+// new container when it creates it. A container created from c's config
+// before one of these targets is recreated stays bound to the removed
+// container, while creating it when a target is removed fails.
+//
+// Parameters:
+//   - others: The containers c's host config may name.
+//
+// Returns:
+//   - []*Container: The containers of others the host config names by name
+//     or ID, in the order of others.
+func (c *Container) CreateConfigTargets(others []*Container) []*Container {
+	named := slices.Concat(legacyLinkNames(c), volumesFromLinks(c))
+	if networkContainer := c.NetworkContainer(); networkContainer != "" {
+		named = append(named, networkContainer)
+	}
+
+	var targets []*Container
+
+	for _, other := range others {
+		if other != c && slices.ContainsFunc(named, other.isNamed) {
+			targets = append(targets, other)
+		}
+	}
+
+	return targets
+}
+
+// isNamed reports whether a host config reference names c.
+//
+// Docker accepts a container's name or its full ID in a network mode, a legacy
+// link or a volumes-from entry.
+//
+// Parameters:
+//   - reference: The container named in the host config.
+//
+// Returns:
+//   - bool: True when reference is c's name or ID.
+func (c *Container) isNamed(reference string) bool {
+	return reference == c.Name() || reference == string(c.ID())
 }
 
 // filterSelfReferences removes the links equal to containerName.
@@ -235,15 +339,11 @@ func getLinksFromComposeLabel(c *Container) []string {
 
 // getLinksFromHostConfig extracts dependency links from Docker HostConfig.
 //
-// It parses HostConfig.Links and network mode to determine container
-// dependencies. If the container has a project label, legacy link names are
-// qualified with the project name if they are not already qualified. Network
-// mode is a Docker identity, not a Compose service name, and is not
-// project-prefixed. VolumesFrom is merged in Links, not here.
-//
-// A malformed legacy link is skipped with a warning. Docker stores links as
-// /name:/container/alias, so this only happens with inspect data Docker did
-// not write.
+// It returns the legacy links and the network container. If the container
+// has a project label, legacy link names are qualified with the project name
+// if they are not already qualified. Network mode is a Docker identity rather
+// than a Compose service name and is not project-prefixed. VolumesFrom is merged in
+// Links, not here.
 //
 // Parameters:
 //   - c: Container instance
@@ -264,19 +364,55 @@ func getLinksFromHostConfig(c *Container) []string {
 
 	projectName := composeLabels.GetProjectName(labels)
 
-	hostConfig := info.HostConfig
+	legacyLinks := legacyLinkNames(c)
+	networkContainer := c.NetworkContainer()
 
 	// Pre-allocate for links plus a potential network mode dependency.
-	capacity := len(hostConfig.Links)
+	normalizedLinks := make([]string, 0, len(legacyLinks)+1)
 
-	networkMode := hostConfig.NetworkMode
-	if networkMode.IsContainer() {
-		capacity++
+	for _, name := range legacyLinks {
+		if projectName != "" && !strings.HasPrefix(name, projectName+"-") {
+			name = projectName + "-" + name
+		}
+
+		normalizedLinks = append(normalizedLinks, name)
 	}
 
-	normalizedLinks := make([]string, 0, capacity)
+	// Add network dependency.
+	//
+	// Unlike a Compose service reference, network mode is a Docker identity.
+	// The daemon stores container:<id> after create. List inspect rewrites
+	// that to container:<name>. Do not prefix either form with this
+	// container's Compose project.
+	if networkContainer != "" {
+		normalizedLinks = append(normalizedLinks, networkContainer)
+	}
 
-	for _, link := range hostConfig.Links {
+	return normalizedLinks
+}
+
+// legacyLinkNames returns the names of the containers HostConfig.Links
+// names, as Docker stores them.
+//
+// A malformed legacy link is skipped with a warning. Docker stores links as
+// /name:/container/alias, so this only happens with inspect data Docker did
+// not write.
+//
+// Parameters:
+//   - c: Container instance.
+//
+// Returns:
+//   - []string: The linked container names without a leading slash.
+func legacyLinkNames(c *Container) []string {
+	info := c.ContainerInfo()
+
+	if info == nil || info.HostConfig == nil || len(info.HostConfig.Links) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(info.HostConfig.Links))
+
+	for _, link := range info.HostConfig.Links {
 		if !strings.Contains(link, ":") {
 			c.Logger().Warn().
 				Str("container", c.Name()).
@@ -296,26 +432,10 @@ func getLinksFromHostConfig(c *Container) []string {
 			continue
 		}
 
-		normalizedName := NormalizeContainerName(parts[0])
-		if projectName != "" && !strings.HasPrefix(normalizedName, projectName+"-") {
-			normalizedName = projectName + "-" + normalizedName
-		}
-
-		normalizedLinks = append(normalizedLinks, normalizedName)
+		names = append(names, NormalizeContainerName(parts[0]))
 	}
 
-	// Add network dependency.
-	//
-	// Unlike a Compose service reference, network mode is a Docker identity.
-	// The daemon stores container:<id> after create. List inspect rewrites
-	// that to container:<name>. Do not prefix either form with this
-	// container's Compose project.
-	if networkMode.IsContainer() {
-		normalizedName := NormalizeContainerName(networkMode.ConnectedContainer())
-		normalizedLinks = append(normalizedLinks, normalizedName)
-	}
-
-	return normalizedLinks
+	return names
 }
 
 // volumesFromLinks returns normalized HostConfig.VolumesFrom identities.

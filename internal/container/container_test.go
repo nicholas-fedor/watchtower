@@ -63,6 +63,17 @@ func TestContainerModel(t *testing.T) {
 			assert.Equal(t, errNoImageInfo, err)
 		})
 
+		// A rebound container is recreated from its own config and image ID,
+		// so it needs no image info.
+		t.Run("accepts a rebound container without image info", func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer(containerfixture.WithPortBindings())
+			c.imageInfo = nil
+			c.SetRebinding(true)
+			require.NoError(t, c.VerifyConfiguration())
+		})
+
 		t.Run("returns an error when container info is nil", func(t *testing.T) {
 			t.Parallel()
 
@@ -1922,4 +1933,89 @@ func TestNormalizeContainerName_SlashInMiddle(t *testing.T) {
 
 	result := NormalizeContainerName("test/container")
 	assert.Equal(t, "test/container", result)
+}
+
+// TestContainer_ToRestart verifies that each reason to recreate a container
+// marks it for restart.
+func TestContainer_ToRestart(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		update func(c *Container)
+		want   bool
+	}{
+		{name: "none", update: func(*Container) {}, want: false},
+		{name: "stale", update: func(c *Container) { c.SetStale(true) }, want: true},
+		{name: "linked to restarting", update: func(c *Container) { c.SetLinkedToRestarting(true) }, want: true},
+		{name: "rebinding", update: func(c *Container) { c.SetRebinding(true) }, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer()
+			tt.update(c)
+			assert.Equal(t, tt.want, c.ToRestart())
+		})
+	}
+}
+
+// TestContainer_KeepsAnonymousVolumes verifies that only a rebound container
+// keeps its anonymous volumes, unless it runs with AutoRemove set, since the
+// daemon then removes them with the stopped container.
+func TestContainer_KeepsAnonymousVolumes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		rebinding  bool
+		autoRemove bool
+		running    bool
+		want       bool
+	}{
+		{name: "rebound", rebinding: true, want: true},
+		{name: "rebound and stopped with AutoRemove", rebinding: true, autoRemove: true, want: true},
+		{name: "rebound and running with AutoRemove", rebinding: true, autoRemove: true, running: true, want: false},
+		{name: "not rebound", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := MockContainer(
+				containerfixture.WithAutoRemove(tt.autoRemove),
+				containerfixture.WithContainerState(dockerContainer.State{Running: tt.running}),
+			)
+			c.SetRebinding(tt.rebinding)
+			assert.Equal(t, tt.want, c.KeepsAnonymousVolumes())
+		})
+	}
+}
+
+// TestContainer_IsPaused verifies that a paused container reports itself as
+// paused, while a running one and one without state data do not.
+func TestContainer_IsPaused(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		info *dockerContainer.InspectResponse
+		want bool
+	}{
+		{name: "paused", info: &dockerContainer.InspectResponse{State: &dockerContainer.State{Running: true, Paused: true}}, want: true},
+		{name: "running", info: &dockerContainer.InspectResponse{State: &dockerContainer.State{Running: true}}, want: false},
+		{name: "no state", info: &dockerContainer.InspectResponse{}, want: false},
+		{name: "no inspect data", info: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, NewContainer(nil, tt.info, nil).IsPaused())
+		})
+	}
 }

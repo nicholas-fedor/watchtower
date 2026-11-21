@@ -1179,16 +1179,6 @@ func TestPathHasMount(t *testing.T) {
 	assert.True(t, pathHasMount("/app/./config.yaml", "/app/config.yaml"))
 }
 
-func TestBindIsReadOnly(t *testing.T) {
-	t.Parallel()
-
-	assert.False(t, bindIsReadOnly("nocolon"))
-	assert.False(t, bindIsReadOnly("/host/config.yaml:/app/config.yaml"))
-	assert.False(t, bindIsReadOnly("/host/data:/data:rw,z"))
-	assert.True(t, bindIsReadOnly("/host/data:/data:ro"))
-	assert.True(t, bindIsReadOnly("/host/data:/data:z,ro"))
-}
-
 func TestSnapshotCopyFileErrors(t *testing.T) {
 	t.Parallel()
 

@@ -15,17 +15,20 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
+	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 )
 
-// testGraph returns the dependency graph of the given containers, all of them
-// monitored.
-func testGraph(t *testing.T, containers []*container.Container) *sorter.DependencyGraph {
+// testGraph returns the dependency graph of the monitored containers, with the
+// unmonitored ones outside it.
+func testGraph(t *testing.T, monitored, unmonitored []*container.Container) *sorter.DependencyGraph {
 	t.Helper()
 
-	graph, err := sorter.NewDependencyGraph(newTestLogger(t), containers, nil, false)
+	graph, err := sorter.NewDependencyGraph(newTestLogger(t), monitored, unmonitored, false)
 	require.NoError(t, err)
 
 	return graph
@@ -351,12 +354,12 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		app.SetStale(true)
 		containers := []*container.Container{app, db}
-		markImplicitRestarts(log, testGraph(t, containers), containers, containers, nil)
+		markImplicitRestarts(log, testGraph(t, containers, nil), containers, containers, nil)
 		assert.True(t, db.IsLinkedToRestarting())
 
 		app.SetStale(false)
 
-		got := Reconcile(log, testGraph(t, containers), containers, containers, updateParams.Params{}, nil)
+		got := Reconcile(log, testGraph(t, containers, nil), containers, containers, updateParams.Params{}, nil)
 
 		assert.False(t, db.IsLinkedToRestarting())
 		assert.Empty(t, got)
@@ -385,7 +388,7 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		app.SetStale(true)
 		containers := []*container.Container{app, db}
-		got := Reconcile(log, testGraph(t, containers), containers, containers, updateParams.Params{}, nil)
+		got := Reconcile(log, testGraph(t, containers, nil), containers, containers, updateParams.Params{}, nil)
 
 		assert.True(t, db.IsLinkedToRestarting())
 		assert.ElementsMatch(t, []*container.Container{app, db}, got)
@@ -478,5 +481,195 @@ func TestReconcileImplicitRestarts(t *testing.T) {
 
 		assert.False(t, dependent.IsLinkedToRestarting())
 		assert.ElementsMatch(t, []*container.Container{serviceMatch}, got)
+	})
+}
+
+// TestRebind verifies which containers are rebound to a recreated network
+// namespace and where they are placed in the restart order.
+func TestRebind(t *testing.T) {
+	t.Parallel()
+
+	// named builds a container with a name, an ID derived from it and an
+	// optional network mode.
+	named := func(name, networkMode string, updates ...containerfixture.Update) *container.Container {
+		all := make([]containerfixture.Update, 0, 3+len(updates))
+		all = append(all,
+			containerfixture.WithName("/"+name),
+			containerfixture.WithID(name+"-id"),
+			containerfixture.WithNetworkMode(networkMode),
+		)
+
+		return modelfixture.Container(append(all, updates...)...)
+	}
+
+	names := func(containers []*container.Container) []string {
+		names := make([]string, 0, len(containers))
+		for _, c := range containers {
+			names = append(names, c.Name())
+		}
+
+		return names
+	}
+
+	t.Run("places dependents after the container they join", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		db := named("db", "bridge")
+		app := named("app", "container:vpn")
+		stopped := named("stopped", "container:vpn-id")
+		plan := []*container.Container{vpn, db}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, []*container.Container{app}),
+			plan, []*container.Container{app, stopped, db, vpn}, nil)
+
+		assert.Equal(t, []string{"vpn", "app", "stopped", "db"}, names(got))
+		assert.True(t, app.IsRebinding())
+		assert.True(t, stopped.IsRebinding())
+		assert.False(t, vpn.IsRebinding())
+		assert.False(t, db.IsRebinding())
+		assert.Equal(t, "vpn", stopped.NetworkContainer(),
+			"the removed container's ID is replaced by the name its replacement takes")
+	})
+
+	t.Run("rebinds a chain of namespaces", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		proxy := named("proxy", "container:vpn")
+		app := named("app", "container:proxy")
+		plan := []*container.Container{vpn}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, []*container.Container{app, proxy}),
+			plan, []*container.Container{app, proxy}, nil)
+
+		assert.Equal(t, []string{"vpn", "proxy", "app"}, names(got))
+		assert.True(t, app.IsRebinding())
+	})
+
+	// Docker resolves a legacy link when it creates the container, so the
+	// linked container must have been recreated first.
+	t.Run("places a dependent after the containers its host config names", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		db := named("db", "bridge")
+		app := named("app", "container:vpn", containerfixture.WithLinks([]string{"/db:/app/db"}))
+		plan := []*container.Container{vpn, db}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, []*container.Container{app}),
+			plan, []*container.Container{app}, nil)
+
+		assert.Equal(t, []string{"vpn", "db", "app"}, names(got))
+	})
+
+	// A container is placed only once every container it needs is placed,
+	// also when one of them was still waiting for its own dependencies.
+	t.Run("places a dependent after a dependency that waited", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		db := named("db", "bridge")
+		app := named("app", "container:vpn", containerfixture.WithLinks([]string{"/metrics:/app/metrics"}))
+		metrics := named("metrics", "container:db")
+		agent := named("agent", "container:db", containerfixture.WithLinks([]string{"/app:/agent/app"}))
+		plan := []*container.Container{vpn, db}
+		candidates := []*container.Container{app, metrics, agent}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, candidates), plan, candidates, nil)
+
+		assert.Equal(t, []string{"vpn", "db", "metrics", "app", "agent"}, names(got))
+	})
+
+	// A monitor-only container is in the graph, so its labeled dependencies
+	// order it too.
+	t.Run("places a dependent after its dependencies in the graph", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		db := named("db", "bridge")
+		app := named("app", "container:vpn",
+			containerfixture.WithLabels(map[string]string{labels.DependsOn: "db"}))
+		plan := []*container.Container{vpn, db}
+
+		got := Rebind(newTestLogger(t), testGraph(t, []*container.Container{vpn, db, app}, nil),
+			plan, []*container.Container{app}, nil)
+
+		assert.Equal(t, []string{"vpn", "db", "app"}, names(got))
+	})
+
+	// The plan's sort cannot see a link to a container outside it, so a
+	// container of the plan that joins a rebound container moves after it.
+	t.Run("places a container of the plan after the rebound container it joins", func(t *testing.T) {
+		t.Parallel()
+
+		gateway := named("gateway", "bridge")
+		proxy := named("proxy", "container:gateway")
+		app := named("app", "container:proxy")
+		plan := []*container.Container{app, gateway}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, []*container.Container{proxy}),
+			plan, []*container.Container{proxy}, nil)
+
+		assert.Equal(t, []string{"gateway", "proxy", "app"}, names(got))
+		assert.True(t, proxy.IsRebinding())
+		assert.False(t, app.IsRebinding())
+	})
+
+	// The scan keeps a network container's ID when it cannot inspect the
+	// container, an ID that is gone once the container is recreated.
+	t.Run("names the recreated container in the network mode", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		planned := named("planned", "container:vpn-id")
+		rebound := named("rebound", "container:vpn-id")
+		plan := []*container.Container{vpn, planned}
+
+		Rebind(newTestLogger(t), testGraph(t, plan, []*container.Container{rebound}),
+			plan, []*container.Container{rebound}, nil)
+
+		assert.Equal(t, "vpn", planned.NetworkContainer())
+		assert.Equal(t, "vpn", rebound.NetworkContainer())
+	})
+
+	t.Run("leaves out other containers", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		other := named("other", "container:db")
+		watchtower := named("watchtower", "container:vpn",
+			containerfixture.WithLabels(map[string]string{labels.Watchtower: "true"}))
+		skipped := named("skipped", "container:vpn")
+		planned := named("planned", "container:vpn")
+		plan := []*container.Container{vpn, planned}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, nil),
+			plan,
+			[]*container.Container{other, watchtower, skipped, planned},
+			map[container.ContainerID]struct{}{skipped.ID(): {}},
+		)
+
+		assert.Equal(t, []string{"vpn", "planned"}, names(got))
+		assert.False(t, other.IsRebinding())
+		assert.False(t, watchtower.IsRebinding())
+		assert.False(t, skipped.IsRebinding())
+		assert.False(t, planned.IsRebinding())
+	})
+
+	// The self-update replaces Watchtower's container after this process
+	// hands over, too late to recreate a container against the replacement.
+	t.Run("leaves the containers that join a Watchtower container", func(t *testing.T) {
+		t.Parallel()
+
+		watchtower := named("watchtower", "bridge",
+			containerfixture.WithLabels(map[string]string{labels.Watchtower: "true"}))
+		app := named("app", "container:watchtower")
+		plan := []*container.Container{watchtower}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, nil), plan, []*container.Container{app}, nil)
+
+		assert.Equal(t, []string{"watchtower"}, names(got))
+		assert.False(t, app.IsRebinding())
 	})
 }

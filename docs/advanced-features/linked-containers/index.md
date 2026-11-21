@@ -143,9 +143,87 @@ Dependents are found with the same dependency graph that orders the update, so t
 - A container that names a Watchtower container exactly, by container name or ID, restarts when that Watchtower container is updated. The name without its replica number (such as `infra-watchtower` for `infra-watchtower-1`) also works when exactly one Watchtower container has it, so it names nothing when the service runs several replicas.
 - Containers in a circular dependency are neither updated nor restarted.
 
+### Containers Sharing a Recreated Container's Network
+
+Docker records the container that `network_mode: container:CONTAINER`, `network_mode: service:SERVICE` or `--network container:CONTAINER` names by its ID.
+When Watchtower recreates that container, any container that joins its network still refers to the removed one, so it loses its network if it is running and can no longer start if it is stopped.
+Watchtower therefore recreates such a container after the container whose network it joins, so that it joins the new one.
+
+#### Which Containers Are Recreated
+
+Watchtower recreates every container that joins the network of a container it recreates, whether that container is running, stopped, paused or restarting.
+A container that joins the network of one of these is recreated in turn.
+This includes containers Watchtower would otherwise leave alone:
+
+- A monitor-only container.
+- A container excluded from monitoring, such as one without the enable label or in another instance's scope.
+- A container skipped because of a circular dependency or a dependency on itself.
+
+Any other monitored container that joins the network is restarted as a dependent of the container it joins instead (see [Restarting Dependent Containers](#restarting_dependent_containers)), so its lifecycle hooks run and the remove-volumes configuration option applies to it.
+
+Watchtower never recreates these containers this way:
+
+- Its own containers and the containers that join a Watchtower container's network. Its self-update replaces its container only after the running instance hands over, which is too late to recreate them against the new container.
+- A run of a Docker Engine job (see [Compose Jobs](../compose-jobs/index.md)).
+- A container built from Git in the same session while the no-restart configuration option is set, which keeps running as it is with the removed container's network.
+
+When Compose recreates a joining container during a Git-monitored apply in the same session as Watchtower recreates the container it joins, the new container still refers to the removed one.
+
+#### How a Recreated Container Is Handled
+
+- It keeps its image. A monitor-only container is still checked for updates and reported as usual.
+- It keeps its anonymous volumes even when the remove-volumes configuration option is set. The exception is a running container started with `--rm`, whose anonymous volumes Docker removes along with the stopped container.
+- Its replacement records the kept volumes in the `com.centurylinklabs.watchtower.kept-volumes` label. A later recreation that does not keep them, such as an update, gives it new anonymous volumes as for any other container.
+- Volumes it takes from another container through volumes-from still come from that container.
+- A running or paused container starts again unless the no-restart configuration option is set, while a stopped container stays stopped even with the revive-stopped configuration option. A paused container comes back running.
+- Its pre-update and post-update commands do not run. Its pre-check and post-check commands run when Watchtower monitors it.
+
+#### Recreation Order
+
+A recreated container follows the container whose network it joins, along with any container Watchtower recreates that its links or volumes-from name, since Docker resolves those when it creates the container.
+A monitored container also follows the containers it depends on.
+
+#### Replacing the Shared Container
+
+Watchtower replaces the shared container before it removes the containers that join it:
+
+1. It stops the other containers it recreates with the shared container, in reverse order. These are the containers placed between the shared container and a joining container that waits for them, such as one its links name. Each one's pre-update command runs right before it stops.
+2. It runs the shared container's pre-update command.
+3. It renames the shared container to `NAME-replaced-ID`, where `NAME` is its name and `ID` its short ID.
+4. It creates the replacement under the original name.
+5. It removes the containers that join the shared container, then the shared container itself. These removals run to their end even when the update is canceled, since Docker finishes a stop it has begun.
+6. It recreates the removed containers against the replacement.
+
+Without rolling restarts, the shared container is not replaced early when its own network mode, links or volumes-from name another container Watchtower recreates.
+In that case the joining containers are removed first and the replacement is created only after that other container's.
+
+With rolling restarts, a monitored container that joins the shared container is stopped only in its own turn, after the shared container is replaced.
+It has no network until then. On Podman the shared container cannot be removed while it runs, so its replacement is undone.
+
+#### Failures
+
+If the replacement cannot be created before the joining containers are removed, the shared container takes its name back and those containers are left untouched.
+When the replacement is created only after they were removed, a failed create leaves the shared container and the joining containers removed. Watchtower reports each of them.
+
+A container stopped in step 1 that joins the network of another container in the group and cannot be stopped, such as one whose pre-update command skips it, keeps the shared container in place.
+Watchtower then renames nothing. It reports the shared container as failed and skips the containers of its group it did not reach.
+
+If a joining container cannot be stopped or the shared container cannot be removed, Watchtower removes the replacement and gives the shared container its name back.
+It starts the shared container again if it was running, then recreates the joining containers it already removed so they join it again.
+The joining container that could not be stopped keeps its place in the restored network and starts again if it was running, while those not reached yet are skipped.
+On Podman, a paused joining container cannot be stopped, so the shared container stays as it is.
+
+When the removal of the shared container fails but the daemon removed it anyway, its replacement counts as done.
+If Watchtower cannot tell whether it was removed, it keeps the replacement and reports the shared container as failed, since removing the replacement could leave neither container.
+
+Without rolling restarts, a container that joins another's network and is not stopped keeps the container it joins running too, so Watchtower reports that container as not updated.
+
+Watchtower reports a container it cannot recreate as "Could not reconnect container to the network of a recreated container" and lists it as failed, also when it does not monitor that container.
+A joining container that cannot be stopped keeps its network, so the shared container's failure reports it.
+
 ### Dependencies on Unmonitored Containers
 
-A container that Watchtower does not monitor is left alone, including when a monitored container depends on it.
+A container that Watchtower does not monitor is left alone, including when a monitored container depends on it, unless it joins the network of a container Watchtower recreates (see [Containers Sharing a Recreated Container's Network](#containers_sharing_a_recreated_containers_network)).
 Containers are excluded from monitoring by the [container selection](../../configuration/container-selection/index.md) options, such as the enable label, the disable lists, image filters, and scopes.
 
 - A dependency on an unmonitored container is ignored when ordering updates and restarting dependents.

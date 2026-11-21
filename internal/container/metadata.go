@@ -546,6 +546,21 @@ func (c *Container) IsWatchtower() bool {
 	return containsWatchtowerLabel(info.Config.Labels)
 }
 
+// IsJobRun reports whether the container is a run of a Docker Engine job.
+//
+// The engine creates each run and removes it after a success. It keeps a
+// failed run for the job's history. A run that Watchtower recreated or
+// restarted would run outside the job's schedule, and a recreated failed run
+// would lose its exit status and logs, so Watchtower leaves job runs alone.
+//
+// Returns:
+//   - bool: True when the container carries the engine's job label.
+func (c *Container) IsJobRun() bool {
+	_, ok := c.GetLabel(labels.JobID)
+
+	return ok
+}
+
 // IsEphemeralOrchestrator reports whether the container is the ephemeral
 // orchestrator of a self-update.
 //

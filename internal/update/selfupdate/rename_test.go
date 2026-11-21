@@ -269,14 +269,14 @@ func TestRename_Retire(t *testing.T) {
 	})
 }
 
-// Test_removeFailedReplacement verifies the bound for removing a replacement
+// TestRemoveFailedReplacement verifies the bound for removing a replacement
 // that failed to start. The bound is the stop timeout plus 30 seconds. When the
 // container the replacement was created from sets a longer stop timeout, the
 // stop waits that long, so the bound is that stop timeout plus 30 seconds. A
 // stop timeout too long for a duration saturates the bound instead of
 // overflowing it. An empty ID removes nothing, and a replacement already gone
 // is not a failure.
-func Test_removeFailedReplacement(t *testing.T) {
+func TestRemoveFailedReplacement(t *testing.T) {
 	t.Parallel()
 
 	// largestBound is the bound for a container stop timeout of the largest int.
@@ -329,7 +329,7 @@ func Test_removeFailedReplacement(t *testing.T) {
 				client.EXPECT().GetContainer(boundCtx, renameReplacementID).Return(failedNew, nil).Once()
 				client.EXPECT().StopAndRemoveContainer(boundCtx, failedNew, 30*time.Second).Return(tt.removeErr).Once()
 
-				removeFailedReplacement(newTestLogger(t), t.Context(), client, source, renameReplacementID,
+				RemoveFailedReplacement(newTestLogger(t), t.Context(), client, source, renameReplacementID,
 					updateParams.Params{Timeout: 30 * time.Second})
 			})
 		})
@@ -341,7 +341,7 @@ func Test_removeFailedReplacement(t *testing.T) {
 		source := newRenameSource("/watchtower")
 
 		// The mock fails the test on any call.
-		removeFailedReplacement(newTestLogger(t), t.Context(), mockSelfupdate.NewMockReplacementRemover(t),
+		RemoveFailedReplacement(newTestLogger(t), t.Context(), mockSelfupdate.NewMockReplacementRemover(t),
 			source, "", updateParams.Params{})
 	})
 }

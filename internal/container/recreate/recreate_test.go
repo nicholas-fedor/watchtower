@@ -15,11 +15,13 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 	dockerContainer "github.com/moby/moby/api/types/container"
 	dockerImage "github.com/moby/moby/api/types/image"
+	dockerMount "github.com/moby/moby/api/types/mount"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 	dockerClient "github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	mockContainer "github.com/nicholas-fedor/watchtower/internal/container/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container/network"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
@@ -221,6 +223,98 @@ func TestCreateTargetContainer(t *testing.T) {
 		assert.Equal(t, container.ContainerID(testTargetID), newID)
 		assert.Contains(t, logOutput.String(),
 			"Using full network config for API version >= 1.44 or single network")
+	})
+	// An ordinary recreation of a container rebound earlier mounts its kept
+	// volumes anonymously again.
+	t.Run("should keep a rebound container's image and anonymous volumes", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name      string
+			rebinding bool
+			image     string
+			// label is the Zodiac original-image label, empty for none.
+			label string
+			// recorded reports whether an earlier rebind kept the volume
+			// by name.
+			recorded bool
+			binds    []string
+		}{
+			{
+				name:      "rebound container",
+				rebinding: true,
+				image:     "sha256:running",
+				label:     "example/app:latest",
+				binds:     []string{"anonymous-data:/data:nocopy"},
+			},
+			{name: "other container", rebinding: false, image: "example/app:latest", label: "", binds: nil},
+			{
+				name:      "container rebound earlier",
+				rebinding: false,
+				recorded:  true,
+				image:     "example/app:latest",
+				label:     "",
+				binds:     []string{},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				updates := []containerfixture.Update{
+					containerfixture.WithImageName("example/app:latest"),
+					containerfixture.WithImageID("sha256:running"),
+					containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+						{Type: dockerMount.TypeVolume, Name: "anonymous-data", Destination: "/data", RW: true},
+					}),
+				}
+				if tt.recorded {
+					updates = append(updates,
+						containerfixture.WithBinds([]string{"anonymous-data:/data:nocopy"}),
+						containerfixture.WithLabels(map[string]string{
+							labels.KeptVolumes: `[{"destination": "/data", "volume": "anonymous-data", "form": "volume"}]`,
+						}),
+					)
+				}
+
+				log, _ := logcapture.New(zerolog.DebugLevel)
+				source := modelfixture.Container(updates...)
+				source.SetRebinding(tt.rebinding)
+
+				// The strict mock fails when a container that is not rebound
+				// inspects its image reference.
+				api := mockContainer.NewMockAPIClient(t)
+				if tt.rebinding {
+					api.EXPECT().ImageInspect(mock.Anything, "example/app:latest").
+						Return(dockerClient.ImageInspectResult{ID: "sha256:newer"}, nil).Once()
+				}
+
+				var created dockerClient.ContainerCreateOptions
+
+				api.EXPECT().ContainerCreate(mock.Anything, mock.Anything).RunAndReturn(
+					func(_ context.Context, options dockerClient.ContainerCreateOptions) (dockerClient.ContainerCreateResult, error) {
+						created = options
+
+						return dockerClient.ContainerCreateResult{ID: testTargetID}, nil
+					},
+				).Once()
+				api.EXPECT().
+					ContainerRename(mock.Anything, testTargetID, dockerClient.ContainerRenameOptions{NewName: source.Name()}).
+					Return(dockerClient.ContainerRenameResult{}, nil).Once()
+
+				_, err := CreateTarget(log, t.Context(), api, source, network.FromContainer(log, source, "1.44"),
+					"1.44", false, "auto", false,
+				)
+				require.NoError(t, err)
+				require.NotNil(t, created.Config)
+				require.NotNil(t, created.HostConfig)
+				assert.Equal(t, tt.image, created.Config.Image)
+				assert.Equal(t, tt.label, created.Config.Labels[labels.ZodiacOriginalImage])
+				assert.Equal(t, tt.binds, created.HostConfig.Binds)
+				assert.Equal(t, tt.rebinding, created.Config.Labels[labels.KeptVolumes] != "")
+			})
+		}
 	})
 	t.Run("should handle ContainerCreate failure", func(t *testing.T) {
 		t.Parallel()
@@ -663,4 +757,236 @@ func newMultiNetworkSource() *container.Container {
 		containerfixture.WithContainerState(dockerContainer.State{Running: true, Status: "running"}),
 		containerfixture.WithNetworks("network1", "network2"),
 	)
+}
+
+// TestKeepRunningImage verifies that a new container is created from the
+// image the source container runs when its image reference names another
+// image or none. It also verifies that the reference is kept in the Zodiac
+// original-image label so later scans still check it against its registry.
+func TestKeepRunningImage(t *testing.T) {
+	t.Parallel()
+
+	const (
+		running  = "sha256:running"
+		imageRef = "example/app:latest"
+	)
+
+	tests := []struct {
+		name string
+		// named is the image the reference names, empty when it names none.
+		named string
+		want  string
+		// wantLabel is the Zodiac original-image label, empty for none.
+		wantLabel string
+		// withoutImageInfo builds the source as when its image inspect failed,
+		// which leaves only the container inspect to name the running image.
+		withoutImageInfo bool
+	}{
+		{name: "reference names the running image", named: running, want: imageRef, wantLabel: ""},
+		{name: "reference names a newer image", named: "sha256:newer", want: running, wantLabel: imageRef},
+		{name: "reference names no image", named: "", want: running, wantLabel: imageRef},
+		{
+			name:             "running image known only from the container",
+			named:            "sha256:newer",
+			want:             running,
+			wantLabel:        imageRef,
+			withoutImageInfo: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			build := modelfixture.Container
+			if tt.withoutImageInfo {
+				build = modelfixture.ContainerWithoutImageInfo
+			}
+
+			source := build(
+				containerfixture.WithImageName(imageRef),
+				containerfixture.WithImageID(running),
+			)
+
+			api := mockContainer.NewMockAPIClient(t)
+
+			call := api.EXPECT().ImageInspect(mock.Anything, imageRef)
+			if tt.named == "" {
+				call.Return(dockerClient.ImageInspectResult{}, cerrdefs.ErrNotFound).Once()
+			} else {
+				call.Return(dockerClient.ImageInspectResult{ID: tt.named}, nil).Once()
+			}
+
+			config := source.GetCreateConfig()
+			log, _ := logcapture.New(zerolog.DebugLevel)
+
+			keepRunningImage(t.Context(), api, log, source, config)
+
+			assert.Equal(t, tt.want, config.Image)
+			assert.Equal(t, tt.wantLabel, config.Labels[labels.ZodiacOriginalImage])
+			assert.NotContains(t, source.ContainerInfo().Config.Labels, labels.ZodiacOriginalImage,
+				"the inspect data is not changed")
+		})
+	}
+}
+
+// TestKeepAnonymousVolumes verifies that the new container mounts the source
+// container's anonymous volumes, including those declared as volume mounts
+// without a source. It keeps its binds and named volume mounts as they are.
+// A bind and a mount target are written with a trailing slash, which Docker
+// keeps in the host config but not in the inspect mount points. A bind that
+// gives only a destination names its anonymous volume rather than gaining a
+// second mount at the same path. Every kept volume is mounted without copying
+// the image's files into it. The new container's labels record each kept
+// volume, and restoring them declares each one as the source container did.
+func TestKeepAnonymousVolumes(t *testing.T) {
+	t.Parallel()
+
+	source := modelfixture.Container(
+		containerfixture.WithBinds([]string{"config:/config/", "/srv/media:/media:ro", "/state"}),
+		containerfixture.WithMounts([]dockerMount.Mount{
+			{Type: dockerMount.TypeVolume, Source: "logs", Target: "/logs"},
+			{
+				Type:          dockerMount.TypeVolume,
+				Target:        "/scratch/",
+				VolumeOptions: &dockerMount.VolumeOptions{Labels: map[string]string{"tier": "cache"}},
+			},
+		}),
+		containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			{Type: dockerMount.TypeVolume, Name: "anonymous-data", Destination: "/data", RW: true},
+			{Type: dockerMount.TypeVolume, Name: "anonymous-cache", Destination: "/cache", RW: false},
+			{Type: dockerMount.TypeVolume, Name: "config", Destination: "/config", RW: true},
+			{Type: dockerMount.TypeVolume, Name: "logs", Destination: "/logs", RW: true},
+			{Type: dockerMount.TypeVolume, Name: "anonymous-scratch", Destination: "/scratch", RW: true},
+			{Type: dockerMount.TypeBind, Source: "/srv/media", Destination: "/media", RW: true},
+			{Type: dockerMount.TypeVolume, Name: "anonymous-state", Destination: "/state", RW: true},
+		}),
+	)
+
+	config := source.GetCreateConfig()
+	hostConfig := source.GetCreateHostConfig()
+	log, _ := logcapture.New(zerolog.DebugLevel)
+
+	keepAnonymousVolumes(log, source, config, hostConfig)
+
+	assert.Equal(t, []dockerMount.Mount{
+		{Type: dockerMount.TypeVolume, Source: "logs", Target: "/logs"},
+		{
+			Type:   dockerMount.TypeVolume,
+			Source: "anonymous-scratch",
+			Target: "/scratch/",
+			VolumeOptions: &dockerMount.VolumeOptions{
+				NoCopy: true,
+				Labels: map[string]string{"tier": "cache"},
+			},
+		},
+	}, hostConfig.Mounts)
+	assert.Equal(t, []dockerMount.Mount{
+		{Type: dockerMount.TypeVolume, Source: "logs", Target: "/logs"},
+		{
+			Type:          dockerMount.TypeVolume,
+			Target:        "/scratch/",
+			VolumeOptions: &dockerMount.VolumeOptions{Labels: map[string]string{"tier": "cache"}},
+		},
+	}, source.ContainerInfo().HostConfig.Mounts, "the inspect data is not changed")
+	assert.Equal(t, []string{
+		"config:/config/",
+		"/srv/media:/media:ro",
+		"anonymous-state:/state:nocopy",
+		"anonymous-data:/data:nocopy",
+		"anonymous-cache:/cache:ro,nocopy",
+	}, hostConfig.Binds)
+	assert.Equal(t, []string{"config:/config/", "/srv/media:/media:ro", "/state"},
+		source.ContainerInfo().HostConfig.Binds, "the inspect data is not changed")
+	assert.JSONEq(t, `[
+		{"destination": "/state", "volume": "anonymous-state", "form": "bind"},
+		{"destination": "/scratch/", "volume": "anonymous-scratch", "form": "mount"},
+		{"destination": "/data", "volume": "anonymous-data", "form": "volume"},
+		{"destination": "/cache", "volume": "anonymous-cache", "form": "volume"}
+	]`, config.Labels[labels.KeptVolumes])
+	assert.NotContains(t, source.ContainerInfo().Config.Labels, labels.KeptVolumes, "the inspect data is not changed")
+
+	// A later recreation that does not keep them declares each volume as
+	// the source container did, so it gets a new anonymous volume there.
+	restoreAnonymousVolumes(log, config, hostConfig)
+
+	assert.Equal(t, source.GetCreateHostConfig().Binds, hostConfig.Binds)
+	assert.Equal(t, source.GetCreateHostConfig().Mounts, hostConfig.Mounts)
+	assert.NotContains(t, config.Labels, labels.KeptVolumes)
+}
+
+// TestRestoreAnonymousVolumes verifies that a recreation which does not keep
+// anonymous volumes mounts only the recorded ones anonymously again. A bind or
+// mount that no longer names the recorded volume, such as one the user
+// changed, is left as it is. A record that cannot be read changes nothing but
+// is removed.
+func TestRestoreAnonymousVolumes(t *testing.T) {
+	t.Parallel()
+
+	log, _ := logcapture.New(zerolog.DebugLevel)
+
+	t.Run("leaves binds and mounts that name other volumes", func(t *testing.T) {
+		t.Parallel()
+
+		config := &dockerContainer.Config{Labels: map[string]string{
+			labels.KeptVolumes: `[{"destination": "/data", "volume": "anonymous-data", "form": "bind"},
+				{"destination": "/cache", "volume": "anonymous-cache", "form": "mount", "noCopy": true}]`,
+		}}
+		hostConfig := &dockerContainer.HostConfig{
+			Binds:  []string{"user-data:/data", "config:/config"},
+			Mounts: []dockerMount.Mount{{Type: dockerMount.TypeVolume, Source: "anonymous-cache", Target: "/cache"}},
+		}
+
+		restoreAnonymousVolumes(log, config, hostConfig)
+
+		assert.Equal(t, []string{"user-data:/data", "config:/config"}, hostConfig.Binds)
+		assert.Equal(t, []dockerMount.Mount{{
+			Type:          dockerMount.TypeVolume,
+			Target:        "/cache",
+			VolumeOptions: &dockerMount.VolumeOptions{NoCopy: true},
+		}}, hostConfig.Mounts)
+		assert.Empty(t, config.Labels)
+	})
+
+	t.Run("unreadable record", func(t *testing.T) {
+		t.Parallel()
+
+		config := &dockerContainer.Config{Labels: map[string]string{labels.KeptVolumes: "not json"}}
+		hostConfig := &dockerContainer.HostConfig{Binds: []string{"anonymous-data:/data:nocopy"}}
+
+		restoreAnonymousVolumes(log, config, hostConfig)
+
+		assert.Equal(t, []string{"anonymous-data:/data:nocopy"}, hostConfig.Binds)
+		assert.Empty(t, config.Labels)
+	})
+}
+
+// TestKeepAnonymousVolumes_volumesFrom verifies that a volume the source
+// container got from a volumes-from container is not mounted by name. Docker
+// takes it from that container again, which may have a new volume there since
+// it was recreated. The volumes-from destinations are those recorded when the
+// source container was listed, so a volumes-from container recreated with
+// other volumes since then changes nothing. The source container's own
+// anonymous volume is still kept.
+func TestKeepAnonymousVolumes_volumesFrom(t *testing.T) {
+	t.Parallel()
+
+	source := modelfixture.Container(
+		containerfixture.WithVolumesFrom([]string{"vpn:ro"}),
+		containerfixture.WithInspectMounts([]dockerContainer.MountPoint{
+			{Type: dockerMount.TypeVolume, Name: "anonymous-vpn-state", Destination: "/state", RW: false},
+			{Type: dockerMount.TypeVolume, Name: "anonymous-data", Destination: "/data", RW: true},
+		}),
+	)
+	source.SetVolumesFromDestinations([]string{"/state"})
+
+	config := source.GetCreateConfig()
+	hostConfig := source.GetCreateHostConfig()
+	log, _ := logcapture.New(zerolog.DebugLevel)
+
+	keepAnonymousVolumes(log, source, config, hostConfig)
+
+	assert.Empty(t, hostConfig.Mounts)
+	assert.Equal(t, []string{"anonymous-data:/data:nocopy"}, hostConfig.Binds)
+	assert.Equal(t, []string{"vpn:ro"}, hostConfig.VolumesFrom)
 }

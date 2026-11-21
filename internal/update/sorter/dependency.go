@@ -63,19 +63,7 @@ func (ds dependencySorter) Sort(log *zerolog.Logger, containers []*container.Con
 		Int("container_count", len(containers)).
 		Msg("Starting dependency sort")
 
-	// Separate Watchtower containers from non-Watchtower containers
-	var (
-		nonWatchtowerContainers []*container.Container
-		watchtowerContainers    []*container.Container
-	)
-
-	for _, c := range containers {
-		if c.IsWatchtower() {
-			watchtowerContainers = append(watchtowerContainers, c)
-		} else {
-			nonWatchtowerContainers = append(nonWatchtowerContainers, c)
-		}
-	}
+	nonWatchtowerContainers, watchtowerContainers := splitWatchtowers(containers)
 
 	log.Debug().
 		Int("non_watchtower_count", len(nonWatchtowerContainers)).
