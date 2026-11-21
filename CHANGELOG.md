@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Recreate containers that join a recreated container's network by @nicholas-fedor in [#3991](https://github.com/nicholas-fedor/watchtower/pull/3991)
 - Leave ls-remote time when a Git API stalls by @nicholas-fedor in [#3978](https://github.com/nicholas-fedor/watchtower/pull/3978)
 - Share one hostname rule for Git hosts by @nicholas-fedor in [#3966](https://github.com/nicholas-fedor/watchtower/pull/3966)
 - Treat fully qualified Git hosts as equal by @nicholas-fedor in [#3963](https://github.com/nicholas-fedor/watchtower/pull/3963)
