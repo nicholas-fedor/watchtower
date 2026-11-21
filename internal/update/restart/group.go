@@ -624,8 +624,9 @@ func splitReaching(group []*container.Container) (reaching, others []*container.
 // startAgain starts a container whose stop failed when it was running.
 //
 // It may have stopped before its removal failed. Starting one that still runs
-// does nothing. The start keeps ctx's values but not its cancellation and
-// gets the stop timeout plus 30 seconds.
+// does nothing. A paused container is left as it is, since Docker and Podman
+// refuse to stop or start one. The start keeps ctx's values but not its
+// cancellation and gets the stop timeout plus 30 seconds.
 //
 // Parameters:
 //   - ctx: The update's context.
@@ -643,7 +644,7 @@ func startAgain(
 	failed map[container.ContainerID]error,
 	cause error,
 ) {
-	if !c.IsRunning() {
+	if !c.IsRunning() || c.IsPaused() {
 		return
 	}
 

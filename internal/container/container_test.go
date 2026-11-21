@@ -1994,3 +1994,28 @@ func TestContainer_KeepsAnonymousVolumes(t *testing.T) {
 		})
 	}
 }
+
+// TestContainer_IsPaused verifies that a paused container reports itself as
+// paused, while a running one and one without state data do not.
+func TestContainer_IsPaused(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		info *dockerContainer.InspectResponse
+		want bool
+	}{
+		{name: "paused", info: &dockerContainer.InspectResponse{State: &dockerContainer.State{Running: true, Paused: true}}, want: true},
+		{name: "running", info: &dockerContainer.InspectResponse{State: &dockerContainer.State{Running: true}}, want: false},
+		{name: "no state", info: &dockerContainer.InspectResponse{}, want: false},
+		{name: "no inspect data", info: nil, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, NewContainer(nil, tt.info, nil).IsPaused())
+		})
+	}
+}

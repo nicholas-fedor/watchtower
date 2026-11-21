@@ -311,6 +311,22 @@ func (c *Container) IsRestarting() bool {
 	return info.State.Restarting
 }
 
+// IsPaused reports whether the container is paused.
+//
+// A paused container also reports itself as running.
+//
+// Returns:
+//   - bool: True if paused, false otherwise.
+func (c *Container) IsPaused() bool {
+	info := c.ContainerInfo()
+
+	if info == nil || info.State == nil {
+		return false
+	}
+
+	return info.State.Paused
+}
+
 // IsCreated checks if the container is in the Docker "created" state,
 // meaning it was successfully created but never started.
 //
