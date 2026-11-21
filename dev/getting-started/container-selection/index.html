@@ -3654,6 +3654,7 @@ A container is monitored only if it passes every filter in the chain. The filter
 <ul>
 <li>If an image name pattern is configured, then Watchtower will exclusively manage only the respective container(s).</li>
 <li>If a container name is provided as an argument, then Watchtower will exclusively manage only the specified container(s).</li>
+<li>A container these filters exclude is still recreated when it joins the network of a container Watchtower recreates, with the exceptions listed in <a href="../../advanced-features/linked-containers/#containers_sharing_a_recreated_containers_network">Containers Sharing a Recreated Container's Network</a>.</li>
 </ul>
 </div>
 <div class="admonition note">
@@ -3757,7 +3758,7 @@ A container is monitored only if it passes every filter in the chain. The filter
 </div>
 </div>
 <h2 id="monitor-only_mode">Monitor-Only Mode<a class="headerlink" href="#monitor-only_mode" title="Permanent link">&para;</a></h2>
-<p>Individual containers can be set to <a href="../../configuration/update-behavior/#monitor_only">monitor-only mode</a>, where Watchtower checks for updates and sends notifications but does not recreate the container.</p>
+<p>Individual containers can be set to <a href="../../configuration/update-behavior/#monitor_only">monitor-only mode</a>, where Watchtower checks for updates and sends notifications but does not recreate the container. The exception is a container that joins the network of a container Watchtower recreates, which is recreated with its own image (see <a href="../../advanced-features/linked-containers/#containers_sharing_a_recreated_containers_network">Containers Sharing a Recreated Container's Network</a>).</p>
 <p>Set the <code>com.centurylinklabs.watchtower.monitor-only</code> label to <code>true</code> on the container:</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="3:3"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Docker Compose</label><label for="__tabbed_3_2">Docker CLI</label><label for="__tabbed_3_3">Dockerfile</label></div>
 <div class="tabbed-content">
@@ -3978,7 +3979,7 @@ This supports comma- or space-separated values and regex patterns.</p>
 </div>
 <h2 id="monitoring_scopes">Monitoring Scopes<a class="headerlink" href="#monitoring_scopes" title="Permanent link">&para;</a></h2>
 <p>Scopes allow multiple Watchtower instances to run on the same Docker host without interfering with each other.
-Each instance manages only the containers within its scope.</p>
+Each instance manages only the containers within its scope, apart from a container that joins the network of a container it recreates (see <a href="../../advanced-features/linked-containers/#containers_sharing_a_recreated_containers_network">Containers Sharing a Recreated Container's Network</a>).</p>
 <ol>
 <li>Use the <a href="../../configuration/container-selection/#scope_filter">scope filter</a> option to define a scope.</li>
 <li>Then, use the <code>com.centurylinklabs.watchtower.scope</code> label on containers to assign them to that scope.</li>
@@ -4610,7 +4611,7 @@ Each instance manages only the containers within its scope.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 18, 2026 00:11:27 UTC"><span class="timeago" datetime="2026-11-18T00:11:27+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 18, 2026 00:11:27 UTC">2026-11-18</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 21, 2026 16:14:07 UTC"><span class="timeago" datetime="2026-11-21T16:14:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 21, 2026 16:14:07 UTC">2026-11-21</span>
   </span>
 
     

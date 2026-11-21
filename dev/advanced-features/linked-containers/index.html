@@ -2666,6 +2666,78 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#containers_sharing_a_recreated_containers_network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containers Sharing a Recreated Container's Network
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Containers Sharing a Recreated Container&#39;s Network">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which_containers_are_recreated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which Containers Are Recreated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how_a_recreated_container_is_handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a Recreated Container Is Handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recreation_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recreation Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing_the_shared_container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing the Shared Container
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#dependencies_on_unmonitored_containers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3237,6 +3309,78 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#containers_sharing_a_recreated_containers_network" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Containers Sharing a Recreated Container's Network
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Containers Sharing a Recreated Container&#39;s Network">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which_containers_are_recreated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which Containers Are Recreated
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#how_a_recreated_container_is_handled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How a Recreated Container Is Handled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recreation_order" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recreation Order
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#replacing_the_shared_container" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Replacing the Shared Container
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#failures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Failures
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#dependencies_on_unmonitored_containers" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3623,8 +3767,69 @@ Dependents are found with the same dependency graph that orders the update, so t
 <li>A container that names a Watchtower container exactly, by container name or ID, restarts when that Watchtower container is updated. The name without its replica number (such as <code>infra-watchtower</code> for <code>infra-watchtower-1</code>) also works when exactly one Watchtower container has it, so it names nothing when the service runs several replicas.</li>
 <li>Containers in a circular dependency are neither updated nor restarted.</li>
 </ul>
+<h3 id="containers_sharing_a_recreated_containers_network">Containers Sharing a Recreated Container's Network<a class="headerlink" href="#containers_sharing_a_recreated_containers_network" title="Permanent link">&para;</a></h3>
+<p>Docker records the container that <code>network_mode: container:CONTAINER</code>, <code>network_mode: service:SERVICE</code> or <code>--network container:CONTAINER</code> names by its ID.
+When Watchtower recreates that container, any container that joins its network still refers to the removed one, so it loses its network if it is running and can no longer start if it is stopped.
+Watchtower therefore recreates such a container after the container whose network it joins, so that it joins the new one.</p>
+<h4 id="which_containers_are_recreated">Which Containers Are Recreated<a class="headerlink" href="#which_containers_are_recreated" title="Permanent link">&para;</a></h4>
+<p>Watchtower recreates every container that joins the network of a container it recreates, whether that container is running, stopped, paused or restarting.
+A container that joins the network of one of these is recreated in turn.
+This includes containers Watchtower would otherwise leave alone:</p>
+<ul>
+<li>A monitor-only container.</li>
+<li>A container excluded from monitoring, such as one without the enable label or in another instance's scope.</li>
+<li>A container skipped because of a circular dependency or a dependency on itself.</li>
+</ul>
+<p>Any other monitored container that joins the network is restarted as a dependent of the container it joins instead (see <a href="#restarting_dependent_containers">Restarting Dependent Containers</a>), so its lifecycle hooks run and the remove-volumes configuration option applies to it.</p>
+<p>Watchtower never recreates these containers this way:</p>
+<ul>
+<li>Its own containers and the containers that join a Watchtower container's network. Its self-update replaces its container only after the running instance hands over, which is too late to recreate them against the new container.</li>
+<li>A run of a Docker Engine job (see <a href="../compose-jobs/">Compose Jobs</a>).</li>
+<li>A container built from Git in the same session while the no-restart configuration option is set, which keeps running as it is with the removed container's network.</li>
+</ul>
+<p>When Compose recreates a joining container during a Git-monitored apply in the same session as Watchtower recreates the container it joins, the new container still refers to the removed one.</p>
+<h4 id="how_a_recreated_container_is_handled">How a Recreated Container Is Handled<a class="headerlink" href="#how_a_recreated_container_is_handled" title="Permanent link">&para;</a></h4>
+<ul>
+<li>It keeps its image. A monitor-only container is still checked for updates and reported as usual.</li>
+<li>It keeps its anonymous volumes even when the remove-volumes configuration option is set. The exception is a running container started with <code>--rm</code>, whose anonymous volumes Docker removes along with the stopped container.</li>
+<li>Its replacement records the kept volumes in the <code>com.centurylinklabs.watchtower.kept-volumes</code> label. A later recreation that does not keep them, such as an update, gives it new anonymous volumes as for any other container.</li>
+<li>Volumes it takes from another container through volumes-from still come from that container.</li>
+<li>A running or paused container starts again unless the no-restart configuration option is set, while a stopped container stays stopped even with the revive-stopped configuration option. A paused container comes back running.</li>
+<li>Its pre-update and post-update commands do not run. Its pre-check and post-check commands run when Watchtower monitors it.</li>
+</ul>
+<h4 id="recreation_order">Recreation Order<a class="headerlink" href="#recreation_order" title="Permanent link">&para;</a></h4>
+<p>A recreated container follows the container whose network it joins, along with any container Watchtower recreates that its links or volumes-from name, since Docker resolves those when it creates the container.
+A monitored container also follows the containers it depends on.</p>
+<h4 id="replacing_the_shared_container">Replacing the Shared Container<a class="headerlink" href="#replacing_the_shared_container" title="Permanent link">&para;</a></h4>
+<p>Watchtower replaces the shared container before it removes the containers that join it:</p>
+<ol>
+<li>It stops the other containers it recreates with the shared container, in reverse order. These are the containers placed between the shared container and a joining container that waits for them, such as one its links name. Each one's pre-update command runs right before it stops.</li>
+<li>It runs the shared container's pre-update command.</li>
+<li>It renames the shared container to <code>NAME-replaced-ID</code>, where <code>NAME</code> is its name and <code>ID</code> its short ID.</li>
+<li>It creates the replacement under the original name.</li>
+<li>It removes the containers that join the shared container, then the shared container itself. These removals run to their end even when the update is canceled, since Docker finishes a stop it has begun.</li>
+<li>It recreates the removed containers against the replacement.</li>
+</ol>
+<p>Without rolling restarts, the shared container is not replaced early when its own network mode, links or volumes-from name another container Watchtower recreates.
+In that case the joining containers are removed first and the replacement is created only after that other container's.</p>
+<p>With rolling restarts, a monitored container that joins the shared container is stopped only in its own turn, after the shared container is replaced.
+It has no network until then. On Podman the shared container cannot be removed while it runs, so its replacement is undone.</p>
+<h4 id="failures">Failures<a class="headerlink" href="#failures" title="Permanent link">&para;</a></h4>
+<p>If the replacement cannot be created before the joining containers are removed, the shared container takes its name back and those containers are left untouched.
+When the replacement is created only after they were removed, a failed create leaves the shared container and the joining containers removed. Watchtower reports each of them.</p>
+<p>A container stopped in step 1 that joins the network of another container in the group and cannot be stopped, such as one whose pre-update command skips it, keeps the shared container in place.
+Watchtower then renames nothing. It reports the shared container as failed and skips the containers of its group it did not reach.</p>
+<p>If a joining container cannot be stopped or the shared container cannot be removed, Watchtower removes the replacement and gives the shared container its name back.
+It starts the shared container again if it was running, then recreates the joining containers it already removed so they join it again.
+The joining container that could not be stopped keeps its place in the restored network and starts again if it was running, while those not reached yet are skipped.
+On Podman, a paused joining container cannot be stopped, so the shared container stays as it is.</p>
+<p>When the removal of the shared container fails but the daemon removed it anyway, its replacement counts as done.
+If Watchtower cannot tell whether it was removed, it keeps the replacement and reports the shared container as failed, since removing the replacement could leave neither container.</p>
+<p>Without rolling restarts, a container that joins another's network and is not stopped keeps the container it joins running too, so Watchtower reports that container as not updated.</p>
+<p>Watchtower reports a container it cannot recreate as "Could not reconnect container to the network of a recreated container" and lists it as failed, also when it does not monitor that container.
+A joining container that cannot be stopped keeps its network, so the shared container's failure reports it.</p>
 <h3 id="dependencies_on_unmonitored_containers">Dependencies on Unmonitored Containers<a class="headerlink" href="#dependencies_on_unmonitored_containers" title="Permanent link">&para;</a></h3>
-<p>A container that Watchtower does not monitor is left alone, including when a monitored container depends on it.
+<p>A container that Watchtower does not monitor is left alone, including when a monitored container depends on it, unless it joins the network of a container Watchtower recreates (see <a href="#containers_sharing_a_recreated_containers_network">Containers Sharing a Recreated Container's Network</a>).
 Containers are excluded from monitoring by the <a href="../../configuration/container-selection/">container selection</a> options, such as the enable label, the disable lists, image filters, and scopes.</p>
 <ul>
 <li>A dependency on an unmonitored container is ignored when ordering updates and restarting dependents.</li>
@@ -3895,7 +4100,7 @@ A recreated container or a restart of Watchtower reports the problem again.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 12, 2026 13:17:10 UTC"><span class="timeago" datetime="2026-11-12T13:17:10+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 12, 2026 13:17:10 UTC">2026-11-12</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 21, 2026 16:14:07 UTC"><span class="timeago" datetime="2026-11-21T16:14:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 21, 2026 16:14:07 UTC">2026-11-21</span>
   </span>
 
     
