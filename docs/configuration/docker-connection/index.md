@@ -125,10 +125,10 @@ Watchtower talks to Podman through its Docker-compatible API. It recreates a con
 | Umask (`--umask`) | It exists only in Podman's own API | The OCI runtime's default umask, normally `0022` |
 | A `k8s-file` log driver and its options, such as `max-size` | The API reports the driver as `json-file` and leaves out its options | `json-file` without those options, so the log size limit falls back to `log_size_max` in `containers.conf` (unlimited by default) |
 | Podman metadata, such as `CreateCommand` and the systemd notify mode | It is not part of the Docker API | Not set |
-| A static IP address set with `--ip` or `--ip6`, or with `ipv4_address` or `ipv6_address` in Compose | Podman does not report it | The next free address on the network |
+| A static IP address set with `--ip` or `--ip6`, or with `ipv4_address` or `ipv6_address` in Compose | Podman does not report it | A new address from the network, except that Podman 5.8 keeps the IPv4 address |
 
 To work around these losses:
 
 - Set the timezone through the `TZ` environment variable, which Watchtower keeps on recreation and which takes effect when the image or application reads it.
-- Reach a container by its name rather than its address. Podman's DNS resolves container names on user-defined networks.
-- Manage the container with a Podman Quadlet or systemd unit and let Podman's own auto-update restart it. Podman then recreates the container with every setting above.
+- Reach a container by its name rather than its address. Podman resolves container names only on bridge networks with DNS enabled. On a macvlan or ipvlan network, or a bridge network created with `--disable-dns`, manage the container as the next item describes so that it keeps its address.
+- Manage the container with a Podman Quadlet that sets `AutoUpdate=registry` and let `podman auto-update` update it. Podman then creates the container again from the unit, so the unit must set every setting above. A unit from `podman generate systemd` works the same way only when generated with `--new`, since without it the unit restarts the existing container instead of creating a new one.
