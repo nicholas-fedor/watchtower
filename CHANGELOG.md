@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Leave out the shm size for host and none IPC modes by @nicholas-fedor in [#4003](https://github.com/nicholas-fedor/watchtower/pull/4003)
 - Warn when revive-stopped is set without include-stopped by @nicholas-fedor in [#3998](https://github.com/nicholas-fedor/watchtower/pull/3998)
 - Recreate containers that join a recreated container's network by @nicholas-fedor in [#3991](https://github.com/nicholas-fedor/watchtower/pull/3991)
 - Leave ls-remote time when a Git API stalls by @nicholas-fedor in [#3978](https://github.com/nicholas-fedor/watchtower/pull/3978)
