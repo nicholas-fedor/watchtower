@@ -486,10 +486,30 @@ func TestEphemeralOrchestrator(t *testing.T) {
 				assert.Contains(t, config.Env, "WT_ORCHESTRATOR_ORIGINAL_NAME=watchtower-test")
 				assert.Contains(t, config.Env, "WT_ORCHESTRATOR_CONTAINER_CHAIN=old1,old2")
 				assert.Contains(t, config.Env, "WT_ORCHESTRATOR_CLEANUP=false")
+				assert.Contains(t, config.Env, "WT_ORCHESTRATOR_NETWORK_CONTAINER=")
 
 				// Verify the orchestrator label is set but the watchtower label is NOT set.
 				assert.Equal(t, "true", config.Labels[labels.EphemeralOrchestrator])
 				assert.NotContains(t, config.Labels, "com.centurylinklabs.watchtower")
+			})
+		})
+
+		t.Run("the source joins another container's network", func(t *testing.T) {
+			t.Parallel()
+
+			t.Run("should pass the network container's name", func(t *testing.T) {
+				t.Parallel()
+
+				source := modelfixture.Container(
+					containerfixture.WithID("abc123"),
+					containerfixture.WithName("watchtower"),
+					containerfixture.WithImageName("watchtower:latest"),
+					containerfixture.WithNetworkMode("container:vpn"),
+				)
+
+				config := buildOrchestratorConfig(source, "watchtower:v2", "", nil, false)
+
+				assert.Contains(t, config.Env, "WT_ORCHESTRATOR_NETWORK_CONTAINER=vpn")
 			})
 		})
 

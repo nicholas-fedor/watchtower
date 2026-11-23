@@ -3,6 +3,7 @@ package selfupdate
 import (
 	"errors"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,6 +67,26 @@ func createEphemeralHandoffContainer(
 	}
 
 	return ctr
+}
+
+// handoffEnv returns the orchestrator environment for replacing the
+// container with the given ID by one running watchtower:v2 under the name
+// watchtower, with no container chain, network container or image cleanup.
+//
+// Parameters:
+//   - oldID: The old container's ID.
+//
+// Returns:
+//   - orchestratorEnv: The environment the old instance would pass.
+func handoffEnv(oldID string) orchestratorEnv {
+	return orchestratorEnv{
+		oldID:            oldID,
+		newImage:         orchestratorNewImage,
+		originalName:     orchestratorOriginalName,
+		containerChain:   "",
+		networkContainer: "",
+		cleanup:          false,
+	}
 }
 
 // handoffCalls are the expected client calls of a self-update handoff, so a
@@ -147,8 +168,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		remove := expectHandoffFinish(client, old)
 		mock.InOrder(calls.stop, calls.rename, calls.start, remove)
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-id-ok", "watchtower:v2", "watchtower", "", false)
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, handoffEnv("wt-old-id-ok"))
 		require.NoError(t, err)
 	})
 
@@ -170,8 +190,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		expectHandoffFinish(client, old)
 		mock.InOrder(calls.stop, calls.start)
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-ports", "watchtower:v2", "watchtower", "", false)
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, handoffEnv("wt-old-ports"))
 		require.NoError(t, err)
 	})
 
@@ -187,8 +206,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).
 			Return(stopErr).Once()
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-stop-fail", "watchtower:v2", "watchtower", "", false)
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, handoffEnv("wt-old-stop-fail"))
 		require.Same(t, stopErr, err)
 	})
 
@@ -205,8 +223,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		restart := client.EXPECT().StartContainerByID(mock.Anything, old.ID()).Return(nil).Once()
 		mock.InOrder(calls.stop, calls.rename, calls.start, renameBack, restart)
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-create-fail", "watchtower:v2", "watchtower", "", false)
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, handoffEnv("wt-old-create-fail"))
 		require.Same(t, createErr, err)
 	})
 
@@ -223,9 +240,74 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		})
 		expectHandoffFinish(client, old)
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-pin", "watchtower:v2", "watchtower", "", false)
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, handoffEnv("wt-old-pin"))
 		require.NoError(t, err)
+	})
+
+	// Docker stores a network container by the ID it had when the old
+	// container was created. A network container recreated in the same
+	// session has a new ID, so the replacement joins it by the name the old
+	// instance passed. A network container that still exists is inspected
+	// under its own name and stays as it is.
+	t.Run("creates the replacement against the network container's name", func(t *testing.T) {
+		t.Parallel()
+
+		staleID := "container:" + strings.Repeat("ab", 32)
+
+		tests := []struct {
+			name             string
+			networkMode      string
+			networkContainer string
+			want             string
+		}{
+			{
+				name:             "stale ID replaced by the passed name",
+				networkMode:      staleID,
+				networkContainer: "vpn",
+				want:             "container:vpn",
+			},
+			{
+				name:             "existing network container kept",
+				networkMode:      "container:vpn-old",
+				networkContainer: "vpn",
+				want:             "container:vpn-old",
+			},
+			{
+				name:        "no name passed by an older instance",
+				networkMode: staleID,
+				want:        staleID,
+			},
+			{
+				name:             "own network left as it is",
+				networkMode:      "bridge",
+				networkContainer: "vpn",
+				want:             "bridge",
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				old := createEphemeralHandoffContainer("wt-old-network", nil)
+				old.ContainerInfo().HostConfig.NetworkMode = dockerContainer.NetworkMode(tt.networkMode)
+
+				client := mockSelfupdate.NewMockHandoffClient(t)
+				calls := expectHandoffStart(client, old, nil)
+				calls.start.Run(func(args mock.Arguments) {
+					created, ok := args.Get(1).(*container.Container)
+					require.True(t, ok)
+					assert.Equal(t, tt.want, string(created.GetCreateHostConfig().NetworkMode))
+				})
+				expectHandoffFinish(client, old)
+
+				env := handoffEnv("wt-old-network")
+				env.networkContainer = tt.networkContainer
+
+				err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, env)
+				require.NoError(t, err)
+			})
+		}
 	})
 
 	t.Run("propagates the container chain label onto the source config used for create", func(t *testing.T) {
@@ -246,8 +328,10 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		})
 		expectHandoffFinish(client, old)
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-chain", "watchtower:v2", "watchtower", chain, false)
+		env := handoffEnv("wt-old-chain")
+		env.containerChain = chain
+
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, env)
 		require.NoError(t, err)
 	})
 
@@ -259,8 +343,10 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		expectHandoff(client, old)
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").Return(nil).Once()
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-cleanup", "watchtower:v2", "watchtower", "", true)
+		env := handoffEnv("wt-old-cleanup")
+		env.cleanup = true
+
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, env)
 		require.NoError(t, err)
 	})
 
@@ -272,8 +358,7 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client := mockSelfupdate.NewMockHandoffClient(t)
 		expectHandoff(client, old)
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-no-cleanup", "watchtower:v2", "watchtower", "", false)
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, handoffEnv("wt-old-no-cleanup"))
 		require.NoError(t, err)
 	})
 
@@ -286,8 +371,10 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").
 			Return(containerImage.ErrImageInUse).Once()
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-in-use", "watchtower:v2", "watchtower", "", true)
+		env := handoffEnv("wt-old-in-use")
+		env.cleanup = true
+
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, env)
 		require.NoError(t, err)
 	})
 
@@ -300,8 +387,10 @@ func Test_orchestrateSelfUpdate(t *testing.T) {
 		client.EXPECT().RemoveImageByID(mock.Anything, old.ImageID(), "watchtower:v1").
 			Return(cerrdefs.ErrNotFound).Once()
 
-		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client,
-			"wt-old-missing-image", "watchtower:v2", "watchtower", "", true)
+		env := handoffEnv("wt-old-missing-image")
+		env.cleanup = true
+
+		err := orchestrateSelfUpdate(newTestLogger(t), t.Context(), client, env)
 		require.NoError(t, err)
 	})
 }
