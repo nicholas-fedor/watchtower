@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update google.golang.org/genproto/googleapis/api digest to 1e707ab by @renovate[bot] in [#4009](https://github.com/nicholas-fedor/watchtower/pull/4009)
 - Update module github.com/valyala/fasthttp to v1.80.0 by @renovate[bot] in [#4001](https://github.com/nicholas-fedor/watchtower/pull/4001)
 - Update golang.org/x/exp digest to e1094ee by @renovate[bot] in [#3997](https://github.com/nicholas-fedor/watchtower/pull/3997)
 - Update module go.opentelemetry.io/auto/sdk to v1.2.2 by @renovate[bot] in [#3993](https://github.com/nicholas-fedor/watchtower/pull/3993)
