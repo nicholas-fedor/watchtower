@@ -83,15 +83,16 @@ func orchestratorCalls(client *mockSelfupdate.MockHandoffClient) []string {
 }
 
 // TestReadOrchestratorEnv verifies how the orchestrator reads its settings
-// from the environment, and that it rejects an old container ID or cleanup
-// value that Watchtower would never write.
+// from the environment, and that it rejects an old container ID, network
+// container or cleanup value that Watchtower would never write.
 func TestReadOrchestratorEnv(t *testing.T) {
 	complete := map[string]string{
-		"WT_ORCHESTRATOR_OLD_ID":          orchestratorOldID,
-		"WT_ORCHESTRATOR_NEW_IMAGE":       orchestratorNewImage,
-		"WT_ORCHESTRATOR_ORIGINAL_NAME":   orchestratorOriginalName,
-		"WT_ORCHESTRATOR_CONTAINER_CHAIN": "chain-a,chain-b",
-		"WT_ORCHESTRATOR_CLEANUP":         "true",
+		"WT_ORCHESTRATOR_OLD_ID":            orchestratorOldID,
+		"WT_ORCHESTRATOR_NEW_IMAGE":         orchestratorNewImage,
+		"WT_ORCHESTRATOR_ORIGINAL_NAME":     orchestratorOriginalName,
+		"WT_ORCHESTRATOR_CONTAINER_CHAIN":   "chain-a,chain-b",
+		"WT_ORCHESTRATOR_CLEANUP":           "true",
+		"WT_ORCHESTRATOR_NETWORK_CONTAINER": "vpn",
 	}
 
 	tests := []struct {
@@ -103,13 +104,44 @@ func TestReadOrchestratorEnv(t *testing.T) {
 		wantVar     string
 		wantOldID   string
 		wantChain   string
+		wantNetwork string
 		wantCleanup bool
 	}{
 		{
 			name:        "all variables set",
 			wantOldID:   orchestratorOldID,
 			wantChain:   "chain-a,chain-b",
+			wantNetwork: "vpn",
 			wantCleanup: true,
+		},
+		{
+			name:        "network container is optional",
+			override:    map[string]string{"WT_ORCHESTRATOR_NETWORK_CONTAINER": ""},
+			wantOldID:   orchestratorOldID,
+			wantChain:   "chain-a,chain-b",
+			wantCleanup: true,
+		},
+		{
+			name:        "single-character Podman name",
+			override:    map[string]string{"WT_ORCHESTRATOR_NETWORK_CONTAINER": "v"},
+			wantOldID:   orchestratorOldID,
+			wantChain:   "chain-a,chain-b",
+			wantNetwork: "v",
+			wantCleanup: true,
+		},
+		{
+			name:        "network container ID",
+			override:    map[string]string{"WT_ORCHESTRATOR_NETWORK_CONTAINER": orchestratorOldID},
+			wantOldID:   orchestratorOldID,
+			wantChain:   "chain-a,chain-b",
+			wantNetwork: orchestratorOldID,
+			wantCleanup: true,
+		},
+		{
+			name:     "network container is not a container name",
+			override: map[string]string{"WT_ORCHESTRATOR_NETWORK_CONTAINER": "vpn;rm -rf /"},
+			wantErr:  errOrchestratorInvalidEnv,
+			wantVar:  "WT_ORCHESTRATOR_NETWORK_CONTAINER",
 		},
 		{
 			name:     "old ID missing",
@@ -133,13 +165,15 @@ func TestReadOrchestratorEnv(t *testing.T) {
 			name:        "container chain is optional",
 			override:    map[string]string{"WT_ORCHESTRATOR_CONTAINER_CHAIN": ""},
 			wantOldID:   orchestratorOldID,
+			wantNetwork: "vpn",
 			wantCleanup: true,
 		},
 		{
-			name:      "empty cleanup value reads as false",
-			override:  map[string]string{"WT_ORCHESTRATOR_CLEANUP": ""},
-			wantOldID: orchestratorOldID,
-			wantChain: "chain-a,chain-b",
+			name:        "empty cleanup value reads as false",
+			override:    map[string]string{"WT_ORCHESTRATOR_CLEANUP": ""},
+			wantOldID:   orchestratorOldID,
+			wantChain:   "chain-a,chain-b",
+			wantNetwork: "vpn",
 		},
 		{
 			name:     "malformed cleanup value",
@@ -177,7 +211,7 @@ func TestReadOrchestratorEnv(t *testing.T) {
 				t.Setenv(key, value)
 			}
 
-			oldID, newImage, originalName, chain, cleanup, err := readOrchestratorEnv()
+			env, err := readOrchestratorEnv()
 			if tt.wantErr != nil {
 				require.ErrorIs(t, err, tt.wantErr)
 				assert.Contains(t, err.Error(), tt.wantVar)
@@ -186,11 +220,14 @@ func TestReadOrchestratorEnv(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.Equal(t, tt.wantOldID, oldID)
-			assert.Equal(t, orchestratorNewImage, newImage)
-			assert.Equal(t, orchestratorOriginalName, originalName)
-			assert.Equal(t, tt.wantChain, chain)
-			assert.Equal(t, tt.wantCleanup, cleanup)
+			assert.Equal(t, orchestratorEnv{
+				oldID:            tt.wantOldID,
+				newImage:         orchestratorNewImage,
+				originalName:     orchestratorOriginalName,
+				containerChain:   tt.wantChain,
+				networkContainer: tt.wantNetwork,
+				cleanup:          tt.wantCleanup,
+			}, env)
 		})
 	}
 }
@@ -545,8 +582,12 @@ func TestOrchestrateSelfUpdate_Handoff(t *testing.T) {
 
 			log, logBuf := logcapture.NewJSON(zerolog.DebugLevel)
 
-			err := orchestrateSelfUpdate(log, t.Context(), client,
-				orchestratorOldID, orchestratorNewImage, originalName, "", tt.cleanup)
+			env := handoffEnv(orchestratorOldID)
+			env.originalName = originalName
+			env.cleanup = tt.cleanup
+
+			err := orchestrateSelfUpdate(log, t.Context(), client, env)
+
 			switch {
 			case tt.wantErr == nil:
 				require.NoError(t, err)
@@ -642,8 +683,7 @@ func TestOrchestrateSelfUpdate_StopSignal(t *testing.T) {
 			client := mockSelfupdate.NewMockHandoffClient(t)
 			tt.setup(t, client, old, cancel)
 
-			err := orchestrateSelfUpdate(newTestLogger(t), ctx, client,
-				orchestratorOldID, orchestratorNewImage, orchestratorOriginalName, "", false)
+			err := orchestrateSelfUpdate(newTestLogger(t), ctx, client, handoffEnv(orchestratorOldID))
 			require.ErrorIs(t, err, context.Canceled)
 
 			assert.Equal(t, tt.wantCalls, orchestratorCalls(client))
@@ -765,8 +805,7 @@ func TestOrchestrateSelfUpdate_RecoveryAfterDeadline(t *testing.T) {
 				client := mockSelfupdate.NewMockHandoffClient(t)
 				tt.setup(client, old)
 
-				err := orchestrateSelfUpdate(newTestLogger(t), ctx, client,
-					orchestratorOldID, orchestratorNewImage, orchestratorOriginalName, "", false)
+				err := orchestrateSelfUpdate(newTestLogger(t), ctx, client, handoffEnv(orchestratorOldID))
 				require.ErrorIs(t, err, context.DeadlineExceeded)
 			})
 		})

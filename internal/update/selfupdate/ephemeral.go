@@ -14,6 +14,7 @@ import (
 	cerrdefs "github.com/containerd/errdefs"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/ephemeral"
 	containerImage "github.com/nicholas-fedor/watchtower/internal/container/image"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
@@ -51,6 +52,25 @@ type HandoffClient interface {
 	RemoveImageByID(ctx context.Context, imageID container.ImageID, imageName string) error
 }
 
+// orchestratorEnv holds what the old Watchtower passes to its orchestrator
+// through the environment.
+type orchestratorEnv struct {
+	// oldID is the old container's full ID.
+	oldID string
+	// newImage is the image reference the replacement is created from.
+	newImage string
+	// originalName is the name the replacement takes over.
+	originalName string
+	// containerChain is the container chain label for lineage tracking.
+	containerChain string
+	// networkContainer is the name or ID of the container whose network
+	// namespace the old container joins, empty when it has a network of its
+	// own.
+	networkContainer string
+	// cleanup reports whether the old image is removed after the handoff.
+	cleanup bool
+}
+
 // orchestratorTimeout defines the maximum duration for the orchestrator to complete.
 // This covers: inspect old, stop old, create new, start new, remove old.
 const orchestratorTimeout = 5 * time.Minute
@@ -86,9 +106,17 @@ var (
 	errNewContainerNotRunning = errors.New("new container is not running after start")
 )
 
-// fullContainerIDPattern matches a full container ID, the form the old
-// instance writes to WT_ORCHESTRATOR_OLD_ID.
-var fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+// Patterns for the container references the orchestrator reads.
+var (
+	// fullContainerIDPattern matches a full container ID, the form the old
+	// instance writes for its own ID and the form Docker stores for a network
+	// container.
+	fullContainerIDPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
+	// containerNamePattern matches a container name without its leading
+	// slash. It follows Podman's rule, which also accepts the single-character
+	// names Docker rejects. A full container ID matches too.
+	containerNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
+)
 
 // StartOrchestrator performs a self-update using an ephemeral orchestrator container.
 //
@@ -230,7 +258,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 	clog.Debug().Msg("Starting Watchtower self-update orchestrator")
 
 	// Read environment variables.
-	oldID, newImage, originalName, containerChain, cleanup, err := readOrchestratorEnv()
+	env, err := readOrchestratorEnv()
 	if err != nil {
 		clog.Error().
 			Err(err).
@@ -240,11 +268,12 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 	}
 
 	clog.Debug().
-		Str("old_id", oldID).
-		Str("new_image", newImage).
-		Str("original_name", originalName).
-		Str("container_chain", containerChain).
-		Bool("cleanup", cleanup).
+		Str("old_id", env.oldID).
+		Str("new_image", env.newImage).
+		Str("original_name", env.originalName).
+		Str("container_chain", env.containerChain).
+		Str("network_container", env.networkContainer).
+		Bool("cleanup", env.cleanup).
 		Msg("Read orchestrator environment variables")
 
 	// Create a timeout context for the entire orchestration.
@@ -255,15 +284,7 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 	defer orchCancel()
 
 	// Execute the orchestration sequence.
-	err = orchestrateSelfUpdate(clog,
-		orchCtx,
-		client,
-		oldID,
-		newImage,
-		originalName,
-		containerChain,
-		cleanup,
-	)
+	err = orchestrateSelfUpdate(clog, orchCtx, client, env)
 	if err != nil {
 		// The steps log their failures at debug. This line reports the failure,
 		// unless a stop signal ended the handoff on purpose. The handoff's own
@@ -275,9 +296,9 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 
 		clog.WithLevel(level).
 			Err(err).
-			Str("old_id", oldID).
-			Str("new_image", newImage).
-			Str("original_name", originalName).
+			Str("old_id", env.oldID).
+			Str("new_image", env.newImage).
+			Str("original_name", env.originalName).
 			Msg(msg)
 
 		return err
@@ -291,65 +312,68 @@ func RunOrchestrator(log *zerolog.Logger, ctx context.Context, client HandoffCli
 // readOrchestratorEnv reads and validates the environment variables required
 // by the orchestrator.
 //
+// The container chain and the network container are optional. An empty
+// cleanup value means false.
+//
 // Returns:
-//   - string: Old container ID.
-//   - string: New image reference.
-//   - string: Original container name.
-//   - string: Container chain for lineage tracking.
-//   - bool: Whether old-image cleanup is enabled. An empty value means false.
-//   - error: Non-nil if a required variable is missing, the old ID is not a full
-//     container ID, or the cleanup value is not a boolean.
-func readOrchestratorEnv() (string, string, string, string, bool, error) {
-	oldID := os.Getenv("WT_ORCHESTRATOR_OLD_ID")
+//   - orchestratorEnv: The values the old instance passed.
+//   - error: Non-nil if a required variable is missing, the old ID is not a
+//     full container ID, the network container is not a container name or ID,
+//     or the cleanup value is not a boolean.
+func readOrchestratorEnv() (orchestratorEnv, error) {
+	oldID := os.Getenv(ephemeral.OrchestratorOldIDEnv)
 	if oldID == "" {
-		return "", "", "", "", false, fmt.Errorf(
-			"%w: WT_ORCHESTRATOR_OLD_ID",
-			errOrchestratorMissingEnv,
-		)
+		return orchestratorEnv{}, fmt.Errorf("%w: %s", errOrchestratorMissingEnv, ephemeral.OrchestratorOldIDEnv)
 	}
 
 	if !fullContainerIDPattern.MatchString(oldID) {
-		return "", "", "", "", false, fmt.Errorf(
-			"%w: WT_ORCHESTRATOR_OLD_ID %q is not a full container ID",
+		return orchestratorEnv{}, fmt.Errorf(
+			"%w: %s %q is not a full container ID",
 			errOrchestratorInvalidEnv,
+			ephemeral.OrchestratorOldIDEnv,
 			oldID,
 		)
 	}
 
-	newImage := os.Getenv("WT_ORCHESTRATOR_NEW_IMAGE")
+	newImage := os.Getenv(ephemeral.OrchestratorNewImageEnv)
 	if newImage == "" {
-		return "", "", "", "", false, fmt.Errorf(
-			"%w: WT_ORCHESTRATOR_NEW_IMAGE",
-			errOrchestratorMissingEnv,
-		)
+		return orchestratorEnv{}, fmt.Errorf("%w: %s", errOrchestratorMissingEnv, ephemeral.OrchestratorNewImageEnv)
 	}
 
-	originalName := os.Getenv("WT_ORCHESTRATOR_ORIGINAL_NAME")
+	originalName := os.Getenv(ephemeral.OrchestratorOriginalNameEnv)
 	if originalName == "" {
-		return "", "", "", "", false, fmt.Errorf(
-			"%w: WT_ORCHESTRATOR_ORIGINAL_NAME",
-			errOrchestratorMissingEnv,
-		)
+		return orchestratorEnv{}, fmt.Errorf("%w: %s", errOrchestratorMissingEnv, ephemeral.OrchestratorOriginalNameEnv)
 	}
 
-	containerChain := os.Getenv("WT_ORCHESTRATOR_CONTAINER_CHAIN")
+	networkContainer := os.Getenv(ephemeral.OrchestratorNetworkContainerEnv)
+	if networkContainer != "" && !containerNamePattern.MatchString(networkContainer) {
+		return orchestratorEnv{}, fmt.Errorf(
+			"%w: %s %q is not a container name or ID",
+			errOrchestratorInvalidEnv,
+			ephemeral.OrchestratorNetworkContainerEnv,
+			networkContainer,
+		)
+	}
 
 	cleanup := false
 
-	if rawCleanup := os.Getenv("WT_ORCHESTRATOR_CLEANUP"); rawCleanup != "" {
+	if rawCleanup := os.Getenv(ephemeral.OrchestratorCleanupEnv); rawCleanup != "" {
 		parsed, err := strconv.ParseBool(rawCleanup)
 		if err != nil {
-			return "", "", "", "", false, fmt.Errorf(
-				"%w: WT_ORCHESTRATOR_CLEANUP: %w",
-				errOrchestratorInvalidEnv,
-				err,
-			)
+			return orchestratorEnv{}, fmt.Errorf("%w: %s: %w", errOrchestratorInvalidEnv, ephemeral.OrchestratorCleanupEnv, err)
 		}
 
 		cleanup = parsed
 	}
 
-	return oldID, newImage, originalName, containerChain, cleanup, nil
+	return orchestratorEnv{
+		oldID:            oldID,
+		newImage:         newImage,
+		originalName:     originalName,
+		containerChain:   os.Getenv(ephemeral.OrchestratorContainerChainEnv),
+		networkContainer: networkContainer,
+		cleanup:          cleanup,
+	}, nil
 }
 
 // orchestrateSelfUpdate performs the container replacement sequence for a
@@ -357,7 +381,8 @@ func readOrchestratorEnv() (string, string, string, string, bool, error) {
 //
 // Sequence:
 //  1. Inspect the old container and propagate the chain label.
-//  2. Pin Config.Image to newImage for create.
+//  2. Pin Config.Image to newImage for create and point the replacement at
+//     the network container by name when its ID names a removed container.
 //  3. Stop the old container (frees host ports).
 //  4. Rename the stopped old container off the original name.
 //  5. Create and start the new container under the original name.
@@ -373,26 +398,18 @@ func readOrchestratorEnv() (string, string, string, string, bool, error) {
 // Parameters:
 //   - ctx: Context for cancellation and timeouts.
 //   - client: Container client for Docker operations.
-//   - oldID: ID of the old Watchtower container to replace.
-//   - newImage: Image reference for the new container.
-//   - originalName: Original container name to preserve on the new container.
-//   - containerChain: Container chain label for lineage tracking.
-//   - cleanup: Remove the old image after the predecessor container is gone.
+//   - env: The values the old instance passed.
 //
 // Returns:
 //   - error: Non-nil if any step in the orchestration fails.
 func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	client HandoffClient,
-	oldID string,
-	newImage string,
-	originalName string,
-	containerChain string,
-	cleanup bool,
+	env orchestratorEnv,
 ) error {
 	clogVal := log.With().
-		Str("old_id", oldID).
-		Str("new_image", newImage).
-		Str("original_name", originalName).
+		Str("old_id", env.oldID).
+		Str("new_image", env.newImage).
+		Str("original_name", env.originalName).
 		Logger()
 	clog := &clogVal
 
@@ -400,8 +417,8 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 		ctx,
 		client,
 		clog,
-		oldID,
-		containerChain,
+		env.oldID,
+		env.containerChain,
 	)
 	if err != nil {
 		return err
@@ -411,7 +428,15 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	oldImageID := oldContainer.ImageID()
 	oldImageName := oldContainer.ImageName()
 
-	pinContainerCreateImage(oldContainer, newImage, clog)
+	pinContainerCreateImage(oldContainer, env.newImage, clog)
+
+	// Inspecting the old container replaces the network container's ID with
+	// its name when that container still exists, and the replacement joins
+	// it. A full ID left in place names a removed container, so the
+	// replacement joins the container the old instance named.
+	if env.networkContainer != "" && fullContainerIDPattern.MatchString(oldContainer.NetworkContainer()) {
+		oldContainer.SetNetworkContainer(env.networkContainer)
+	}
 
 	// Free host ports before create. Keep the container so rename can preserve
 	// it for recovery if the replacement fails.
@@ -444,7 +469,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 		// Recover any existing predecessor, including one already renamed to
 		// watchtower-old-* from an earlier attempt (renamed may be false).
 		if !oldGone {
-			restoreAndStartOldContainer(ctx, client, clog, oldContainer, originalName)
+			restoreAndStartOldContainer(ctx, client, clog, oldContainer, env.originalName)
 		}
 
 		return err
@@ -458,7 +483,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 			updateParams.Params{Timeout: orchestratorStopTimeout})
 
 		if !oldGone {
-			restoreAndStartOldContainer(ctx, client, clog, oldContainer, originalName)
+			restoreAndStartOldContainer(ctx, client, clog, oldContainer, env.originalName)
 		}
 
 		return err
@@ -473,7 +498,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 		}
 	}
 
-	if cleanup {
+	if env.cleanup {
 		removeOldImage(ctx, client, clog, oldImageID, oldImageName)
 	}
 

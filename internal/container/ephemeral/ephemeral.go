@@ -22,22 +22,30 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 )
 
-// Environment variable keys used by the ephemeral orchestrator.
+// Environment variable keys the old Watchtower passes to its orchestrator.
+// The orchestrator reads them through these constants, so both sides of the
+// handoff share one spelling.
 const (
-	// orchestratorOldIDEnv is the environment variable key for the old container ID.
-	orchestratorOldIDEnv = "WT_ORCHESTRATOR_OLD_ID"
-	// orchestratorNewImageEnv is the environment variable key for the new image reference.
-	// The orchestrator pins the replacement's create config to this image.
-	orchestratorNewImageEnv = "WT_ORCHESTRATOR_NEW_IMAGE"
-	// orchestratorOriginalNameEnv is the environment variable key for the original container name.
-	orchestratorOriginalNameEnv = "WT_ORCHESTRATOR_ORIGINAL_NAME"
-	// orchestratorContainerChainEnv is the environment variable key for the container chain label.
-	orchestratorContainerChainEnv = "WT_ORCHESTRATOR_CONTAINER_CHAIN"
-	// orchestratorCleanupEnv is the environment variable key for old-image cleanup.
-	orchestratorCleanupEnv = "WT_ORCHESTRATOR_CLEANUP"
-	// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
-	orchestratorCleanupTimeout = 5 * time.Second
+	// OrchestratorOldIDEnv holds the old container's full ID.
+	OrchestratorOldIDEnv = "WT_ORCHESTRATOR_OLD_ID"
+	// OrchestratorNewImageEnv holds the image reference the replacement is
+	// created from.
+	OrchestratorNewImageEnv = "WT_ORCHESTRATOR_NEW_IMAGE"
+	// OrchestratorOriginalNameEnv holds the name the replacement takes over.
+	OrchestratorOriginalNameEnv = "WT_ORCHESTRATOR_ORIGINAL_NAME"
+	// OrchestratorContainerChainEnv holds the container chain label.
+	OrchestratorContainerChainEnv = "WT_ORCHESTRATOR_CONTAINER_CHAIN"
+	// OrchestratorCleanupEnv holds whether the old image is removed after the
+	// handoff.
+	OrchestratorCleanupEnv = "WT_ORCHESTRATOR_CLEANUP"
+	// OrchestratorNetworkContainerEnv holds the name or ID of the container
+	// whose network namespace the old container joins, empty when it has a
+	// network of its own.
+	OrchestratorNetworkContainerEnv = "WT_ORCHESTRATOR_NETWORK_CONTAINER"
 )
+
+// orchestratorCleanupTimeout is the timeout for cleanup operations on failed orchestrator creation.
+const orchestratorCleanupTimeout = 5 * time.Second
 
 // Docker connection environment variable keys.
 const (
@@ -342,11 +350,12 @@ func buildOrchestratorConfig(
 ) *dockerContainer.Config {
 	// Build the environment variables with orchestrator-specific values.
 	env := []string{
-		fmt.Sprintf("%s=%s", orchestratorOldIDEnv, sourceContainer.ID()),
-		fmt.Sprintf("%s=%s", orchestratorNewImageEnv, newImage),
-		fmt.Sprintf("%s=%s", orchestratorOriginalNameEnv, sourceContainer.Name()),
-		fmt.Sprintf("%s=%s", orchestratorContainerChainEnv, containerChain),
-		fmt.Sprintf("%s=%t", orchestratorCleanupEnv, cleanup),
+		fmt.Sprintf("%s=%s", OrchestratorOldIDEnv, sourceContainer.ID()),
+		fmt.Sprintf("%s=%s", OrchestratorNewImageEnv, newImage),
+		fmt.Sprintf("%s=%s", OrchestratorOriginalNameEnv, sourceContainer.Name()),
+		fmt.Sprintf("%s=%s", OrchestratorContainerChainEnv, containerChain),
+		fmt.Sprintf("%s=%t", OrchestratorCleanupEnv, cleanup),
+		fmt.Sprintf("%s=%s", OrchestratorNetworkContainerEnv, sourceContainer.NetworkContainer()),
 	}
 
 	// Forward Docker connection environment variables to maintain parity with the source.

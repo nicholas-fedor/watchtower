@@ -24,6 +24,7 @@ import (
 	mockCmd "github.com/nicholas-fedor/watchtower/cmd/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
+	"github.com/nicholas-fedor/watchtower/internal/container/ephemeral"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
 	"github.com/nicholas-fedor/watchtower/internal/settings"
 	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
@@ -1088,11 +1089,12 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 	}
 
 	for _, key := range []string{
-		"WT_ORCHESTRATOR_OLD_ID",
-		"WT_ORCHESTRATOR_NEW_IMAGE",
-		"WT_ORCHESTRATOR_ORIGINAL_NAME",
-		"WT_ORCHESTRATOR_CONTAINER_CHAIN",
-		"WT_ORCHESTRATOR_CLEANUP",
+		ephemeral.OrchestratorOldIDEnv,
+		ephemeral.OrchestratorNewImageEnv,
+		ephemeral.OrchestratorOriginalNameEnv,
+		ephemeral.OrchestratorContainerChainEnv,
+		ephemeral.OrchestratorCleanupEnv,
+		ephemeral.OrchestratorNetworkContainerEnv,
 	} {
 		t.Setenv(key, "")
 	}
