@@ -130,5 +130,5 @@ Watchtower talks to Podman through its Docker-compatible API. It recreates a con
 To work around these losses:
 
 - Set the timezone through the `TZ` environment variable, which Watchtower keeps on recreation and which takes effect when the image or application reads it.
-- Reach a container by its name rather than its address. Podman resolves container names only on bridge networks with DNS enabled. On a macvlan or ipvlan network, or a bridge network created with `--disable-dns`, manage the container as the next item describes so that it keeps its address.
-- Manage the container with a Podman Quadlet that sets `AutoUpdate=registry` and let `podman auto-update` update it. Podman then creates the container again from the unit, so the unit must set every setting above. A unit from `podman generate systemd` works the same way only when generated with `--new`, since without it the unit restarts the existing container instead of creating a new one.
+- Let other containers reach the container by its name, which Podman resolves for containers on the same bridge network unless the network was created with `--disable-dns`. Clients outside that network can use a published port.
+- Manage the container with a Podman Quadlet that sets `AutoUpdate=registry` and the `com.centurylinklabs.watchtower.enable=false` label, so that `podman auto-update` updates it instead of Watchtower. Podman recreates the container from the unit, which keeps every setting above.
