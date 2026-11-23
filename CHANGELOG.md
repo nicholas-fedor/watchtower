@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- Note that recreated containers lose their static ip by @nicholas-fedor in [#4005](https://github.com/nicholas-fedor/watchtower/pull/4005)
 - Limit Git credentials to HTTPS and SSH remotes by @nicholas-fedor in [#3945](https://github.com/nicholas-fedor/watchtower/pull/3945)
 
 ### Tests
