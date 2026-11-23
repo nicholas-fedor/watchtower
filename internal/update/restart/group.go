@@ -233,7 +233,7 @@ func stopNetworkGroup(
 		// update is canceled. The stop bounds itself, and this bound covers
 		// the steps before it, such as the copy-file snapshot.
 		prepareCtx, cancelPrepare := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
-		err = stopOne(log, prepareCtx, member, client, config, failed, stopped)
+		err = stopOne(log, prepareCtx, group, member, client, config, failed, stopped)
 
 		cancelPrepare()
 
@@ -413,7 +413,7 @@ func stopMembers(
 			return false
 		}
 
-		err := stopOne(log, ctx, member, client, config, failed, stopped)
+		err := stopOne(log, ctx, group, member, client, config, failed, stopped)
 		if holdsMember(group, member, err) {
 			heldBy(group, member, err, failed, stopped)
 			startAgain(ctx, member, client, config, failed, err)
@@ -458,9 +458,16 @@ func skipCanceled(
 // stopOne stops a single container, without the rest of its group, and
 // records the outcome.
 //
+// A running container whose stop fails is started again, since nothing
+// recreates it. Starting one that still runs does nothing. A container that
+// joins another container of its group is left for the group to start, since
+// the group first decides whether the namespace it joins stays.
+//
 // Parameters:
 //   - log: Session logger.
 //   - ctx: Context for cancellation and timeouts.
+//   - group: The containers stopped together with this one. When it joins one
+//     of them, the group decides when it starts again.
 //   - c: Container to stop.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying stop timeout and other behaviors.
@@ -472,6 +479,7 @@ func skipCanceled(
 func stopOne(
 	log *zerolog.Logger,
 	ctx context.Context,
+	group []*container.Container,
 	c *container.Container,
 	client Client,
 	config updateParams.Params,
@@ -482,7 +490,13 @@ func stopOne(
 	if err != nil {
 		failed[c.ID()] = err
 
-		return err
+		// A skipped or missing container is left as it is, and a member that
+		// joins another member is started by its group.
+		if !isSkip(err) && !holdsMember(group, c, err) {
+			startAgain(ctx, c, client, config, failed, err)
+		}
+
+		return failed[c.ID()]
 	}
 
 	if stoppedNow {
@@ -621,7 +635,8 @@ func splitReaching(group []*container.Container) (reaching, others []*container.
 	return reaching, others
 }
 
-// startAgain starts a container whose stop failed when it was running.
+// startAgain starts a container whose stop or removal failed when it was
+// running.
 //
 // It may have stopped before its removal failed. Starting one that still runs
 // does nothing. A container that was paused is inspected again, since Docker
@@ -632,12 +647,13 @@ func splitReaching(group []*container.Container) (reaching, others []*container.
 //
 // Parameters:
 //   - ctx: The update's context.
-//   - c: The container that could not be stopped.
+//   - c: The container whose stop or removal failed.
 //   - client: Container client for Docker operations.
 //   - config: Update options holding the stop timeout.
 //   - failed: Receives c's stop error joined with the start's when the start
 //     fails.
-//   - cause: The error that kept c from being stopped.
+//   - cause: The error that kept the container from being stopped and
+//     removed.
 func startAgain(
 	ctx context.Context,
 	c *container.Container,

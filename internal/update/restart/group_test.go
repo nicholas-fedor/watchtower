@@ -523,8 +523,8 @@ func TestStopContainersInReversedOrder_networkGroupPausedJoiner(t *testing.T) {
 // removed when that rebound container was placed after another container it
 // waits for. The container in between stops first, before the container's
 // own pre-update command, as it would without the replacement. Its failure to
-// stop does not keep the container in place, since it does not join the
-// namespace.
+// stop does not keep the container in place because it does not join the
+// namespace. It starts again at once, since nothing recreates it.
 func TestStopContainersInReversedOrder_networkGroupWithWaitingJoiner(t *testing.T) {
 	t.Parallel()
 
@@ -551,6 +551,7 @@ func TestStopContainersInReversedOrder_networkGroupWithWaitingJoiner(t *testing.
 	client.EXPECT().DiscardCopyFiles(db.ID()).Return().Once()
 	mock.InOrder(
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, db, mock.Anything).Return(stopErr).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, db.ID()).Return(nil).Once(),
 		client.EXPECT().SnapshotCopyFiles(mock.Anything, vpn).Return(nil).Once(),
 		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
 		client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
@@ -761,7 +762,8 @@ func TestStopContainersInReversedOrder_networkGroupCanceled(t *testing.T) {
 // stays running when a container that joins its network namespace could not
 // be stopped. A pre-update command that skips the joining container keeps it
 // running in that namespace, so the container it joins fails instead of
-// being removed. Containers that join nothing still stop.
+// being removed. The joining container starts again at once, since the
+// container it joins stays. Containers that join nothing still stop.
 func TestStopContainersInReversedOrder_heldByJoiner(t *testing.T) {
 	t.Parallel()
 
@@ -795,6 +797,7 @@ func TestStopContainersInReversedOrder_heldByJoiner(t *testing.T) {
 	client.EXPECT().DiscardCopyFiles(app.ID()).Return().Once()
 	mock.InOrder(
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(stopErr).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, app.ID()).Return(nil).Once(),
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, db, mock.Anything).Return(nil).Once(),
 	)
 
@@ -842,6 +845,116 @@ func TestRun_networkGroup(t *testing.T) {
 			err := Run(newTestLogger(t), t.Context(), group, client,
 				updateParams.Params{RollingRestart: rolling}, &[]cleanup.RemovedImageInfo{}, &state.Progress{})
 			require.NoError(t, err)
+		})
+	}
+}
+
+// TestStopOne_failedRemoval verifies that a running container whose stop or
+// removal fails is started again, since nothing recreates it. It covers the
+// containers that are not started:
+//   - a container that was not running
+//   - a container that no longer exists
+//   - a container that joins another member of its group, which the group
+//     starts itself
+//
+// The strict mock fails on any start the case does not expect.
+func TestStopOne_failedRemoval(t *testing.T) {
+	t.Parallel()
+
+	errRemove := errors.New("failed to remove container: device or resource busy")
+	errStart := errors.New("failed to start container")
+
+	vpn := modelfixture.Container(containerfixture.WithName("/vpn"), containerfixture.WithID("vpn-id"))
+
+	tests := []struct {
+		name     string
+		running  bool
+		joins    bool
+		stopErr  error
+		startErr error
+		starts   bool
+		wantErrs []error
+		wantSkip bool
+	}{
+		{
+			name:     "running container is started again",
+			running:  true,
+			stopErr:  errRemove,
+			starts:   true,
+			wantErrs: []error{errRemove},
+		},
+		{
+			name:     "a failed start is reported with the removal",
+			running:  true,
+			stopErr:  errRemove,
+			startErr: errStart,
+			starts:   true,
+			wantErrs: []error{errRemove, errStart},
+		},
+		{
+			name:     "stopped container stays stopped",
+			running:  false,
+			stopErr:  errRemove,
+			wantErrs: []error{errRemove},
+		},
+		{
+			name:     "member joining another member waits for its group",
+			running:  true,
+			joins:    true,
+			stopErr:  errRemove,
+			wantErrs: []error{errRemove},
+		},
+		{
+			name:     "missing container is skipped without a start",
+			running:  true,
+			stopErr:  cerrdefs.ErrNotFound,
+			wantErrs: []error{errContainerGone, cerrdefs.ErrNotFound},
+			wantSkip: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			updates := []containerfixture.Update{
+				containerfixture.WithName("/app"),
+				containerfixture.WithID("app-id"),
+				containerfixture.WithContainerState(dockerContainer.State{Running: tt.running}),
+			}
+			if tt.joins {
+				updates = append(updates, containerfixture.WithNetworkMode("container:vpn"))
+			}
+
+			c := modelfixture.Container(updates...)
+			c.SetStale(true)
+
+			group := []*container.Container{c}
+			if tt.joins {
+				group = []*container.Container{vpn, c}
+			}
+
+			client := mockRestart.NewMockClient(t)
+			client.EXPECT().SnapshotCopyFiles(mock.Anything, c).Return(nil).Once()
+			client.EXPECT().StopAndRemoveContainer(mock.Anything, c, mock.Anything).Return(tt.stopErr).Once()
+			client.EXPECT().DiscardCopyFiles(c.ID()).Once()
+
+			if tt.starts {
+				client.EXPECT().StartContainerByID(mock.Anything, c.ID()).Return(tt.startErr).Once()
+			}
+
+			failed := map[container.ContainerID]error{}
+			stopped := map[container.ContainerID]container.ContainerID{}
+
+			err := stopOne(newTestLogger(t), t.Context(), group, c, client, updateParams.Params{}, failed, stopped)
+			assert.Empty(t, stopped)
+			require.Equal(t, err, failed[c.ID()])
+
+			for _, want := range tt.wantErrs {
+				require.ErrorIs(t, err, want)
+			}
+
+			assert.Equal(t, tt.wantSkip, isSkip(err))
 		})
 	}
 }

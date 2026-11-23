@@ -318,7 +318,8 @@ func TestUpdate_CanceledRecreateFailureIsFailed(t *testing.T) {
 
 // TestUpdate_StopFailureStaysFailedWhenCanceled verifies that a container
 // whose stop fails while the update is canceled stays reported as failed with
-// the stop error. The restart phase skips it because it was never stopped, and
+// the stop error. It is started again despite the cancellation, since nothing
+// recreates it. The restart phase skips it because it was never stopped, and
 // that skip must not replace the failure.
 func TestUpdate_StopFailureStaysFailedWhenCanceled(t *testing.T) {
 	t.Parallel()
@@ -339,6 +340,10 @@ func TestUpdate_StopFailureStaysFailedWhenCanceled(t *testing.T) {
 
 			return errors.New("failed to stop container: daemon unavailable")
 		}).Once()
+	// The start runs on a context without the update's cancellation.
+	client.EXPECT().StartContainerByID(mock.MatchedBy(func(startCtx context.Context) bool {
+		return startCtx.Err() == nil
+	}), app.ID()).Return(nil).Once()
 
 	report, _, _ := update(newTestLogger(t), ctx, client, updateParams.Params{}, ratelimit.New())
 	require.NotNil(t, report)
