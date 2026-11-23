@@ -1658,6 +1658,38 @@ func TestContainerModel(t *testing.T) {
 			}
 		})
 
+		t.Run("leaves out the shm size for IPC modes without a shm of their own", func(t *testing.T) {
+			t.Parallel()
+
+			// Docker and Podman both report a shm size for every IPC mode, and
+			// Podman refuses to create a host or none container with one.
+			const shmSize = 65536000
+
+			tests := []struct {
+				name string
+				mode string
+				want int64
+			}{
+				{name: "host", mode: "host", want: 0},
+				{name: "none", mode: "none", want: 0},
+				{name: "private", mode: "private", want: shmSize},
+				{name: "shareable", mode: "shareable", want: shmSize},
+				{name: "another container", mode: "container:db", want: shmSize},
+				{name: "daemon default", mode: "", want: shmSize},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					t.Parallel()
+
+					container := MockContainer(containerfixture.WithIPC(tt.mode, shmSize))
+
+					assert.Equal(t, tt.want, container.GetCreateHostConfig().ShmSize)
+					assert.Equal(t, int64(shmSize), container.ContainerInfo().HostConfig.ShmSize, "inspect data is unchanged")
+				})
+			}
+		})
+
 		t.Run("returns a copy of VolumesFrom so create config does not alias inspect data", func(t *testing.T) {
 			t.Parallel()
 

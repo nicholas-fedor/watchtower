@@ -431,6 +431,25 @@ func WithUTSMode(mode string) Update {
 	}
 }
 
+// WithIPC sets the IPC mode and shm size for the mock container.
+//
+// Parameters:
+//   - mode: IPC mode to set (e.g., "host").
+//   - shmSize: Size of /dev/shm in bytes, as inspect reports it.
+//
+// Returns:
+//   - Update: Function to set the IPC mode and shm size in container HostConfig.
+func WithIPC(mode string, shmSize int64) Update {
+	return func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
+		if c.HostConfig == nil {
+			c.HostConfig = &dockerContainer.HostConfig{}
+		}
+
+		c.HostConfig.IpcMode = dockerContainer.IpcMode(mode)
+		c.HostConfig.ShmSize = shmSize
+	}
+}
+
 // WithHostname sets the hostname for the mock container.
 //
 // Parameters:
