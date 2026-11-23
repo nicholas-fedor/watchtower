@@ -317,7 +317,8 @@ func TestUpdateAction_LifecycleHooks(t *testing.T) {
 // TestUpdate_PreUpdateFailureNamesItOnce verifies that a container whose
 // pre-update hook fails is reported as failed with an error that names the
 // pre-update command once, followed by the command's own error, in both
-// restart modes.
+// restart modes. The container is started again like any container whose stop
+// fails, which does nothing for one that still runs.
 func TestUpdate_PreUpdateFailureNamesItOnce(t *testing.T) {
 	t.Parallel()
 
@@ -339,6 +340,7 @@ func TestUpdate_PreUpdateFailureNamesItOnce(t *testing.T) {
 			client.EXPECT().
 				ExecuteCommand(mock.Anything, app, "/pre-update.sh", mock.Anything, mock.Anything, mock.Anything).
 				Return(false, errCommand).Once()
+			client.EXPECT().StartContainerByID(mock.Anything, app.ID()).Return(nil).Once()
 
 			report, _, err := update(newTestLogger(t), t.Context(), client,
 				updateParams.Params{LifecycleHooks: true, RollingRestart: rolling}, ratelimit.New())
