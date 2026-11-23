@@ -166,7 +166,8 @@ func (c *Container) GetCreateConfig() *dockerContainer.Config {
 // GetCreateHostConfig generates a host configuration for recreation.
 //
 // It adjusts link formats for Docker API compatibility and copies slices that
-// must not alias inspect data.
+// must not alias inspect data. A container in the host IPC namespace or with
+// IPC mode none gets no shm size, since it mounts no /dev/shm of its own.
 //
 // Returns:
 //   - *dockerContainer.HostConfig: Host configuration for container creation.
@@ -254,6 +255,13 @@ func (c *Container) GetCreateHostConfig() *dockerContainer.HostConfig {
 				Str("device", hostConfig.Devices[i].PathOnHost).
 				Msg("Defaulted empty device CgroupPermissions to 'rwm'")
 		}
+	}
+
+	// Inspect reports a shm size for every IPC mode. Podman rejects one for
+	// the host and none modes, and Docker has no /dev/shm of the container's
+	// own to size in them, so the size is left out.
+	if hostConfig.IpcMode.IsHost() || hostConfig.IpcMode.IsNone() {
+		hostConfig.ShmSize = 0
 	}
 
 	return hostConfig
