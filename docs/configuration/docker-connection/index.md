@@ -117,10 +117,18 @@ docker run -d \
 
 ## Recreating Containers on Podman
 
-Watchtower talks to Podman through its Docker-compatible API. It recreates a container from what that API reports. A setting the API does not carry is lost on recreation.
+Watchtower talks to Podman through its Docker-compatible API. It recreates a container from what that API reports, so a setting the API does not carry is lost on recreation.
 
-- **Timezone and umask**: Podman's `--tz` and `--umask` exist only in Podman's own API. A recreated container uses the image's timezone. Its processes run with the OCI runtime's default umask, normally `0022`.
-- **Log driver**: the Docker-compatible API reports a `k8s-file` log driver as `json-file` and leaves out its options, such as `max-size`. A recreated container uses `json-file` without those options. Its log size limit falls back to `log_size_max` in `containers.conf`, which is unlimited by default.
-- **Podman metadata**: fields such as `CreateCommand` and the systemd notify mode are not part of the Docker API. A recreated container does not have them.
+| Setting | Why it is lost | After recreation |
+| --------- | ---------------- | ------------------ |
+| Timezone (`--tz`) | It exists only in Podman's own API | The image's timezone |
+| Umask (`--umask`) | It exists only in Podman's own API | The OCI runtime's default umask, normally `0022` |
+| A `k8s-file` log driver and its options, such as `max-size` | The API reports the driver as `json-file` and leaves out its options | `json-file` without those options, so the log size limit falls back to `log_size_max` in `containers.conf` (unlimited by default) |
+| Podman metadata, such as `CreateCommand` and the systemd notify mode | It is not part of the Docker API | Not set |
+| A static IP address set with `--ip` or `--ip6`, or with `ipv4_address` or `ipv6_address` in Compose | Podman does not report it | The next free address on the network |
 
-To keep these settings, set them where Watchtower does not need to copy them. For example, set the timezone through the `TZ` environment variable. Watchtower keeps the variable on recreation. It takes effect when the image or application reads it. Or manage the container with a Podman Quadlet or systemd unit and let Podman's own auto-update restart it.
+To work around these losses:
+
+- Set the timezone through the `TZ` environment variable, which Watchtower keeps on recreation and which takes effect when the image or application reads it.
+- Reach a container by its name rather than its address. Podman's DNS resolves container names on user-defined networks.
+- Manage the container with a Podman Quadlet or systemd unit and let Podman's own auto-update restart it. Podman then recreates the container with every setting above.
