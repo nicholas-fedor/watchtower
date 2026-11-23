@@ -3064,13 +3064,49 @@ Use <code>none</code> if CPU limits are causing issues and you prefer no limits 
 <a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="w">    </span>--cpu-copy-mode<span class="w"> </span>none
 </code></pre></div>
 <h2 id="recreating_containers_on_podman">Recreating Containers on Podman<a class="headerlink" href="#recreating_containers_on_podman" title="Permanent link">&para;</a></h2>
-<p>Watchtower talks to Podman through its Docker-compatible API. It recreates a container from what that API reports. A setting the API does not carry is lost on recreation.</p>
+<p>Watchtower talks to Podman through its Docker-compatible API. It recreates a container from what that API reports, so a setting the API does not carry is lost on recreation.</p>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Why it is lost</th>
+<th>After recreation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Timezone (<code>--tz</code>)</td>
+<td>It exists only in Podman's own API</td>
+<td>The image's timezone</td>
+</tr>
+<tr>
+<td>Umask (<code>--umask</code>)</td>
+<td>It exists only in Podman's own API</td>
+<td>The OCI runtime's default umask, normally <code>0022</code></td>
+</tr>
+<tr>
+<td>A <code>k8s-file</code> log driver and its options, such as <code>max-size</code></td>
+<td>The API reports the driver as <code>json-file</code> and leaves out its options</td>
+<td><code>json-file</code> without those options, so the log size limit falls back to <code>log_size_max</code> in <code>containers.conf</code> (unlimited by default)</td>
+</tr>
+<tr>
+<td>Podman metadata, such as <code>CreateCommand</code> and the systemd notify mode</td>
+<td>It is not part of the Docker API</td>
+<td>Not set</td>
+</tr>
+<tr>
+<td>A static IP address set with <code>--ip</code> or <code>--ip6</code>, or with <code>ipv4_address</code> or <code>ipv6_address</code> in Compose</td>
+<td>Podman does not report it</td>
+<td>A new address from the network, except that Podman 5.8 keeps the IPv4 address</td>
+</tr>
+</tbody>
+</table>
+<p>To work around these losses:</p>
 <ul>
-<li><strong>Timezone and umask</strong>: Podman's <code>--tz</code> and <code>--umask</code> exist only in Podman's own API. A recreated container uses the image's timezone. Its processes run with the OCI runtime's default umask, normally <code>0022</code>.</li>
-<li><strong>Log driver</strong>: the Docker-compatible API reports a <code>k8s-file</code> log driver as <code>json-file</code> and leaves out its options, such as <code>max-size</code>. A recreated container uses <code>json-file</code> without those options. Its log size limit falls back to <code>log_size_max</code> in <code>containers.conf</code>, which is unlimited by default.</li>
-<li><strong>Podman metadata</strong>: fields such as <code>CreateCommand</code> and the systemd notify mode are not part of the Docker API. A recreated container does not have them.</li>
+<li>Set the timezone through the <code>TZ</code> environment variable, which Watchtower keeps on recreation and which takes effect when the image or application reads it.</li>
+<li>Let other containers reach the container by its name, which Podman resolves for containers on the same bridge network unless the network was created with <code>--disable-dns</code>. Clients outside that network can use a published port.</li>
+<li>Manage the container with a Podman Quadlet that sets <code>AutoUpdate=registry</code> and the <code>com.centurylinklabs.watchtower.enable=false</code> label, so that <code>podman auto-update</code> updates it instead of Watchtower. Podman recreates the container from the unit, which keeps every setting above.</li>
 </ul>
-<p>To keep these settings, set them where Watchtower does not need to copy them. For example, set the timezone through the <code>TZ</code> environment variable. Watchtower keeps the variable on recreation. It takes effect when the image or application reads it. Or manage the container with a Podman Quadlet or systemd unit and let Podman's own auto-update restart it.</p>
 
 
 
@@ -3093,7 +3129,7 @@ Use <code>none</code> if CPU limits are causing issues and you prefer no limits 
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 4, 2026 13:31:07 UTC"><span class="timeago" datetime="2026-11-04T13:31:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 4, 2026 13:31:07 UTC">2026-11-04</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 23, 2026 16:46:00 UTC"><span class="timeago" datetime="2026-11-23T16:46:00+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 23, 2026 16:46:00 UTC">2026-11-23</span>
   </span>
 
     
