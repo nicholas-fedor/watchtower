@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/moby/sys/user to v0.5.1 by @renovate[bot] in [#4026](https://github.com/nicholas-fedor/watchtower/pull/4026)
 - Update anchore/sbom-action action to v0.24.4 by @renovate[bot] in [#4019](https://github.com/nicholas-fedor/watchtower/pull/4019)
 - Update golang.org/x/exp digest to d6646c5 by @renovate[bot] in [#4018](https://github.com/nicholas-fedor/watchtower/pull/4018)
 - Update module github.com/jedib0t/go-pretty/v6 to v6.9.3 by @renovate[bot] in [#4013](https://github.com/nicholas-fedor/watchtower/pull/4013)
