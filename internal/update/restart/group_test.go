@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 	"testing/synctest"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -371,11 +372,22 @@ func TestStopContainersInReversedOrder_networkGroupNameNotRestored(t *testing.T)
 // The container may already be stopped, and the containers that join it lose
 // their network until it runs again. The rename back and the start each get
 // the stop timeout plus 30 seconds, so a rename back that uses all of its time
-// leaves the start a live context.
+// leaves the start a live context with its own full bound.
 func TestStopContainersInReversedOrder_networkGroupStartAfterSlowRenameBack(t *testing.T) {
 	t.Parallel()
 
 	synctest.Test(t, func(t *testing.T) {
+		config := updateParams.Params{Timeout: 10 * time.Second}
+
+		// fullBound matches a live context whose deadline is the stop timeout
+		// plus 30 seconds from now. The bubble's clock stands still while code
+		// runs, so the deadline matches exactly.
+		fullBound := mock.MatchedBy(func(ctx context.Context) bool {
+			deadline, hasDeadline := ctx.Deadline()
+
+			return ctx.Err() == nil && hasDeadline && deadline.Equal(time.Now().Add(config.DetachedTimeout()))
+		})
+
 		group := newNetworkGroup()
 		vpn, torrent, chain := group[0], group[1], group[2]
 		replacement := modelfixture.Container(containerfixture.WithID("new-vpn"))
@@ -398,10 +410,10 @@ func TestStopContainersInReversedOrder_networkGroupStartAfterSlowRenameBack(t *t
 
 					return ctx.Err()
 				}).Once(),
-			client.EXPECT().StartContainerByID(liveContext, vpn.ID()).Return(nil).Once(),
+			client.EXPECT().StartContainerByID(fullBound, vpn.ID()).Return(nil).Once(),
 		)
 
-		failed, _ := stopContainersInReversedOrder(newTestLogger(t), t.Context(), group, client, updateParams.Params{})
+		failed, _ := stopContainersInReversedOrder(newTestLogger(t), t.Context(), group, client, config)
 
 		require.ErrorIs(t, failed[vpn.ID()], errNotRestored)
 		require.ErrorIs(t, failed[vpn.ID()], context.DeadlineExceeded)
