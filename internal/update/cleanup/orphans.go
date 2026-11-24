@@ -7,8 +7,8 @@ import (
 	"github.com/rs/zerolog"
 
 	cerrdefs "github.com/containerd/errdefs"
-	dockerContainer "github.com/moby/moby/api/types/container"
 
+	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 )
 
@@ -63,7 +63,7 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 
 	for _, c := range orchestrators {
 		// Keep orchestrators that may still be running a self-update.
-		started, ok := orchestratorStartTime(c.ContainerInfo())
+		started, ok := orchestratorStartTime(c)
 		if !ok || time.Since(started) < orphanedOrchestratorAge {
 			clog.Debug().
 				Str("container", c.Name()).
@@ -117,20 +117,18 @@ func RemoveOrphanedOrchestrators(log *zerolog.Logger,
 // back to its creation time when Docker reports no start time.
 //
 // Parameters:
-//   - info: Inspect data of the orchestrator container.
+//   - c: The orchestrator container.
 //
 // Returns:
 //   - time.Time: The start or creation time.
 //   - bool: False when neither time can be read.
-func orchestratorStartTime(info *dockerContainer.InspectResponse) (time.Time, bool) {
-	if info.State != nil {
-		started, err := time.Parse(time.RFC3339Nano, info.State.StartedAt)
-		if err == nil && !started.IsZero() {
-			return started, true
-		}
+func orchestratorStartTime(c *container.Container) (time.Time, bool) {
+	started, ok := c.StartedAt()
+	if ok {
+		return started, true
 	}
 
-	created, err := time.Parse(time.RFC3339Nano, info.Created)
+	created, err := time.Parse(time.RFC3339Nano, c.ContainerInfo().Created)
 	if err == nil && !created.IsZero() {
 		return created, true
 	}

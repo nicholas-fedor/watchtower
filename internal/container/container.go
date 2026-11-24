@@ -3,6 +3,7 @@ package container
 import (
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -295,6 +296,26 @@ func (c *Container) IsRunning() bool {
 	}
 
 	return info.State.Running
+}
+
+// StartedAt returns when the container last started, as the daemon records it.
+//
+// Returns:
+//   - time.Time: The start time.
+//   - bool: False when the container has never started or the time cannot be
+//     read.
+func (c *Container) StartedAt() (time.Time, bool) {
+	info := c.ContainerInfo()
+	if info == nil || info.State == nil {
+		return time.Time{}, false
+	}
+
+	started, err := time.Parse(time.RFC3339Nano, info.State.StartedAt)
+	if err != nil || started.IsZero() {
+		return time.Time{}, false
+	}
+
+	return started, true
 }
 
 // IsRestarting checks if the container is currently restarting.
