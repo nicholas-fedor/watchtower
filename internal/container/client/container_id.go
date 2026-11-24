@@ -49,8 +49,8 @@ const (
 	// the line.
 	statStartTimeIndex = 19
 	// startTimeTolerance is how far a container's recorded start may be from
-	// the start of its first process. The boot time in /proc/stat has whole
-	// seconds, so the two differ by up to about a second.
+	// the start derived for its first process, which counts in ticks of 10 ms
+	// from the moment this process started.
 	startTimeTolerance = 2 * time.Second
 )
 
@@ -80,6 +80,10 @@ var containerMarkers = []string{
 	".dockerenv",        // Docker
 }
 
+// processStarted is the wall clock time when this process started, read once
+// so a later clock step cannot shift the start times derived from it.
+var processStarted = time.Now().Round(0)
+
 // Errors for container ID detection operations.
 var (
 	// errReadMountinfoFile indicates a failure to read the mountinfo file for the current process.
@@ -102,10 +106,9 @@ var (
 	// errNoOwnContainer indicates that no candidate is a running container
 	// that could be Watchtower's own.
 	errNoOwnContainer = errors.New("no running container could be Watchtower's own container")
-	// errNoBootTime indicates that /proc/stat holds no boot time.
-	errNoBootTime = errors.New("no boot time in /proc/stat")
-	// errMalformedProcessStat indicates that /proc/1/stat has no start time.
-	errMalformedProcessStat = errors.New("no start time in /proc/1/stat")
+	// errMalformedProcessStat indicates that a process's stat file in /proc
+	// has no start time.
+	errMalformedProcessStat = errors.New("no start time in the process stat file")
 	// errInitOutsideContainer indicates that PID 1 runs outside this
 	// container, as when the container shares the host's or another
 	// container's PID namespace.
@@ -384,6 +387,8 @@ func ownContainer(
 // Docker reports nothing else that tells a restarted old Watchtower container
 // apart from its replacement when both are candidates. Their recorded start
 // times differ unless they started within about two seconds of each other.
+// The derived start does not move with a clock step after this process
+// started, so a step during startup cannot match another candidate.
 //
 // Parameters:
 //   - log: Process logger.
@@ -394,7 +399,7 @@ func ownContainer(
 //   - *container.Container: The matching candidate, or nil when the start
 //     time cannot be read or no single candidate matches it.
 func startedWithThisContainer(log *zerolog.Logger, fsys fs.FS, candidates []*container.Container) *container.Container {
-	started, err := containerStartedAt(fsys)
+	started, err := containerStartedAt(fsys, processStarted)
 	if err != nil {
 		log.Debug().Err(err).Msg("Could not read when this container started")
 
@@ -440,14 +445,20 @@ func soleCandidate(candidates []*container.Container, matches func(*container.Co
 // process's mount namespace. A container that shares the host's or another
 // container's PID namespace sees that namespace's first process as PID 1.
 //
+// The start is derived from the start of this process, moved back by the
+// time between the two processes' starts. Process start times in /proc count
+// ticks since boot, so that difference does not change with the wall clock.
+//
 // Parameters:
 //   - fsys: Filesystem rooted at "/" holding /proc.
+//   - started: The wall clock time when this process started.
 //
 // Returns:
-//   - time.Time: The start time, accurate to about a second.
+//   - time.Time: The start time, accurate to about 10 ms plus the delay
+//     between this process starting and reading started.
 //   - error: Non-nil when PID 1 runs outside this container or cannot be
-//     checked, or when /proc/stat or /proc/1/stat cannot be read or parsed.
-func containerStartedAt(fsys fs.FS) (time.Time, error) {
+//     checked, or when a process stat file cannot be read or parsed.
+func containerStartedAt(fsys fs.FS, started time.Time) (time.Time, error) {
 	ownNamespace, err := fs.ReadLink(fsys, "proc/self/ns/mnt")
 	if err != nil {
 		return time.Time{}, fmt.Errorf("read this process's mount namespace: %w", err)
@@ -464,54 +475,53 @@ func containerStartedAt(fsys fs.FS) (time.Time, error) {
 		return time.Time{}, errInitOutsideContainer
 	}
 
-	stat, err := fs.ReadFile(fsys, "proc/stat")
+	ownTicks, err := processStartTicks(fsys, "proc/self/stat")
 	if err != nil {
-		return time.Time{}, fmt.Errorf("read /proc/stat: %w", err)
+		return time.Time{}, err
 	}
 
-	var bootTime int64
-
-	for line := range strings.Lines(string(stat)) {
-		value, found := strings.CutPrefix(line, "btime ")
-		if found {
-			bootTime, err = strconv.ParseInt(strings.TrimSpace(value), 10, 64)
-			if err != nil {
-				return time.Time{}, fmt.Errorf("%w: %w", errNoBootTime, err)
-			}
-
-			break
-		}
-	}
-
-	if bootTime == 0 {
-		return time.Time{}, errNoBootTime
-	}
-
-	processStat, err := fs.ReadFile(fsys, "proc/1/stat")
+	initTicks, err := processStartTicks(fsys, "proc/1/stat")
 	if err != nil {
-		return time.Time{}, fmt.Errorf("read /proc/1/stat: %w", err)
+		return time.Time{}, err
+	}
+
+	return started.Add(-time.Duration(ownTicks-initTicks) * (time.Second / userHZ)), nil
+}
+
+// processStartTicks returns when a process started, in clock ticks since
+// boot.
+//
+// Parameters:
+//   - fsys: Filesystem rooted at "/" holding /proc.
+//   - name: The process's stat file, such as "proc/1/stat".
+//
+// Returns:
+//   - int64: The start time in ticks of 1/100 s.
+//   - error: Non-nil when the file cannot be read or holds no start time.
+func processStartTicks(fsys fs.FS, name string) (int64, error) {
+	processStat, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		return 0, fmt.Errorf("read /%s: %w", name, err)
 	}
 
 	// The command name is in parentheses and may hold spaces or
 	// parentheses, so the fields are read after the last one.
 	_, afterCommand, found := strings.CutLast(string(processStat), ")")
 	if !found {
-		return time.Time{}, errMalformedProcessStat
+		return 0, fmt.Errorf("/%s: %w", name, errMalformedProcessStat)
 	}
 
 	fields := strings.Fields(afterCommand)
 	if len(fields) <= statStartTimeIndex {
-		return time.Time{}, errMalformedProcessStat
+		return 0, fmt.Errorf("/%s: %w", name, errMalformedProcessStat)
 	}
 
 	ticks, err := strconv.ParseInt(fields[statStartTimeIndex], 10, 64)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("%w: %w", errMalformedProcessStat, err)
+		return 0, fmt.Errorf("/%s: %w: %w", name, errMalformedProcessStat, err)
 	}
 
-	// Each tick is converted before multiplying, since ticks times a second
-	// in nanoseconds overflows once the host has been up for about 2.9 years.
-	return time.Unix(bootTime, 0).Add(time.Duration(ticks) * (time.Second / userHZ)), nil
+	return ticks, nil
 }
 
 // InContainer reports whether the process runs in a container, based on the

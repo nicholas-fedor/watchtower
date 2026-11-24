@@ -882,10 +882,17 @@ func ephemeralOrchestrator() containerfixture.Update {
 	})
 }
 
+// Start ticks of 1/100 s since boot that writeStartTime writes, 5 s apart.
+const (
+	// testInitTicks is when PID 1 started.
+	testInitTicks = 19322773
+	// testOwnTicks is when this process started.
+	testOwnTicks = testInitTicks + 500
+)
+
 // testProcessStarted is when the /proc files writeStartTime writes say this
-// container started: 19322773 ticks of 1/100 s after the boot at Unix time
-// 1795299901.
-var testProcessStarted = time.Unix(1795493128, 730_000_000)
+// container started: 5 s before this test process started.
+var testProcessStarted = processStarted.Add(-5 * time.Second)
 
 // Mount namespace links for the start time tests.
 const (
@@ -905,32 +912,89 @@ func writeMountNamespaces(t *testing.T, fsys fstest.MapFS, first string) {
 	fsys["proc/1/ns/mnt"] = &fstest.MapFile{Data: []byte(first), Mode: fs.ModeSymlink}
 }
 
+// statLine returns a /proc stat file line for a process that started ticks
+// after boot. Its command name holds a space and a parenthesis.
+func statLine(ticks int64) string {
+	return fmt.Sprintf("1 (watch) tower) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 %d 1234 5\n", ticks)
+}
+
 // writeStartTime writes the /proc files that place this container's start at
 // testProcessStarted, with PID 1 in this container.
 func writeStartTime(t *testing.T, fsys fstest.MapFS) {
 	t.Helper()
 
 	writeMountNamespaces(t, fsys, containerMountNamespace)
-	writeProcFile(t, fsys, "/proc/stat", "cpu  1 2 3 4\nbtime 1795299901\nprocesses 9\n")
-	writeProcFile(t, fsys, "/proc/1/stat",
-		"1 (watch) tower) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 19322773 1234 5\n")
+	writeProcFile(t, fsys, "/proc/self/stat", statLine(testOwnTicks))
+	writeProcFile(t, fsys, "/proc/1/stat", statLine(testInitTicks))
 }
 
 // TestContainerStartedAt verifies that the start of this container's first
-// process is read from /proc, and that missing or malformed files fail, as
-// does a PID 1 outside this container's mount namespace.
+// process is derived from this process's start and the start ticks in /proc,
+// and that missing or malformed files fail, as does a PID 1 outside this
+// container's mount namespace.
 func TestContainerStartedAt(t *testing.T) {
 	t.Parallel()
 
-	t.Run("reads the boot time and the start ticks", func(t *testing.T) {
+	// started is when this process started in the fixed-time cases.
+	started := time.Date(2026, 11, 24, 12, 0, 5, 300_000_000, time.UTC)
+
+	t.Run("moves back by the ticks between the two starts", func(t *testing.T) {
 		t.Parallel()
 
 		fsys := fstest.MapFS{}
 		writeStartTime(t, fsys)
 
-		started, err := containerStartedAt(fsys)
+		got, err := containerStartedAt(fsys, started)
 		require.NoError(t, err)
-		assert.True(t, testProcessStarted.Equal(started), "got %v", started)
+		assert.True(t, started.Add(-5*time.Second).Equal(got), "got %v", got)
+	})
+
+	t.Run("matches the right container whatever the boot time says", func(t *testing.T) {
+		t.Parallel()
+
+		// Docker recorded both starts. A clock step of 3.1 s after this
+		// process started moves the boot time in /proc/stat, which would
+		// place this container's start on the other container's.
+		self := modelfixture.Container(startedAt(time.Date(2026, 11, 24, 12, 0, 0, 300_000_000, time.UTC)))
+		other := modelfixture.Container(startedAt(time.Date(2026, 11, 24, 12, 0, 3, 400_000_000, time.UTC)))
+
+		// bootTime is the boot time that matches started without a step.
+		bootTime := started.Add(-testOwnTicks * (time.Second / userHZ))
+
+		for _, step := range []time.Duration{0, 3100 * time.Millisecond} {
+			t.Run(step.String(), func(t *testing.T) {
+				t.Parallel()
+
+				fsys := fstest.MapFS{}
+				writeStartTime(t, fsys)
+				writeProcFile(t, fsys, "/proc/stat", fmt.Sprintf("btime %d\n", bootTime.Add(step).Unix()))
+
+				got, err := containerStartedAt(fsys, started)
+				require.NoError(t, err)
+
+				selfStarted, ok := self.StartedAt()
+				require.True(t, ok)
+				otherStarted, ok := other.StartedAt()
+				require.True(t, ok)
+
+				assert.LessOrEqual(t, got.Sub(selfStarted).Abs(), startTimeTolerance)
+				assert.Greater(t, got.Sub(otherStarted).Abs(), startTimeTolerance)
+			})
+		}
+	})
+
+	t.Run("reads starts long after boot", func(t *testing.T) {
+		t.Parallel()
+
+		// 10000000000 ticks of 1/100 s are about 3.2 years.
+		fsys := fstest.MapFS{}
+		writeMountNamespaces(t, fsys, containerMountNamespace)
+		writeProcFile(t, fsys, "/proc/self/stat", statLine(10000000500))
+		writeProcFile(t, fsys, "/proc/1/stat", statLine(10000000000))
+
+		got, err := containerStartedAt(fsys, started)
+		require.NoError(t, err)
+		assert.True(t, started.Add(-5*time.Second).Equal(got), "got %v", got)
 	})
 
 	t.Run("rejects a PID 1 outside this container", func(t *testing.T) {
@@ -943,7 +1007,7 @@ func TestContainerStartedAt(t *testing.T) {
 		writeStartTime(t, fsys)
 		writeMountNamespaces(t, fsys, hostMountNamespace)
 
-		_, err := containerStartedAt(fsys)
+		_, err := containerStartedAt(fsys, started)
 		require.ErrorIs(t, err, errInitOutsideContainer)
 	})
 
@@ -954,64 +1018,43 @@ func TestContainerStartedAt(t *testing.T) {
 		writeStartTime(t, fsys)
 		delete(fsys, "proc/1/ns/mnt")
 
-		_, err := containerStartedAt(fsys)
+		_, err := containerStartedAt(fsys, started)
 		require.ErrorIs(t, err, fs.ErrNotExist)
 	})
 
-	t.Run("reads a start more than 2.9 years after boot", func(t *testing.T) {
-		t.Parallel()
-
-		// 10000000000 ticks of 1/100 s are 100000000 seconds, about 3.2
-		// years.
-		fsys := fstest.MapFS{}
-		writeMountNamespaces(t, fsys, containerMountNamespace)
-		writeProcFile(t, fsys, "/proc/stat", "btime 1\n")
-		writeProcFile(t, fsys, "/proc/1/stat",
-			"1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 10000000000 1234 5\n")
-
-		started, err := containerStartedAt(fsys)
-		require.NoError(t, err)
-		assert.True(t, time.Unix(100000001, 0).Equal(started), "got %v", started)
-	})
-
-	tests := []struct {
-		name        string
-		stat        string
-		processStat string
-		wantErr     error
+	// malformed holds stat file contents without a readable start time.
+	malformed := []struct {
+		name    string
+		content string
+		wantErr error
 	}{
-		{name: "no boot time", stat: "cpu  1 2 3 4\n", processStat: "1 (sh) S 0", wantErr: errNoBootTime},
-		{name: "malformed boot time", stat: "btime soon\n", processStat: "1 (sh) S 0", wantErr: errNoBootTime},
-		{name: "no command name", stat: "btime 1\n", processStat: "1 sh S 0", wantErr: errMalformedProcessStat},
-		{name: "too few fields", stat: "btime 1\n", processStat: "1 (sh) S 0 1 1", wantErr: errMalformedProcessStat},
+		{name: "no command name", content: "1 sh S 0", wantErr: errMalformedProcessStat},
+		{name: "too few fields", content: "1 (sh) S 0 1 1", wantErr: errMalformedProcessStat},
 		{
-			name:        "malformed start ticks",
-			stat:        "btime 1\n",
-			processStat: "1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 later 1234 5",
-			wantErr:     errMalformedProcessStat,
+			name:    "malformed start ticks",
+			content: "1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 later 1234 5",
+			wantErr: errMalformedProcessStat,
 		},
-		{name: "no process stat", stat: "btime 1\n", wantErr: fs.ErrNotExist},
-		{name: "no stat file", wantErr: fs.ErrNotExist},
+		{name: "missing", wantErr: fs.ErrNotExist},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	for _, file := range []string{"/proc/self/stat", "/proc/1/stat"} {
+		for _, tt := range malformed {
+			t.Run(file+" "+tt.name, func(t *testing.T) {
+				t.Parallel()
 
-			fsys := fstest.MapFS{}
-			writeMountNamespaces(t, fsys, containerMountNamespace)
+				fsys := fstest.MapFS{}
+				writeStartTime(t, fsys)
+				delete(fsys, strings.TrimPrefix(file, "/"))
 
-			if tt.stat != "" {
-				writeProcFile(t, fsys, "/proc/stat", tt.stat)
-			}
+				if tt.content != "" {
+					writeProcFile(t, fsys, file, tt.content)
+				}
 
-			if tt.processStat != "" {
-				writeProcFile(t, fsys, "/proc/1/stat", tt.processStat)
-			}
-
-			_, err := containerStartedAt(fsys)
-			require.ErrorIs(t, err, tt.wantErr)
-		})
+				_, err := containerStartedAt(fsys, started)
+				require.ErrorIs(t, err, tt.wantErr)
+			})
+		}
 	}
 }
 
