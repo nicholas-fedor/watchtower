@@ -30,6 +30,16 @@ import (
 
 const testHostname = "test-hostname"
 
+// Container IDs for the detection tests.
+const (
+	// selfID is Watchtower's own container.
+	selfID = "2222222222222222222222222222222222222222222222222222222222222222"
+	// otherID is another Watchtower container.
+	otherID = "3333333333333333333333333333333333333333333333333333333333333333"
+	// orchestratorID is the ephemeral orchestrator's ID.
+	orchestratorID = "4444444444444444444444444444444444444444444444444444444444444444"
+)
+
 // writeProcFile adds a file with content at the absolute path to fsys, stored
 // relative to the root as io/fs requires.
 func writeProcFile(t *testing.T, fsys fstest.MapFS, path, content string) {
@@ -523,42 +533,6 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]*container.Container{nonWatchtowerContainer, watchtowerContainer}, nil)
 			}, want: container.ContainerID("watchtower-container-id"), wantErrText: ""},
-			{name: "when multiple Watchtower containers share hostname, prefer the non-old one", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
-				t.Helper()
-
-				hostname := testHostname
-
-				// Set HOSTNAME environment variable
-				t.Setenv("HOSTNAME", hostname)
-
-				// Old first in list (simulates arbitrary daemon order)
-				oldContainer := modelfixture.Container(
-					containerfixture.WithHostname(hostname),
-					containerfixture.WithName("watchtower-old-6bfdffce0700"),
-					containerfixture.WithLabels(map[string]string{
-						"com.centurylinklabs.watchtower": "true",
-					}),
-					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-						c.ID = "old-watchtower-id"
-					},
-				)
-
-				// Main (non-old) Watchtower
-				mainNamed := modelfixture.Container(
-					containerfixture.WithHostname(hostname),
-					containerfixture.WithName("watchtower"),
-					containerfixture.WithLabels(map[string]string{
-						"com.centurylinklabs.watchtower": "true",
-					}),
-					func(c *dockerContainer.InspectResponse, _ *dockerImage.InspectResponse) {
-						c.ID = "main-watchtower-id"
-					},
-				)
-
-				mockClient.EXPECT().
-					ListContainers(context.Background()).
-					Return([]*container.Container{oldContainer, mainNamed}, nil)
-			}, want: container.ContainerID("main-watchtower-id"), wantErrText: ""},
 		}
 
 		for _, tt := range tests {
@@ -575,7 +549,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					setup(t, mockClient)
 				}
 
-				got, err := GetContainerIDFromHostname(newTestLogger(t), context.Background(), mockClient)
+				got, err := GetContainerIDFromHostname(newTestLogger(t), context.Background(), fstest.MapFS{}, mockClient)
 				if wantErrText != "" {
 					require.EqualError(t, err, wantErrText)
 					assert.Empty(t, got)
@@ -586,6 +560,164 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 			})
 		}
 	})
+}
+
+// TestGetContainerIDFromHostname_ownContainer verifies how hostname matching
+// tells apart several containers that share Watchtower's hostname. It follows
+// the rules of the shared network namespace check and fails rather than guess.
+//
+// The test sets environment variables, so it does not run in parallel.
+func TestGetContainerIDFromHostname_ownContainer(t *testing.T) {
+	shared := containerfixture.WithHostname(testHostname)
+	self := watchtowerContainer(selfID, "/watchtower", "", shared)
+	other := watchtowerContainer(otherID, "/watchtower-b", "", shared)
+	oldName := otherOldName()
+
+	tests := []struct {
+		name string
+		// listed holds the containers the listing returns.
+		listed []*container.Container
+		// startTime makes /proc report when this container started.
+		startTime bool
+		// initOutside places PID 1 outside this container, as with a
+		// shared PID namespace.
+		initOutside bool
+		wantID      container.ContainerID
+		wantErr     error
+	}{
+		{
+			// Picking another instance that shares an explicit hostname
+			// would take over its scope.
+			name:    "several Watchtower containers share the hostname",
+			listed:  []*container.Container{other, self},
+			wantErr: errAmbiguousOwnContainer,
+		},
+		{
+			name: "several Watchtower containers told apart by their start",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "", shared,
+					startedAt(testProcessStarted.Add(-3*time.Second))),
+				watchtowerContainer(selfID, "/watchtower", "", shared,
+					startedAt(testProcessStarted.Add(500*time.Millisecond))),
+			},
+			startTime: true,
+			wantID:    selfID,
+		},
+		{
+			name: "several Watchtower containers started too close together",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "", shared,
+					startedAt(testProcessStarted.Add(time.Second))),
+				watchtowerContainer(selfID, "/watchtower", "", shared,
+					startedAt(testProcessStarted.Add(500*time.Millisecond))),
+			},
+			startTime: true,
+			wantErr:   errAmbiguousOwnContainer,
+		},
+		{
+			// PID 1 is the other instance's first process, so its start says
+			// nothing about this container.
+			name: "the other Watchtower container's start matches PID 1 outside this container",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "", shared,
+					startedAt(testProcessStarted.Add(500*time.Millisecond))),
+				watchtowerContainer(selfID, "/watchtower", "", shared,
+					startedAt(testProcessStarted.Add(-time.Hour))),
+			},
+			startTime:   true,
+			initOutside: true,
+			wantErr:     errAmbiguousOwnContainer,
+		},
+		{
+			// An image without the Watchtower label falls back to every
+			// container with the hostname, here sharing the network and PID
+			// namespaces of a VPN container.
+			name: "a container without the label started with PID 1 outside this container",
+			listed: []*container.Container{
+				modelfixture.Container(containerfixture.WithID(otherID), shared,
+					startedAt(testProcessStarted.Add(500*time.Millisecond))),
+				modelfixture.Container(containerfixture.WithID(selfID), shared,
+					startedAt(testProcessStarted.Add(-time.Hour))),
+			},
+			startTime:   true,
+			initOutside: true,
+			wantErr:     errAmbiguousOwnContainer,
+		},
+		{
+			// An orchestrator joins the network namespace Watchtower joins
+			// and so reports the same hostname.
+			name: "an ephemeral orchestrator shares the hostname",
+			listed: []*container.Container{
+				self,
+				watchtowerContainer(orchestratorID, "/watchtower-orchestrator-"+selfID, "", shared,
+					ephemeralOrchestrator()),
+			},
+			wantID: selfID,
+		},
+		{
+			name: "a paused Watchtower container shares the hostname",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "", shared, paused()),
+				self,
+			},
+			wantID: selfID,
+		},
+		{
+			// A rename-based self-update keeps the old container running
+			// while its replacement starts.
+			name:   "an old Watchtower container shares the hostname",
+			listed: []*container.Container{self, watchtowerContainer(otherID, oldName, "", shared)},
+			wantID: selfID,
+		},
+		{
+			name: "several containers without the Watchtower label share the hostname",
+			listed: []*container.Container{
+				modelfixture.Container(containerfixture.WithID(otherID), shared),
+				modelfixture.Container(containerfixture.WithID(selfID), shared),
+			},
+			wantErr: errAmbiguousOwnContainer,
+		},
+		{
+			// A Watchtower image without the Watchtower label leaves only
+			// the hostname to go by.
+			name: "only a stopped Watchtower container has the Watchtower label",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-stopped", "", shared,
+					containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateExited})),
+				modelfixture.Container(containerfixture.WithID(selfID), shared),
+			},
+			wantID: selfID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("HOSTNAME", testHostname)
+
+			fsys := fstest.MapFS{}
+			if tt.startTime {
+				writeStartTime(t, fsys)
+			}
+
+			if tt.initOutside {
+				writeMountNamespaces(t, fsys, hostMountNamespace)
+			}
+
+			client := mockContainerClient.NewMockContainerReader(t)
+			client.EXPECT().ListContainers(mock.Anything).Return(tt.listed, nil).Once()
+
+			id, err := GetContainerIDFromHostname(newTestLogger(t), t.Context(), fsys, client)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, id)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantID, id)
+		})
+	}
 }
 
 // TestGetCurrentContainerID verifies that self container ID detection tries the
@@ -726,88 +858,203 @@ func startedAt(started time.Time) containerfixture.Update {
 	})
 }
 
+// otherOldName returns the name a self-update gives the container with
+// otherID.
+func otherOldName() string {
+	return "/" + watchtowerContainer(otherID, "", "").OldWatchtowerName()
+}
+
+// paused sets a paused state, which Docker reports as running too.
+func paused() containerfixture.Update {
+	return containerfixture.WithContainerState(dockerContainer.State{
+		Running: true,
+		Paused:  true,
+		Status:  dockerContainer.StatePaused,
+	})
+}
+
+// ephemeralOrchestrator labels a container as the ephemeral orchestrator of a
+// self-update, which also carries the Watchtower image's label.
+func ephemeralOrchestrator() containerfixture.Update {
+	return containerfixture.WithLabels(map[string]string{
+		labels.Watchtower:            "true",
+		labels.EphemeralOrchestrator: "true",
+	})
+}
+
+// Start ticks of 1/100 s since boot that writeStartTime writes, 5 s apart.
+const (
+	// testInitTicks is when PID 1 started.
+	testInitTicks = 19322773
+	// testOwnTicks is when this process started.
+	testOwnTicks = testInitTicks + 500
+)
+
 // testProcessStarted is when the /proc files writeStartTime writes say this
-// container started: 19322773 ticks of 1/100 s after the boot at Unix time
-// 1795299901.
-var testProcessStarted = time.Unix(1795493128, 730_000_000)
+// container started: 5 s before this package was initialized.
+var testProcessStarted = initialized.Add(-5 * time.Second)
+
+// Mount namespace links for the start time tests.
+const (
+	// containerMountNamespace is the mount namespace of this container.
+	containerMountNamespace = "mnt:[4026532001]"
+	// hostMountNamespace is the mount namespace of the host or of another
+	// container.
+	hostMountNamespace = "mnt:[4026531841]"
+)
+
+// writeMountNamespaces writes the mount namespace links of this process, in
+// this container, and of PID 1, in first.
+func writeMountNamespaces(t *testing.T, fsys fstest.MapFS, first string) {
+	t.Helper()
+
+	fsys["proc/self/ns/mnt"] = &fstest.MapFile{Data: []byte(containerMountNamespace), Mode: fs.ModeSymlink}
+	fsys["proc/1/ns/mnt"] = &fstest.MapFile{Data: []byte(first), Mode: fs.ModeSymlink}
+}
+
+// statLine returns a /proc stat file line for a process that started ticks
+// after boot. Its command name holds a space and a parenthesis.
+func statLine(ticks int64) string {
+	return fmt.Sprintf("1 (watch) tower) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 %d 1234 5\n", ticks)
+}
 
 // writeStartTime writes the /proc files that place this container's start at
-// testProcessStarted.
+// testProcessStarted, with PID 1 in this container.
 func writeStartTime(t *testing.T, fsys fstest.MapFS) {
 	t.Helper()
 
-	writeProcFile(t, fsys, "/proc/stat", "cpu  1 2 3 4\nbtime 1795299901\nprocesses 9\n")
-	writeProcFile(t, fsys, "/proc/1/stat",
-		"1 (watch) tower) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 19322773 1234 5\n")
+	writeMountNamespaces(t, fsys, containerMountNamespace)
+	writeProcFile(t, fsys, "/proc/self/stat", statLine(testOwnTicks))
+	writeProcFile(t, fsys, "/proc/1/stat", statLine(testInitTicks))
 }
 
 // TestContainerStartedAt verifies that the start of this container's first
-// process is read from /proc, and that missing or malformed files fail.
+// process is derived from this package's initialization and the start ticks
+// in /proc, and that missing or malformed files fail, as does a PID 1 outside
+// this container's mount namespace.
 func TestContainerStartedAt(t *testing.T) {
 	t.Parallel()
 
-	t.Run("reads the boot time and the start ticks", func(t *testing.T) {
+	// started is when this package was initialized in the fixed-time cases.
+	started := time.Date(2026, 11, 24, 12, 0, 5, 300_000_000, time.UTC)
+
+	t.Run("moves back by the ticks between the two starts", func(t *testing.T) {
 		t.Parallel()
 
 		fsys := fstest.MapFS{}
 		writeStartTime(t, fsys)
 
-		started, err := containerStartedAt(fsys)
+		got, err := containerStartedAt(fsys, started)
 		require.NoError(t, err)
-		assert.True(t, testProcessStarted.Equal(started), "got %v", started)
+		assert.True(t, started.Add(-5*time.Second).Equal(got), "got %v", got)
 	})
 
-	t.Run("reads a start more than 2.9 years after boot", func(t *testing.T) {
+	t.Run("matches the right container whatever the boot time says", func(t *testing.T) {
 		t.Parallel()
 
-		// 10000000000 ticks of 1/100 s are 100000000 seconds, about 3.2
-		// years.
-		fsys := fstest.MapFS{}
-		writeProcFile(t, fsys, "/proc/stat", "btime 1\n")
-		writeProcFile(t, fsys, "/proc/1/stat",
-			"1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 10000000000 1234 5\n")
+		// Docker recorded both starts. A clock step of 3.1 s after this
+		// process started moves the boot time in /proc/stat, which would
+		// place this container's start on the other container's.
+		self := modelfixture.Container(startedAt(time.Date(2026, 11, 24, 12, 0, 0, 300_000_000, time.UTC)))
+		other := modelfixture.Container(startedAt(time.Date(2026, 11, 24, 12, 0, 3, 400_000_000, time.UTC)))
 
-		started, err := containerStartedAt(fsys)
-		require.NoError(t, err)
-		assert.True(t, time.Unix(100000001, 0).Equal(started), "got %v", started)
+		// bootTime is the boot time that matches started without a step.
+		bootTime := started.Add(-testOwnTicks * (time.Second / userHZ))
+
+		for _, step := range []time.Duration{0, 3100 * time.Millisecond} {
+			t.Run(step.String(), func(t *testing.T) {
+				t.Parallel()
+
+				fsys := fstest.MapFS{}
+				writeStartTime(t, fsys)
+				writeProcFile(t, fsys, "/proc/stat", fmt.Sprintf("btime %d\n", bootTime.Add(step).Unix()))
+
+				got, err := containerStartedAt(fsys, started)
+				require.NoError(t, err)
+
+				selfStarted, ok := self.StartedAt()
+				require.True(t, ok)
+				otherStarted, ok := other.StartedAt()
+				require.True(t, ok)
+
+				assert.LessOrEqual(t, got.Sub(selfStarted).Abs(), startTimeTolerance)
+				assert.Greater(t, got.Sub(otherStarted).Abs(), startTimeTolerance)
+			})
+		}
 	})
 
-	tests := []struct {
-		name        string
-		stat        string
-		processStat string
-		wantErr     error
+	t.Run("reads starts long after boot", func(t *testing.T) {
+		t.Parallel()
+
+		// 10000000000 ticks of 1/100 s are about 3.2 years.
+		fsys := fstest.MapFS{}
+		writeMountNamespaces(t, fsys, containerMountNamespace)
+		writeProcFile(t, fsys, "/proc/self/stat", statLine(10000000500))
+		writeProcFile(t, fsys, "/proc/1/stat", statLine(10000000000))
+
+		got, err := containerStartedAt(fsys, started)
+		require.NoError(t, err)
+		assert.True(t, started.Add(-5*time.Second).Equal(got), "got %v", got)
+	})
+
+	t.Run("rejects a PID 1 outside this container", func(t *testing.T) {
+		t.Parallel()
+
+		// With the host's or another container's PID namespace, PID 1 is
+		// that namespace's first process, whose start would match the
+		// wrong container.
+		fsys := fstest.MapFS{}
+		writeStartTime(t, fsys)
+		writeMountNamespaces(t, fsys, hostMountNamespace)
+
+		_, err := containerStartedAt(fsys, started)
+		require.ErrorIs(t, err, errInitOutsideContainer)
+	})
+
+	t.Run("rejects a PID 1 it cannot check", func(t *testing.T) {
+		t.Parallel()
+
+		fsys := fstest.MapFS{}
+		writeStartTime(t, fsys)
+		delete(fsys, "proc/1/ns/mnt")
+
+		_, err := containerStartedAt(fsys, started)
+		require.ErrorIs(t, err, fs.ErrNotExist)
+	})
+
+	// malformed holds stat file contents without a readable start time.
+	malformed := []struct {
+		name    string
+		content string
+		wantErr error
 	}{
-		{name: "no boot time", stat: "cpu  1 2 3 4\n", processStat: "1 (sh) S 0", wantErr: errNoBootTime},
-		{name: "malformed boot time", stat: "btime soon\n", processStat: "1 (sh) S 0", wantErr: errNoBootTime},
-		{name: "no command name", stat: "btime 1\n", processStat: "1 sh S 0", wantErr: errMalformedProcessStat},
-		{name: "too few fields", stat: "btime 1\n", processStat: "1 (sh) S 0 1 1", wantErr: errMalformedProcessStat},
+		{name: "no command name", content: "1 sh S 0", wantErr: errMalformedProcessStat},
+		{name: "too few fields", content: "1 (sh) S 0 1 1", wantErr: errMalformedProcessStat},
 		{
-			name:        "malformed start ticks",
-			stat:        "btime 1\n",
-			processStat: "1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 later 1234 5",
-			wantErr:     errMalformedProcessStat,
+			name:    "malformed start ticks",
+			content: "1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 later 1234 5",
+			wantErr: errMalformedProcessStat,
 		},
-		{name: "no process stat", stat: "btime 1\n", wantErr: fs.ErrNotExist},
-		{name: "no stat file", wantErr: fs.ErrNotExist},
+		{name: "missing", wantErr: fs.ErrNotExist},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+	for _, file := range []string{"/proc/self/stat", "/proc/1/stat"} {
+		for _, tt := range malformed {
+			t.Run(file+" "+tt.name, func(t *testing.T) {
+				t.Parallel()
 
-			fsys := fstest.MapFS{}
-			if tt.stat != "" {
-				writeProcFile(t, fsys, "/proc/stat", tt.stat)
-			}
+				fsys := fstest.MapFS{}
+				writeStartTime(t, fsys)
+				delete(fsys, strings.TrimPrefix(file, "/"))
 
-			if tt.processStat != "" {
-				writeProcFile(t, fsys, "/proc/1/stat", tt.processStat)
-			}
+				if tt.content != "" {
+					writeProcFile(t, fsys, file, tt.content)
+				}
 
-			_, err := containerStartedAt(fsys)
-			require.ErrorIs(t, err, tt.wantErr)
-		})
+				_, err := containerStartedAt(fsys, started)
+				require.ErrorIs(t, err, tt.wantErr)
+			})
+		}
 	}
 }
 
@@ -817,30 +1064,15 @@ func TestContainerStartedAt(t *testing.T) {
 // sees that container's hostname, hosts and resolv.conf mounts, so mountinfo
 // names the network container.
 func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
-	const (
-		vpnID   = "1111111111111111111111111111111111111111111111111111111111111111"
-		selfID  = "2222222222222222222222222222222222222222222222222222222222222222"
-		otherID = "3333333333333333333333333333333333333333333333333333333333333333"
-		// orchestratorID is the ephemeral orchestrator's ID.
-		orchestratorID = "4444444444444444444444444444444444444444444444444444444444444444"
-	)
+	const vpnID = "1111111111111111111111111111111111111111111111111111111111111111"
 
 	vpn := modelfixture.Container(containerfixture.WithID(vpnID), containerfixture.WithName("/vpn"))
 	self := watchtowerContainer(selfID, "/watchtower", "vpn")
 	orchestrator := watchtowerContainer(orchestratorID, "/watchtower-orchestrator-"+selfID, "vpn",
-		containerfixture.WithLabels(map[string]string{
-			labels.Watchtower:            "true",
-			labels.EphemeralOrchestrator: "true",
-		}))
+		ephemeralOrchestrator())
 	stopped := watchtowerContainer(otherID, "/watchtower-stopped", "vpn",
 		containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateExited}))
-	// paused is paused, which Docker reports as running too.
-	paused := watchtowerContainer(otherID, "/watchtower-paused", "vpn",
-		containerfixture.WithContainerState(dockerContainer.State{
-			Running: true,
-			Paused:  true,
-			Status:  dockerContainer.StatePaused,
-		}))
+	pausedJoiner := watchtowerContainer(otherID, "/watchtower-paused", "vpn", paused())
 	// restarting waits to restart, which Docker reports as running too.
 	restarting := watchtowerContainer(otherID, "/watchtower-restarting", "vpn",
 		containerfixture.WithContainerState(dockerContainer.State{
@@ -848,8 +1080,7 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 			Restarting: true,
 			Status:     dockerContainer.StateRestarting,
 		}))
-	// oldName is the name a self-update gives the container with otherID.
-	oldName := "/" + watchtowerContainer(otherID, "", "").OldWatchtowerName()
+	oldName := otherOldName()
 	// old is a running Watchtower container that a self-update renamed.
 	old := watchtowerContainer(otherID, oldName, "vpn")
 
@@ -861,6 +1092,9 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 		listErr error
 		// startTime makes /proc report when this container started.
 		startTime bool
+		// initOutside places PID 1 outside this container, as with a
+		// shared PID namespace.
+		initOutside bool
 		// cgroupID is the container ID the cgroup file names, empty for none.
 		cgroupID string
 		wantID   container.ContainerID
@@ -929,7 +1163,20 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 				watchtowerContainer(selfID, "/watchtower-a", "vpn", startedAt(testProcessStarted.Add(500*time.Millisecond))),
 			},
 			startTime: true,
-			wantErr:   errSeveralWatchtowersJoinNetwork,
+			wantErr:   errAmbiguousOwnContainer,
+		},
+		{
+			// With the network container's PID namespace too, PID 1 is the
+			// network container's first process, which started with the
+			// other joiner.
+			name: "a joiner started with PID 1 outside this container",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "vpn", startedAt(testProcessStarted.Add(500*time.Millisecond))),
+				watchtowerContainer(selfID, "/watchtower-a", "vpn", startedAt(testProcessStarted.Add(-time.Hour))),
+			},
+			startTime:   true,
+			initOutside: true,
+			wantErr:     errAmbiguousOwnContainer,
 		},
 		{
 			// An orchestrator from the Watchtower image carries its label and
@@ -941,7 +1188,7 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 		},
 		{
 			name:         "a paused Watchtower container joins as well",
-			listed:       []*container.Container{self, paused},
+			listed:       []*container.Container{self, pausedJoiner},
 			wantID:       selfID,
 			wantDetected: true,
 		},
@@ -986,10 +1233,10 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 		},
 		{
 			// Every joiner reports the network container's hostname, so
-			// hostname matching would pick one of them and is skipped.
+			// hostname matching cannot tell them apart either and is skipped.
 			name:    "several Watchtower containers join",
 			listed:  []*container.Container{self, watchtowerContainer(otherID, "/watchtower-b", "vpn")},
-			wantErr: errSeveralWatchtowersJoinNetwork,
+			wantErr: errAmbiguousOwnContainer,
 		},
 		{
 			name:       "the network container cannot be inspected",
@@ -1015,6 +1262,10 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 
 			if tt.startTime {
 				writeStartTime(t, fsys)
+			}
+
+			if tt.initOutside {
+				writeMountNamespaces(t, fsys, hostMountNamespace)
 			}
 
 			if tt.cgroupID != "" {
