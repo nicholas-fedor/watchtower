@@ -945,6 +945,14 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 			wantID:   selfID,
 		},
 		{
+			// An image without the Watchtower label also reaches the cgroup
+			// check, which then names the container detection already read.
+			name:         "the cgroup file names the container mountinfo names",
+			cgroupID:     vpnID,
+			wantID:       vpnID,
+			wantDetected: true,
+		},
+		{
 			name:         "a stopped Watchtower container joins as well",
 			listed:       []*container.Container{self, stopped},
 			wantID:       selfID,
@@ -1181,6 +1189,15 @@ func TestParseContainerIDFromCgroupString_Layouts(t *testing.T) {
 		want   container.ContainerID
 	}{
 		{name: "cgroupfs driver", cgroup: "12:memory:/docker/" + id, want: id},
+		{
+			// Docker running inside a Docker container nests the inner
+			// container's cgroup under the outer one's.
+			name:   "nested Docker",
+			cgroup: "12:memory:/docker/" + strings.Repeat("a", 64) + "/docker/" + id,
+			want:   id,
+		},
+		{name: "a parent cgroup named like a container", cgroup: "12:memory:/docker/" + id + "/app"},
+		{name: "an ID longer than a full ID", cgroup: "12:memory:/docker/" + id + "ab"},
 		{name: "systemd driver on cgroup v1", cgroup: "1:name=systemd:/system.slice/docker-" + id + ".scope", want: id},
 		{name: "systemd driver on cgroup v2", cgroup: "0::/system.slice/docker-" + id + ".scope", want: id},
 		{name: "Podman under systemd", cgroup: "0::/machine.slice/libpod-" + id + ".scope", want: id},

@@ -57,8 +57,11 @@ const (
 // Regex patterns for container ID extraction.
 var (
 	// dockerContainerPattern matches a cgroup file line, in the form
-	// hierarchy-ID:controllers:path, whose path holds Docker's /docker/<id>.
-	dockerContainerPattern = regexp.MustCompile(`[0-9]+:.*:/docker/([a-f0-9]{64})`)
+	// hierarchy-ID:controllers:path, whose path ends in Docker's /docker/<id>.
+	// In a nested path, such as Docker running inside a Docker container, the
+	// last one is this container's, and an ID that does not end the path
+	// names a parent cgroup.
+	dockerContainerPattern = regexp.MustCompile(`^[0-9]+:[^:]*:.*/docker/([a-f0-9]{64})$`)
 	// scopeContainerPattern matches a cgroup file line whose path ends in the
 	// systemd scope of a container: docker-<id>.scope for Docker and
 	// libpod-<id>.scope for Podman, as used with the systemd cgroup driver.
@@ -226,11 +229,11 @@ func GetCurrentContainerID(
 //
 // When the cgroup file names a container, as on cgroup v1 or with the host's
 // cgroup namespace, that ID is returned instead of a joiner. Containers
-// waiting to restart are not counted. Ephemeral orchestrators are not counted, since they join Watchtower's
-// network namespace and carry the Watchtower image's label. A single joiner is
-// returned even when a self-update renamed it as old, since only that
-// container can be this one. Several joiners are told apart by their start
-// time, then by their names.
+// waiting to restart are not counted. Ephemeral orchestrators are not counted
+// either, since they join Watchtower's network namespace and carry the
+// Watchtower image's label. A single joiner is returned even when a
+// self-update renamed it as old, since only that container can be this one.
+// Several joiners are told apart by their start time, then by their names.
 //
 // Parameters:
 //   - log: Process logger.
@@ -271,6 +274,10 @@ func joiningWatchtower(
 	// ID it names is exact.
 	cgroupID, err := GetContainerIDFromCgroupFile(log, fsys)
 	if err == nil {
+		if cgroupID == mountID {
+			return mountID, mounted, nil
+		}
+
 		return cgroupID, nil, nil
 	}
 
