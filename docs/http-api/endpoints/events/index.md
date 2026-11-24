@@ -56,7 +56,7 @@ Each event is sent under its type as the SSE event name:
 | `image_cleanup`  | After an update session removes old images               | `images`, each with `image_id`, `image_name`, `container_id` and `container_name`                                                                                                                                                                |
 
 !!! Note
-    Update sessions are scheduled runs and [`/v1/update`](../update/index.md) requests. Checks are [`/v1/check`](../check/index.md) requests. A check updates nothing, so it never sends `image_cleanup`, and its `scan_completed` reports `updated` as 0.
+    Update sessions are scheduled runs and [`/v1/update`](../update/index.md) requests. Checks are [`/v1/check`](../check/index.md) requests. A check updates nothing, so it never sends `image_cleanup`, and its `scan_completed` reports `updated` as 0. When Watchtower stops during an update session, the session ends without an error and its `scan_completed` carries the counts it reached.
 
 ## Event Format
 
