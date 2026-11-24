@@ -10,9 +10,11 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	mockContainerClient "github.com/nicholas-fedor/watchtower/internal/container/client/mocks"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
@@ -338,11 +341,11 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 	t.Run("should return the correct container ID or error", func(t *testing.T) {
 		tests := []struct {
 			name        string
-			setup       func(t *testing.T, mockClient *mockContainerClient.MockContainerLister)
+			setup       func(t *testing.T, mockClient *mockContainerClient.MockContainerReader)
 			want        container.ContainerID
 			wantErrText string
 		}{
-			{name: "when a container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when a container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				expectedID := container.ContainerID("hostname-container-id")
@@ -361,7 +364,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().ListContainers(context.Background()).Return([]*container.Container{mockContainer}, nil)
 			}, want: container.ContainerID("hostname-container-id"), wantErrText: ""},
-			{name: "when no container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when no container with matching hostname is found", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -380,12 +383,12 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().ListContainers(context.Background()).Return([]*container.Container{mockContainer}, nil)
 			}, want: container.ContainerID(""), wantErrText: "no container found with matching hostname"},
-			{name: "when HOSTNAME environment variable is not set", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when HOSTNAME environment variable is not set", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				// HOSTNAME is not set.
 			}, want: container.ContainerID(""), wantErrText: "HOSTNAME environment variable is not set"},
-			{name: "when container listing fails", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when container listing fails", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -397,7 +400,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 
 				mockClient.EXPECT().ListContainers(context.Background()).Return(nil, expectedError)
 			}, want: container.ContainerID(""), wantErrText: "failed to list containers: connection refused"},
-			{name: "when container info is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when container info is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -420,7 +423,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]*container.Container{containerNilInfo, mockContainerMatching}, nil)
 			}, want: container.ContainerID("matching-container-id"), wantErrText: ""},
-			{name: "when container config is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when container config is nil", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -447,7 +450,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]*container.Container{mockContainerNilConfig, mockContainerMatching}, nil)
 			}, want: container.ContainerID("matching-container-id"), wantErrText: ""},
-			{name: "when multiple containers exist but only one matches hostname", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when multiple containers exist but only one matches hostname", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -489,7 +492,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]*container.Container{mockContainer1, mockContainer2, mockContainerMatching, mockContainer3}, nil)
 			}, want: container.ContainerID("matching-container-id"), wantErrText: ""},
-			{name: "when multiple containers share hostname but only one is Watchtower", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when multiple containers share hostname but only one is Watchtower", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -520,7 +523,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 					ListContainers(context.Background()).
 					Return([]*container.Container{nonWatchtowerContainer, watchtowerContainer}, nil)
 			}, want: container.ContainerID("watchtower-container-id"), wantErrText: ""},
-			{name: "when multiple Watchtower containers share hostname, prefer the non-old one", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when multiple Watchtower containers share hostname, prefer the non-old one", setup: func(t *testing.T, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				hostname := testHostname
@@ -564,7 +567,7 @@ func TestGetContainerIDFromHostname(t *testing.T) {
 				t.Setenv("HOSTNAME", "")
 				require.NoError(t, os.Unsetenv("HOSTNAME"))
 
-				mockClient := mockContainerClient.NewMockContainerLister(t)
+				mockClient := mockContainerClient.NewMockContainerReader(t)
 
 				setup, want, wantErrText := tt.setup, tt.want, tt.wantErrText
 
@@ -594,26 +597,29 @@ func TestGetCurrentContainerID(t *testing.T) {
 	t.Run("should return the correct container ID or error", func(t *testing.T) {
 		tests := []struct {
 			name           string
-			setup          func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerLister)
+			setup          func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerReader)
 			expectedID     container.ContainerID
 			expectError    bool
 			errorSubstring string
 		}{
-			{name: "when cgroup v2 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when cgroup v2 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				expectedID := container.ContainerID(
 					"1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
 				)
 
-				// cgroup v2 detection succeeds.
+				// cgroup v2 detection succeeds and names a Watchtower container.
 				writeProcFile(t, fsys, "/proc/self/mountinfo",
 					"36 35 98:0 /var/lib/docker/containers/"+string(
 						expectedID,
 					)+"/resolv.conf /etc/resolv.conf rw,relatime shared:1 - overlay rw,lowerdir=/var/lib/docker/overlay2/l/...,upperdir=/var/lib/docker/overlay2/...,workdir=/var/lib/docker/overlay2/...,\n",
 				)
+
+				mockClient.EXPECT().GetCurrentWatchtowerContainer(context.Background(), expectedID).
+					Return(watchtowerContainer(string(expectedID), "/watchtower", ""), nil).Once()
 			}, expectedID: container.ContainerID("1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"), expectError: false, errorSubstring: ""},
-			{name: "when cgroup v2 detection fails but cgroup v1 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when cgroup v2 detection fails but cgroup v1 detection succeeds", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				expectedID := container.ContainerID(
@@ -627,7 +633,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 			), expectError: false, errorSubstring: ""},
 			{
 				name: "when both cgroup v2 and cgroup v1 detection fail but hostname detection succeeds",
-				setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerLister) {
+				setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerReader) {
 					t.Helper()
 
 					expectedID := container.ContainerID("hostname-container-id")
@@ -655,7 +661,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 				expectError:    false,
 				errorSubstring: "",
 			},
-			{name: "when all detection methods fail", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerLister) {
+			{name: "when all detection methods fail", setup: func(t *testing.T, fsys fstest.MapFS, mockClient *mockContainerClient.MockContainerReader) {
 				t.Helper()
 
 				// No mountinfo or cgroup file, and HOSTNAME is not set, so hostname
@@ -669,7 +675,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 				t.Setenv("HOSTNAME", "")
 				require.NoError(t, os.Unsetenv("HOSTNAME"))
 
-				mockClient := mockContainerClient.NewMockContainerLister(t)
+				mockClient := mockContainerClient.NewMockContainerReader(t)
 
 				setup, expectedID, expectError, errorSubstring := tt.setup, tt.expectedID, tt.expectError, tt.errorSubstring
 
@@ -678,7 +684,7 @@ func TestGetCurrentContainerID(t *testing.T) {
 					setup(t, fsys, mockClient)
 				}
 
-				id, err := GetCurrentContainerID(newTestLogger(t), context.Background(), fsys, mockClient)
+				id, _, err := GetCurrentContainerID(newTestLogger(t), context.Background(), fsys, mockClient)
 				if expectError {
 					require.Error(t, err)
 					assert.Empty(t, id)
@@ -693,6 +699,364 @@ func TestGetCurrentContainerID(t *testing.T) {
 			})
 		}
 	})
+}
+
+// watchtowerContainer returns a running Watchtower container with the given
+// ID and name. A non-empty networkContainer makes it join that container's
+// network namespace, and extra updates apply after the others.
+func watchtowerContainer(id, name, networkContainer string, extra ...containerfixture.Update) *container.Container {
+	updates := []containerfixture.Update{
+		containerfixture.WithID(id),
+		containerfixture.WithName(name),
+		containerfixture.WithLabels(map[string]string{labels.Watchtower: "true"}),
+	}
+	if networkContainer != "" {
+		updates = append(updates, containerfixture.WithNetworkMode("container:"+networkContainer))
+	}
+
+	return modelfixture.Container(append(updates, extra...)...)
+}
+
+// startedAt sets a running container's recorded start.
+func startedAt(started time.Time) containerfixture.Update {
+	return containerfixture.WithContainerState(dockerContainer.State{
+		Running:   true,
+		Status:    dockerContainer.StateRunning,
+		StartedAt: started.UTC().Format(time.RFC3339Nano),
+	})
+}
+
+// testProcessStarted is when the /proc files writeStartTime writes say this
+// container started: 19322773 ticks of 1/100 s after the boot at Unix time
+// 1795299901.
+var testProcessStarted = time.Unix(1795493128, 730_000_000)
+
+// writeStartTime writes the /proc files that place this container's start at
+// testProcessStarted.
+func writeStartTime(t *testing.T, fsys fstest.MapFS) {
+	t.Helper()
+
+	writeProcFile(t, fsys, "/proc/stat", "cpu  1 2 3 4\nbtime 1795299901\nprocesses 9\n")
+	writeProcFile(t, fsys, "/proc/1/stat",
+		"1 (watch) tower) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 19322773 1234 5\n")
+}
+
+// TestContainerStartedAt verifies that the start of this container's first
+// process is read from /proc, and that missing or malformed files fail.
+func TestContainerStartedAt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reads the boot time and the start ticks", func(t *testing.T) {
+		t.Parallel()
+
+		fsys := fstest.MapFS{}
+		writeStartTime(t, fsys)
+
+		started, err := containerStartedAt(fsys)
+		require.NoError(t, err)
+		assert.True(t, testProcessStarted.Equal(started), "got %v", started)
+	})
+
+	t.Run("reads a start more than 2.9 years after boot", func(t *testing.T) {
+		t.Parallel()
+
+		// 10000000000 ticks of 1/100 s are 100000000 seconds, about 3.2
+		// years.
+		fsys := fstest.MapFS{}
+		writeProcFile(t, fsys, "/proc/stat", "btime 1\n")
+		writeProcFile(t, fsys, "/proc/1/stat",
+			"1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 10000000000 1234 5\n")
+
+		started, err := containerStartedAt(fsys)
+		require.NoError(t, err)
+		assert.True(t, time.Unix(100000001, 0).Equal(started), "got %v", started)
+	})
+
+	tests := []struct {
+		name        string
+		stat        string
+		processStat string
+		wantErr     error
+	}{
+		{name: "no boot time", stat: "cpu  1 2 3 4\n", processStat: "1 (sh) S 0", wantErr: errNoBootTime},
+		{name: "malformed boot time", stat: "btime soon\n", processStat: "1 (sh) S 0", wantErr: errNoBootTime},
+		{name: "no command name", stat: "btime 1\n", processStat: "1 sh S 0", wantErr: errMalformedProcessStat},
+		{name: "too few fields", stat: "btime 1\n", processStat: "1 (sh) S 0 1 1", wantErr: errMalformedProcessStat},
+		{
+			name:        "malformed start ticks",
+			stat:        "btime 1\n",
+			processStat: "1 (sh) S 0 1 1 0 -1 4194560 0 0 0 0 0 0 0 0 20 0 1 0 later 1234 5",
+			wantErr:     errMalformedProcessStat,
+		},
+		{name: "no process stat", stat: "btime 1\n", wantErr: fs.ErrNotExist},
+		{name: "no stat file", wantErr: fs.ErrNotExist},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fsys := fstest.MapFS{}
+			if tt.stat != "" {
+				writeProcFile(t, fsys, "/proc/stat", tt.stat)
+			}
+
+			if tt.processStat != "" {
+				writeProcFile(t, fsys, "/proc/1/stat", tt.processStat)
+			}
+
+			_, err := containerStartedAt(fsys)
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+// TestGetCurrentContainerID_sharedNetworkNamespace verifies how detection
+// treats a mountinfo ID that names a container other than a Watchtower
+// container. A Watchtower that joins another container's network namespace
+// sees that container's hostname, hosts and resolv.conf mounts, so mountinfo
+// names the network container.
+func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
+	const (
+		vpnID   = "1111111111111111111111111111111111111111111111111111111111111111"
+		selfID  = "2222222222222222222222222222222222222222222222222222222222222222"
+		otherID = "3333333333333333333333333333333333333333333333333333333333333333"
+		// orchestratorID is the ephemeral orchestrator's ID.
+		orchestratorID = "4444444444444444444444444444444444444444444444444444444444444444"
+	)
+
+	vpn := modelfixture.Container(containerfixture.WithID(vpnID), containerfixture.WithName("/vpn"))
+	self := watchtowerContainer(selfID, "/watchtower", "vpn")
+	orchestrator := watchtowerContainer(orchestratorID, "/watchtower-orchestrator-"+selfID, "vpn",
+		containerfixture.WithLabels(map[string]string{
+			labels.Watchtower:            "true",
+			labels.EphemeralOrchestrator: "true",
+		}))
+	stopped := watchtowerContainer(otherID, "/watchtower-stopped", "vpn",
+		containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateExited}))
+	// paused is paused, which Docker reports as running too.
+	paused := watchtowerContainer(otherID, "/watchtower-paused", "vpn",
+		containerfixture.WithContainerState(dockerContainer.State{
+			Running: true,
+			Paused:  true,
+			Status:  dockerContainer.StatePaused,
+		}))
+	// restarting waits to restart, which Docker reports as running too.
+	restarting := watchtowerContainer(otherID, "/watchtower-restarting", "vpn",
+		containerfixture.WithContainerState(dockerContainer.State{
+			Running:    true,
+			Restarting: true,
+			Status:     dockerContainer.StateRestarting,
+		}))
+	// oldName is the name a self-update gives the container with otherID.
+	oldName := "/" + watchtowerContainer(otherID, "", "").OldName()
+	// old is a running Watchtower container that a self-update renamed.
+	old := watchtowerContainer(otherID, oldName, "vpn")
+
+	tests := []struct {
+		name       string
+		inspectErr error
+		// listed holds the Watchtower containers the listing returns.
+		listed  []*container.Container
+		listErr error
+		// startTime makes /proc report when this container started.
+		startTime bool
+		// cgroupID is the container ID the cgroup file names, empty for none.
+		cgroupID string
+		wantID   container.ContainerID
+		// wantDetected reports whether detection returns the container it
+		// read for wantID.
+		wantDetected bool
+		wantErr      error
+	}{
+		{
+			name:         "the Watchtower container that joins the network container",
+			listed:       []*container.Container{self, watchtowerContainer(otherID, "/watchtower-b", "")},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			// The listing names the network container by its ID when it
+			// cannot inspect it.
+			name:         "a Watchtower container joins by the network container's ID",
+			listed:       []*container.Container{watchtowerContainer(selfID, "/watchtower", vpnID)},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			// A restarted old container is this one when it joins alone.
+			name:         "only an old Watchtower container joins",
+			listed:       []*container.Container{old},
+			wantID:       otherID,
+			wantDetected: true,
+		},
+		{
+			// An old container restarted while its replacement runs must
+			// not take the replacement's ID, or it would never retire.
+			name: "an old Watchtower container restarted beside its replacement",
+			listed: []*container.Container{
+				watchtowerContainer(selfID, "/watchtower", "vpn", startedAt(testProcessStarted.Add(-time.Hour))),
+				watchtowerContainer(otherID, oldName, "vpn", startedAt(testProcessStarted.Add(500*time.Millisecond))),
+			},
+			startTime:    true,
+			wantID:       otherID,
+			wantDetected: true,
+		},
+		{
+			name: "a replacement started beside the old Watchtower container",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, oldName, "vpn", startedAt(testProcessStarted.Add(-time.Hour))),
+				watchtowerContainer(selfID, "/watchtower", "vpn", startedAt(testProcessStarted.Add(500*time.Millisecond))),
+			},
+			startTime:    true,
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			name: "several Watchtower containers told apart by their start",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "vpn", startedAt(testProcessStarted.Add(-3*time.Second))),
+				watchtowerContainer(selfID, "/watchtower-a", "vpn", startedAt(testProcessStarted.Add(500*time.Millisecond))),
+			},
+			startTime:    true,
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			name: "several Watchtower containers started too close together",
+			listed: []*container.Container{
+				watchtowerContainer(otherID, "/watchtower-b", "vpn", startedAt(testProcessStarted.Add(time.Second))),
+				watchtowerContainer(selfID, "/watchtower-a", "vpn", startedAt(testProcessStarted.Add(500*time.Millisecond))),
+			},
+			startTime: true,
+			wantErr:   errSeveralWatchtowersJoinNetwork,
+		},
+		{
+			// An orchestrator from the Watchtower image carries its label and
+			// joins Watchtower's network namespace during a self-update.
+			name:         "an ephemeral orchestrator joins as well",
+			listed:       []*container.Container{self, orchestrator},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			name:         "a paused Watchtower container joins as well",
+			listed:       []*container.Container{self, paused},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			name:         "a Watchtower container waiting to restart joins as well",
+			listed:       []*container.Container{self, restarting},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			// The cgroup file is exact, so the containers are not listed.
+			name:     "the cgroup file names this container",
+			cgroupID: selfID,
+			wantID:   selfID,
+		},
+		{
+			// An image without the Watchtower label also reaches the cgroup
+			// check, which then names the container detection already read.
+			name:         "the cgroup file names the container mountinfo names",
+			cgroupID:     vpnID,
+			wantID:       vpnID,
+			wantDetected: true,
+		},
+		{
+			name:         "a stopped Watchtower container joins as well",
+			listed:       []*container.Container{self, stopped},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			// A rename-based self-update keeps the old container running
+			// while its replacement starts.
+			name:         "an old Watchtower container joins as well",
+			listed:       []*container.Container{old, self},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			name:   "no Watchtower container joins, as for an image without the label",
+			listed: []*container.Container{watchtowerContainer(otherID, "/watchtower-b", "")},
+			wantID: vpnID,
+		},
+		{
+			// Every joiner reports the network container's hostname, so
+			// hostname matching would pick one of them and is skipped.
+			name:    "several Watchtower containers join",
+			listed:  []*container.Container{self, watchtowerContainer(otherID, "/watchtower-b", "vpn")},
+			wantErr: errSeveralWatchtowersJoinNetwork,
+		},
+		{
+			name:       "the network container cannot be inspected",
+			inspectErr: errors.New("daemon unavailable"),
+			wantID:     vpnID,
+		},
+		{
+			name:    "the containers cannot be listed",
+			listErr: errors.New("daemon unavailable"),
+			wantID:  vpnID,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The several-joiners cases must fail without hostname matching,
+			// which would succeed with this HOSTNAME.
+			t.Setenv("HOSTNAME", "vpn-hostname")
+
+			fsys := fstest.MapFS{}
+			writeProcFile(t, fsys, "/proc/self/mountinfo",
+				"36 35 98:0 /var/lib/docker/containers/"+vpnID+"/hostname /etc/hostname rw,relatime - ext4 /dev/sda1 rw\n")
+
+			if tt.startTime {
+				writeStartTime(t, fsys)
+			}
+
+			if tt.cgroupID != "" {
+				writeProcFile(t, fsys, cgroupFile(), "12:memory:/docker/"+tt.cgroupID+"\n")
+			}
+
+			client := mockContainerClient.NewMockContainerReader(t)
+
+			switch {
+			case tt.inspectErr != nil:
+				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, container.ContainerID(vpnID)).
+					Return(nil, tt.inspectErr).Once()
+			case tt.cgroupID != "":
+				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, container.ContainerID(vpnID)).
+					Return(vpn, nil).Once()
+			default:
+				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, container.ContainerID(vpnID)).
+					Return(vpn, nil).Once()
+				client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).
+					Return(tt.listed, tt.listErr).Once()
+			}
+
+			id, detected, err := GetCurrentContainerID(newTestLogger(t), t.Context(), fsys, client)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				assert.Empty(t, id)
+				assert.Nil(t, detected)
+
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantID, id)
+
+			if tt.wantDetected {
+				require.NotNil(t, detected)
+				assert.Equal(t, tt.wantID, detected.ID())
+			} else {
+				assert.Nil(t, detected, "the network container is not Watchtower's own")
+			}
+		})
+	}
 }
 
 // statErrorFs is a filesystem whose Stat fails with err for every path.
@@ -769,7 +1133,7 @@ func TestGetCurrentContainerID_FailureLogsAtDebug(t *testing.T) {
 
 	log := zerolog.New(&out).Level(zerolog.TraceLevel)
 
-	id, err := GetCurrentContainerID(&log, t.Context(), fstest.MapFS{}, nil)
+	id, _, err := GetCurrentContainerID(&log, t.Context(), fstest.MapFS{}, nil)
 	require.Error(t, err)
 	assert.Empty(t, id)
 	assert.NotContains(t, out.String(), `"level":"error"`)
@@ -838,6 +1202,15 @@ func TestParseContainerIDFromCgroupString_Layouts(t *testing.T) {
 		want   container.ContainerID
 	}{
 		{name: "cgroupfs driver", cgroup: "12:memory:/docker/" + id, want: id},
+		{
+			// Docker running inside a Docker container nests the inner
+			// container's cgroup under the outer one's.
+			name:   "nested Docker",
+			cgroup: "12:memory:/docker/" + strings.Repeat("a", 64) + "/docker/" + id,
+			want:   id,
+		},
+		{name: "a parent cgroup named like a container", cgroup: "12:memory:/docker/" + id + "/app"},
+		{name: "an ID longer than a full ID", cgroup: "12:memory:/docker/" + id + "ab"},
 		{name: "systemd driver on cgroup v1", cgroup: "1:name=systemd:/system.slice/docker-" + id + ".scope", want: id},
 		{name: "systemd driver on cgroup v2", cgroup: "0::/system.slice/docker-" + id + ".scope", want: id},
 		{name: "Podman under systemd", cgroup: "0::/machine.slice/libpod-" + id + ".scope", want: id},

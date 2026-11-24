@@ -421,7 +421,12 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	// Retrieve and store the current container ID for use throughout the application.
 	var detectErr, inspectErr error
 
-	p.currentContainerID, detectErr = containerClient.GetCurrentContainerID(p.log, lookupCtx, p.fsys, p.client)
+	p.currentContainerID, p.currentContainer, detectErr = containerClient.GetCurrentContainerID(
+		p.log,
+		lookupCtx,
+		p.fsys,
+		p.client,
+	)
 	if detectErr != nil {
 		p.log.Debug().Err(detectErr).Msg("Failed to get current container ID")
 
@@ -437,8 +442,9 @@ func (p *process) preRun(cmd *cobra.Command, args []string) error {
 	// failed detection.
 	//
 	// Another failed inspect keeps the detected ID, so the checks that tell
-	// Watchtower apart from other instances still work.
-	if p.currentContainerID != "" {
+	// Watchtower apart from other instances still work. A container that
+	// detection already read is not inspected again.
+	if p.currentContainerID != "" && p.currentContainer == nil {
 		// A health check uses none of the container's data, so its inspect
 		// shares the lookup's timeout instead of waiting for every retry.
 		inspectCtx := ctx
@@ -1031,6 +1037,9 @@ func (p *process) isContainerMainProcess() bool {
 // exit path, waiting at most 5 seconds. A failed detection leaves the ID
 // empty.
 //
+// The container is kept too when detection read it from the daemon, so a
+// restart policy that is already "no" is not updated.
+//
 // Parameters:
 //   - ctx: The process context, which a stop signal cancels.
 //
@@ -1042,7 +1051,7 @@ func (p *process) detectCurrentContainerID(ctx context.Context) error {
 
 	var err error
 
-	p.currentContainerID, err = containerClient.GetCurrentContainerID(p.log, ctx, p.fsys, p.client)
+	p.currentContainerID, p.currentContainer, err = containerClient.GetCurrentContainerID(p.log, ctx, p.fsys, p.client)
 
 	return err //nolint:wrapcheck // The error already says that the container ID could not be detected.
 }

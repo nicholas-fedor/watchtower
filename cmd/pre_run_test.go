@@ -62,8 +62,10 @@ func cgroupWithSelf() string {
 // Execute sets before preRun runs.
 //
 // Its client factory returns client, and self container ID detection reads
-// only detection. The Docker variables preRun reads and sets are cleared and
-// restored when the test ends.
+// only detection. When detection includes mountinfo, detection's inspect of
+// the container mountinfo names returns a Watchtower container unless an
+// inspect the test expected earlier matches it. The Docker variables preRun
+// reads and sets are cleared and restored when the test ends.
 //
 // Parameters:
 //   - t: Test that owns the process.
@@ -72,7 +74,7 @@ func cgroupWithSelf() string {
 //
 // Returns:
 //   - *process: The process to run preRun with.
-func newPreRunProcess(t *testing.T, client DockerClient, detection selfDetection) *process {
+func newPreRunProcess(t *testing.T, client *mockCmd.MockDockerClient, detection selfDetection) *process {
 	t.Helper()
 
 	// io/fs paths are relative to the root, so the absolute paths drop their
@@ -88,6 +90,8 @@ func newPreRunProcess(t *testing.T, client DockerClient, detection selfDetection
 
 	if detection.mountinfo != "" {
 		writeFile("/proc/self/mountinfo", detection.mountinfo)
+		client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
+			Return(selfContainer("/watchtower", ""), nil).Maybe()
 	}
 
 	if detection.cgroup != "" {
@@ -232,10 +236,13 @@ func TestPreRun_SelfDetection(t *testing.T) {
 			args:      []string{"--scope", "prod"},
 			detection: selfDetection{mountinfo: mountinfoWithSelf()},
 			setup: func(client *mockCmd.MockDockerClient) {
+				// Detection's inspect has a deadline, and preRun's own
+				// inspect of a container detection could not read has none.
+				client.EXPECT().GetCurrentWatchtowerContainer(withDeadline, selfID).Return(nil, errRunTestDocker).Once()
 				client.EXPECT().GetCurrentWatchtowerContainer(withoutDeadline, selfID).Return(nil, errRunTestDocker)
 			},
 			wantID:      selfID,
-			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc", "GetCurrentWatchtowerContainer cccccccccccc"},
 			wantWarning: "Could not inspect Watchtower's own container",
 			wantError:   errRunTestDocker.Error(),
 		},
@@ -252,7 +259,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 					Return(nil, fmt.Errorf("inspect: %w", context.DeadlineExceeded))
 			},
 			wantID:      selfID,
-			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc", "GetCurrentWatchtowerContainer cccccccccccc"},
 			wantWarning: "Could not inspect Watchtower's own container",
 			wantError:   context.DeadlineExceeded.Error(),
 		},
@@ -266,7 +273,7 @@ func TestPreRun_SelfDetection(t *testing.T) {
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, selfID).
 					Return(nil, fmt.Errorf("inspect: %w", cerrdefs.ErrNotFound))
 			},
-			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc"},
+			wantCalls:   []string{"GetCurrentWatchtowerContainer cccccccccccc", "GetCurrentWatchtowerContainer cccccccccccc"},
 			wantUnknown: true,
 			wantWarning: "Could not identify Watchtower's own container",
 			wantError:   cerrdefs.ErrNotFound.Error(),
@@ -972,7 +979,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 				stopProcess()
 
 				return nil, errRunTestDocker
-			}).Once()
+			})
 	case "stopped-while-inspecting-own-container":
 		detection = selfDetection{mountinfo: mountinfoWithSelf()}
 
@@ -981,7 +988,7 @@ func preRunExitHelper(t *testing.T, helperCase string) {
 				stopProcess()
 
 				return nil, ctx.Err()
-			}).Once()
+			})
 	case "orchestrator-without-settings":
 		args = []string{"--self-update-orchestrator"}
 		detection = selfDetection{}

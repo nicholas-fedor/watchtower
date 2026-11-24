@@ -279,7 +279,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 
 			// Call GetCurrentContainerID which internally uses the client
 			// The function will eventually call ListContainers with our expired context
-			_, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
+			_, _, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
@@ -310,7 +310,7 @@ func TestContainerLookupWithTimeoutContext(t *testing.T) {
 			mockClient.EXPECT().ListContainers(ctx).Return(nil, context.Canceled).Once()
 
 			// Call GetCurrentContainerID
-			_, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
+			_, _, err := containerClient.GetCurrentContainerID(newTestLogger(t), ctx, fstest.MapFS{}, mockClient)
 
 			// Verify error is propagated
 			require.Error(t, err)
