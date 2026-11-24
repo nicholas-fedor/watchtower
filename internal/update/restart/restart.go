@@ -26,7 +26,7 @@ import (
 type Client interface {
 	hooks.Client
 	selfupdate.OrchestratorCreator
-	selfupdate.RenameClient
+	selfupdate.PredecessorClient
 
 	// StopAndRemoveContainer stops the container and removes it. The stop
 	// waits up to timeout.
@@ -844,7 +844,7 @@ func restartStaleContainer(
 		"image":     sourceContainer.ImageName(),
 	}
 
-	var rename selfupdate.Rename
+	var predecessor selfupdate.Predecessor
 
 	// Rename Watchtower containers regardless of NoRestart flag,
 	// but skip in run-once mode as there's no need to avoid conflicts
@@ -879,7 +879,7 @@ func restartStaleContainer(
 
 		var err error
 
-		rename, err = selfupdate.BeginRename(log, ctx, client, sourceContainer)
+		predecessor, err = selfupdate.NewPredecessor(log, ctx, client, sourceContainer)
 		if err != nil {
 			return "", false, err //nolint:wrapcheck // The client's error already names the failed rename.
 		}
@@ -898,9 +898,9 @@ func restartStaleContainer(
 				Fields(fields).
 				Msg("Failed to create container")
 
-			err = rename.Abort(ctx, client, "", config, err)
+			err = predecessor.Abort(ctx, client, "", config, err)
 
-			return "", rename.Renamed(), err
+			return "", predecessor.HasOldName(), err
 		}
 	}
 
@@ -909,15 +909,15 @@ func restartStaleContainer(
 		if err != nil {
 			// A Watchtower container renamed for this self-update still runs
 			// this process, and it takes its original name back.
-			err = rename.Abort(ctx, client, newContainerID, config, err)
+			err = predecessor.Abort(ctx, client, newContainerID, config, err)
 
-			return "", rename.Renamed(), err
+			return "", predecessor.HasOldName(), err
 		}
 	}
 
-	rename.Retire(detachedCtx, client)
+	predecessor.Retire(detachedCtx, client)
 
-	return newContainerID, rename.Renamed(), nil
+	return newContainerID, predecessor.HasOldName(), nil
 }
 
 // recreates reports whether the restart phase recreates a container.

@@ -45,7 +45,7 @@ func newRenameSource(name string) *container.Container {
 	)
 }
 
-// beginRename renames source to its old name through a mocked client, so a
+// predecessorOf renames source to its old name through a mocked client, so a
 // test can go on from a started self-update.
 //
 // Parameters:
@@ -53,35 +53,35 @@ func newRenameSource(name string) *container.Container {
 //   - source: The running Watchtower container.
 //
 // Returns:
-//   - Rename: The started self-update.
-func beginRename(t *testing.T, source *container.Container) Rename {
+//   - Predecessor: The container, under its old name.
+func predecessorOf(t *testing.T, source *container.Container) Predecessor {
 	t.Helper()
 
 	renamer := mockSelfupdate.NewMockRenamer(t)
 	if !container.IsOldContainer(source.Name()) {
-		renamer.EXPECT().RenameContainer(mock.Anything, source, source.OldName()).Return(nil).Once()
+		renamer.EXPECT().RenameContainer(mock.Anything, source, source.OldWatchtowerName()).Return(nil).Once()
 	}
 
-	rename, err := BeginRename(newTestLogger(t), t.Context(), renamer, source)
+	predecessor, err := NewPredecessor(newTestLogger(t), t.Context(), renamer, source)
 	require.NoError(t, err)
 
-	return rename
+	return predecessor
 }
 
-// TestBeginRename verifies that a self-update renames the running Watchtower
+// TestNewPredecessor verifies that a self-update renames the running Watchtower
 // container to its old name and adds it to the replacement's container chain.
 // A container that already has its old name is not renamed again, and a failed
 // rename returns the client's error and leaves the chain alone.
-func TestBeginRename(t *testing.T) {
+func TestNewPredecessor(t *testing.T) {
 	t.Parallel()
 
 	t.Run("renames the container to its old name", func(t *testing.T) {
 		t.Parallel()
 
 		source := newRenameSource("/watchtower")
-		rename := beginRename(t, source)
+		predecessor := predecessorOf(t, source)
 
-		assert.True(t, rename.Renamed())
+		assert.True(t, predecessor.HasOldName())
 
 		chain, ok := source.GetContainerChain()
 		require.True(t, ok)
@@ -92,9 +92,9 @@ func TestBeginRename(t *testing.T) {
 		t.Parallel()
 
 		source := newRenameSource("/watchtower-old-abc123def456")
-		rename := beginRename(t, source)
+		predecessor := predecessorOf(t, source)
 
-		assert.True(t, rename.Renamed())
+		assert.True(t, predecessor.HasOldName())
 
 		chain, ok := source.GetContainerChain()
 		require.True(t, ok)
@@ -108,164 +108,261 @@ func TestBeginRename(t *testing.T) {
 		renameErr := errors.New("failed to rename container: daemon unavailable")
 
 		renamer := mockSelfupdate.NewMockRenamer(t)
-		renamer.EXPECT().RenameContainer(mock.Anything, source, source.OldName()).Return(renameErr).Once()
+		renamer.EXPECT().RenameContainer(mock.Anything, source, source.OldWatchtowerName()).Return(renameErr).Once()
 
-		rename, err := BeginRename(newTestLogger(t), t.Context(), renamer, source)
+		predecessor, err := NewPredecessor(newTestLogger(t), t.Context(), renamer, source)
 		require.Same(t, renameErr, err)
-		assert.False(t, rename.Renamed())
+		assert.False(t, predecessor.HasOldName())
 
 		_, ok := source.GetContainerChain()
 		assert.False(t, ok)
 	})
 }
 
-// TestRename_Abort verifies that a self-update whose replacement fails gives
-// the running container its original name back.
+// newTemporaryRename renames source to its temporary name through a mocked
+// client, so a test can go on from a started rename.
 //
-// A created replacement holds the original name, so it is removed before the
-// rename back. A failed rename back is added to the returned error with both
-// names, since the update reports that error once with the container. A
-// container that already had its old name keeps it, and a restart that renamed
-// nothing returns the cause alone.
-func TestRename_Abort(t *testing.T) {
+// Parameters:
+//   - t: The test.
+//   - source: The container to replace.
+//
+// Returns:
+//   - TemporaryRename: The started rename.
+func newTemporaryRename(t *testing.T, source *container.Container) TemporaryRename {
+	t.Helper()
+
+	renamer := mockSelfupdate.NewMockRenamer(t)
+	renamer.EXPECT().RenameContainer(mock.Anything, source, source.ReplacedName()).Return(nil).Once()
+
+	rename, err := RenameForReplacement(t.Context(), renamer, source, source.ReplacedName())
+	require.NoError(t, err)
+
+	return rename
+}
+
+// TestRenameForReplacement verifies that a container is renamed to its
+// temporary name and that a failed rename returns the client's error without
+// renaming anything.
+func TestRenameForReplacement(t *testing.T) {
+	t.Parallel()
+
+	t.Run("renames the container", func(t *testing.T) {
+		t.Parallel()
+
+		rename := newTemporaryRename(t, newRenameSource("/app"))
+		assert.True(t, rename.HasTemporaryName())
+	})
+
+	t.Run("returns the client's error when the rename fails", func(t *testing.T) {
+		t.Parallel()
+
+		source := newRenameSource("/app")
+		renameErr := errors.New("failed to rename container: daemon unavailable")
+
+		renamer := mockSelfupdate.NewMockRenamer(t)
+		renamer.EXPECT().RenameContainer(mock.Anything, source, source.ReplacedName()).Return(renameErr).Once()
+
+		rename, err := RenameForReplacement(t.Context(), renamer, source, source.ReplacedName())
+		require.Same(t, renameErr, err)
+		assert.False(t, rename.HasTemporaryName())
+	})
+}
+
+// TestPredecessor_Abort verifies that a self-update whose replacement fails gives
+// the running container its original name back and returns the cause.
+//
+// A failed rename back is added to the returned error with both names, since
+// the update reports that error once with the container. A container that
+// already had its old name keeps it. A restart that renamed nothing returns the
+// cause alone.
+func TestPredecessor_Abort(t *testing.T) {
 	t.Parallel()
 
 	t.Run("restores the name after a failed create", func(t *testing.T) {
 		t.Parallel()
 
 		source := newRenameSource("/watchtower")
-		rename := beginRename(t, source)
+		predecessor := predecessorOf(t, source)
 		cause := errors.New("failed to create container: daemon unavailable")
 
-		client := mockSelfupdate.NewMockRenameClient(t)
+		client := mockSelfupdate.NewMockPredecessorClient(t)
 		client.EXPECT().RenameContainer(mock.Anything, source, "watchtower").Return(nil).Once()
 
-		err := rename.Abort(t.Context(), client, "", updateParams.Params{}, cause)
+		err := predecessor.Abort(t.Context(), client, "", updateParams.Params{}, cause)
 		require.Same(t, cause, err)
-		assert.False(t, rename.Renamed())
-	})
-
-	t.Run("removes a failed replacement before restoring the name", func(t *testing.T) {
-		t.Parallel()
-
-		source := newRenameSource("/watchtower")
-		rename := beginRename(t, source)
-		cause := errors.New("failed to start container replacement-id: daemon unavailable")
-		failed := mockUpdate.CreateMockContainer(string(renameReplacementID), "/watchtower", "watchtower:latest", time.Now())
-
-		client := mockSelfupdate.NewMockRenameClient(t)
-		removal := client.EXPECT().GetContainer(mock.Anything, renameReplacementID).Return(failed, nil).Once()
-		stop := client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Second).Return(nil).Once().
-			NotBefore(removal)
-		client.EXPECT().RenameContainer(mock.Anything, source, "watchtower").Return(nil).Once().NotBefore(stop)
-
-		err := rename.Abort(t.Context(), client, renameReplacementID, updateParams.Params{Timeout: time.Second}, cause)
-		require.Same(t, cause, err)
-		assert.False(t, rename.Renamed())
+		assert.False(t, predecessor.HasOldName())
 	})
 
 	t.Run("keeps an old name it did not give", func(t *testing.T) {
 		t.Parallel()
 
 		source := newRenameSource("/watchtower-old-abc123def456")
-		rename := beginRename(t, source)
+		predecessor := predecessorOf(t, source)
 		cause := errors.New("failed to start container replacement-id: daemon unavailable")
 		failed := mockUpdate.CreateMockContainer(string(renameReplacementID), "/watchtower-old-abc123def456", "watchtower:latest", time.Now())
 
 		// The mock fails the test on any rename.
-		client := mockSelfupdate.NewMockRenameClient(t)
+		client := mockSelfupdate.NewMockPredecessorClient(t)
 		client.EXPECT().GetContainer(mock.Anything, renameReplacementID).Return(failed, nil).Once()
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Duration(0)).Return(nil).Once()
 
-		err := rename.Abort(t.Context(), client, renameReplacementID, updateParams.Params{}, cause)
+		err := predecessor.Abort(t.Context(), client, renameReplacementID, updateParams.Params{}, cause)
 		require.Same(t, cause, err)
-		assert.True(t, rename.Renamed())
+		assert.True(t, predecessor.HasOldName())
 	})
 
 	t.Run("returns the cause when nothing was renamed", func(t *testing.T) {
 		t.Parallel()
 
-		var rename Rename
+		var predecessor Predecessor
 
 		cause := errors.New("failed to start container replacement-id: daemon unavailable")
 
-		err := rename.Abort(t.Context(), mockSelfupdate.NewMockRenameClient(t), renameReplacementID, updateParams.Params{}, cause)
+		err := predecessor.Abort(t.Context(), mockSelfupdate.NewMockPredecessorClient(t), renameReplacementID, updateParams.Params{}, cause)
 		require.Same(t, cause, err)
-		assert.False(t, rename.Renamed())
-	})
-
-	t.Run("detaches the rename back from a canceled self-update", func(t *testing.T) {
-		t.Parallel()
-
-		synctest.Test(t, func(t *testing.T) {
-			source := newRenameSource("/watchtower")
-			rename := beginRename(t, source)
-
-			ctx, cancel := context.WithCancel(t.Context())
-			cancel()
-
-			// The rename back gets the stop timeout plus 30 seconds. The
-			// bubble's clock stands still while code runs, so the deadline
-			// matches exactly.
-			client := mockSelfupdate.NewMockRenameClient(t)
-			client.EXPECT().RenameContainer(mock.MatchedBy(func(ctx context.Context) bool {
-				deadline, hasDeadline := ctx.Deadline()
-
-				return ctx.Err() == nil && hasDeadline && deadline.Equal(time.Now().Add(40*time.Second))
-			}), source, "watchtower").Return(nil).Once()
-
-			err := rename.Abort(ctx, client, "", updateParams.Params{Timeout: 10 * time.Second}, context.Canceled)
-			require.ErrorIs(t, err, context.Canceled)
-		})
+		assert.False(t, predecessor.HasOldName())
 	})
 
 	t.Run("adds a failed rename back to the error", func(t *testing.T) {
 		t.Parallel()
 
 		source := newRenameSource("/watchtower")
-		rename := beginRename(t, source)
+		predecessor := predecessorOf(t, source)
 		cause := errors.New("failed to create container: daemon unavailable")
 
-		client := mockSelfupdate.NewMockRenameClient(t)
+		client := mockSelfupdate.NewMockPredecessorClient(t)
 		client.EXPECT().RenameContainer(mock.Anything, source, "watchtower").
 			Return(errors.New("failed to rename container: daemon unavailable")).Once()
 
-		err := rename.Abort(t.Context(), client, "", updateParams.Params{}, cause)
+		err := predecessor.Abort(t.Context(), client, "", updateParams.Params{}, cause)
 		require.ErrorIs(t, err, cause)
 		require.ErrorIs(t, err, errNameNotRestored)
 		require.EqualError(t, err, cause.Error()+
-			", and could not restore Watchtower's container name watchtower from "+source.OldName()+
+			", and could not restore Watchtower's container name watchtower from "+source.OldWatchtowerName()+
 			": failed to rename container: daemon unavailable")
-		assert.True(t, rename.Renamed(), "the source still has its old name")
+		assert.True(t, predecessor.HasOldName(), "the source still has its old name")
 	})
 }
 
-// TestRename_Retire verifies that the container under its old name gets the
+// TestPredecessor_Retire verifies that the container under its old name gets the
 // restart policy "no" once its replacement runs, and that a restart that
 // renamed nothing changes no restart policy.
-func TestRename_Retire(t *testing.T) {
+func TestPredecessor_Retire(t *testing.T) {
 	t.Parallel()
 
 	t.Run("disables the restarts of the renamed container", func(t *testing.T) {
 		t.Parallel()
 
 		source := newRenameSource("/watchtower")
-		rename := beginRename(t, source)
+		predecessor := predecessorOf(t, source)
 
 		client := mockSelfupdate.NewMockRestartPolicySetter(t)
 		client.EXPECT().SetRestartPolicy(mock.Anything, source.ID(),
 			dockerContainer.RestartPolicy{Name: dockerContainer.RestartPolicyDisabled}).Return(nil).Once()
 
-		rename.Retire(t.Context(), client)
+		predecessor.Retire(t.Context(), client)
 	})
 
 	t.Run("does nothing when nothing was renamed", func(t *testing.T) {
 		t.Parallel()
 
-		var rename Rename
+		var predecessor Predecessor
 
 		// The mock fails the test on any call.
-		rename.Retire(t.Context(), mockSelfupdate.NewMockRestartPolicySetter(t))
+		predecessor.Retire(t.Context(), mockSelfupdate.NewMockRestartPolicySetter(t))
+	})
+}
+
+// TestTemporaryRename_Rollback verifies that a failed replacement is removed
+// before the container takes its name back.
+//
+// The rename back runs detached from a canceled update, with the stop timeout
+// plus 30 seconds. A failed rename back returns the client's error and leaves
+// the container under its temporary name. A rename of nothing does nothing.
+func TestTemporaryRename_Rollback(t *testing.T) {
+	t.Parallel()
+
+	t.Run("restores the name when no replacement was created", func(t *testing.T) {
+		t.Parallel()
+
+		source := newRenameSource("/app")
+		rename := newTemporaryRename(t, source)
+
+		client := mockSelfupdate.NewMockRollbackClient(t)
+		client.EXPECT().RenameContainer(mock.Anything, source, "app").Return(nil).Once()
+
+		require.NoError(t, rename.Rollback(newTestLogger(t), t.Context(), client, "", updateParams.Params{}))
+		assert.False(t, rename.HasTemporaryName())
+	})
+
+	t.Run("removes the replacement before restoring the name", func(t *testing.T) {
+		t.Parallel()
+
+		source := newRenameSource("/app")
+		rename := newTemporaryRename(t, source)
+		failed := mockUpdate.CreateMockContainer(string(renameReplacementID), "/app", "app:latest", time.Now())
+
+		client := mockSelfupdate.NewMockRollbackClient(t)
+		removal := client.EXPECT().GetContainer(mock.Anything, renameReplacementID).Return(failed, nil).Once()
+		stop := client.EXPECT().StopAndRemoveContainer(mock.Anything, failed, time.Second).Return(nil).Once().
+			NotBefore(removal)
+		client.EXPECT().RenameContainer(mock.Anything, source, "app").Return(nil).Once().NotBefore(stop)
+
+		err := rename.Rollback(newTestLogger(t), t.Context(), client, renameReplacementID,
+			updateParams.Params{Timeout: time.Second})
+		require.NoError(t, err)
+		assert.False(t, rename.HasTemporaryName())
+	})
+
+	t.Run("does nothing when nothing was renamed", func(t *testing.T) {
+		t.Parallel()
+
+		var rename TemporaryRename
+
+		// The mock fails the test on any call.
+		err := rename.Rollback(newTestLogger(t), t.Context(), mockSelfupdate.NewMockRollbackClient(t),
+			renameReplacementID, updateParams.Params{})
+		require.NoError(t, err)
+		assert.False(t, rename.HasTemporaryName())
+	})
+
+	t.Run("detaches the rename back from a canceled update", func(t *testing.T) {
+		t.Parallel()
+
+		synctest.Test(t, func(t *testing.T) {
+			source := newRenameSource("/app")
+			rename := newTemporaryRename(t, source)
+
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+
+			// The bubble's clock stands still while code runs, so the
+			// deadline matches exactly.
+			client := mockSelfupdate.NewMockRollbackClient(t)
+			client.EXPECT().RenameContainer(mock.MatchedBy(func(ctx context.Context) bool {
+				deadline, hasDeadline := ctx.Deadline()
+
+				return ctx.Err() == nil && hasDeadline && deadline.Equal(time.Now().Add(40*time.Second))
+			}), source, "app").Return(nil).Once()
+
+			err := rename.Rollback(newTestLogger(t), ctx, client, "", updateParams.Params{Timeout: 10 * time.Second})
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("returns the error of a failed rename back", func(t *testing.T) {
+		t.Parallel()
+
+		source := newRenameSource("/app")
+		rename := newTemporaryRename(t, source)
+		renameErr := errors.New("failed to rename container: daemon unavailable")
+
+		client := mockSelfupdate.NewMockRollbackClient(t)
+		client.EXPECT().RenameContainer(mock.Anything, source, "app").Return(renameErr).Once()
+
+		err := rename.Rollback(newTestLogger(t), t.Context(), client, "", updateParams.Params{})
+		require.Same(t, renameErr, err)
+		assert.True(t, rename.HasTemporaryName(), "the container is still under its temporary name")
 	})
 }
 
@@ -329,7 +426,7 @@ func TestRemoveFailedReplacement(t *testing.T) {
 				client.EXPECT().GetContainer(boundCtx, renameReplacementID).Return(failedNew, nil).Once()
 				client.EXPECT().StopAndRemoveContainer(boundCtx, failedNew, 30*time.Second).Return(tt.removeErr).Once()
 
-				RemoveFailedReplacement(newTestLogger(t), t.Context(), client, source, renameReplacementID,
+				removeFailedReplacement(newTestLogger(t), t.Context(), client, source, renameReplacementID,
 					updateParams.Params{Timeout: 30 * time.Second})
 			})
 		})
@@ -341,7 +438,7 @@ func TestRemoveFailedReplacement(t *testing.T) {
 		source := newRenameSource("/watchtower")
 
 		// The mock fails the test on any call.
-		RemoveFailedReplacement(newTestLogger(t), t.Context(), mockSelfupdate.NewMockReplacementRemover(t),
+		removeFailedReplacement(newTestLogger(t), t.Context(), mockSelfupdate.NewMockReplacementRemover(t),
 			source, "", updateParams.Params{})
 	})
 }

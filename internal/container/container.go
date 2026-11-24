@@ -371,7 +371,7 @@ func (c *Container) Name() string {
 	return c.normalizedName
 }
 
-// OldName returns the name a self-update gives this Watchtower container
+// OldWatchtowerName returns the name a self-update gives this Watchtower container
 // before its replacement takes the original name.
 //
 // The name is "watchtower-old-" followed by the container's short ID, so
@@ -379,7 +379,7 @@ func (c *Container) Name() string {
 //
 // Returns:
 //   - string: The container's old name.
-func (c *Container) OldName() string {
+func (c *Container) OldWatchtowerName() string {
 	return watchtowerOldPrefix + c.ID().ShortID()
 }
 

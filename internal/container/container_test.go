@@ -1915,8 +1915,8 @@ func TestContainer_OldName(t *testing.T) {
 		containerfixture.WithName("/watchtower"),
 	)
 
-	assert.Equal(t, "watchtower-old-0123456789ab", c.OldName())
-	assert.True(t, IsOldContainer(c.OldName()))
+	assert.Equal(t, "watchtower-old-0123456789ab", c.OldWatchtowerName())
+	assert.True(t, IsOldContainer(c.OldWatchtowerName()))
 }
 
 // TestNormalizeContainerName_WithLeadingSlash verifies that NormalizeContainerName removes leading slash.
