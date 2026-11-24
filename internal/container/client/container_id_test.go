@@ -891,8 +891,8 @@ const (
 )
 
 // testProcessStarted is when the /proc files writeStartTime writes say this
-// container started: 5 s before this test process started.
-var testProcessStarted = processStarted.Add(-5 * time.Second)
+// container started: 5 s before this package was initialized.
+var testProcessStarted = initialized.Add(-5 * time.Second)
 
 // Mount namespace links for the start time tests.
 const (
@@ -929,13 +929,13 @@ func writeStartTime(t *testing.T, fsys fstest.MapFS) {
 }
 
 // TestContainerStartedAt verifies that the start of this container's first
-// process is derived from this process's start and the start ticks in /proc,
-// and that missing or malformed files fail, as does a PID 1 outside this
-// container's mount namespace.
+// process is derived from this package's initialization and the start ticks
+// in /proc, and that missing or malformed files fail, as does a PID 1 outside
+// this container's mount namespace.
 func TestContainerStartedAt(t *testing.T) {
 	t.Parallel()
 
-	// started is when this process started in the fixed-time cases.
+	// started is when this package was initialized in the fixed-time cases.
 	started := time.Date(2026, 11, 24, 12, 0, 5, 300_000_000, time.UTC)
 
 	t.Run("moves back by the ticks between the two starts", func(t *testing.T) {

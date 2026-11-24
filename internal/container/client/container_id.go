@@ -50,7 +50,7 @@ const (
 	statStartTimeIndex = 19
 	// startTimeTolerance is how far a container's recorded start may be from
 	// the start derived for its first process, which counts in ticks of 10 ms
-	// from the moment this process started.
+	// from the time this package was initialized.
 	startTimeTolerance = 2 * time.Second
 )
 
@@ -58,8 +58,9 @@ const (
 var (
 	// dockerContainerPattern matches a cgroup file line, in the form
 	// hierarchy-ID:controllers:path, whose path ends in Docker's /docker/<id>.
+	//
 	// In a nested path, such as Docker running inside a Docker container, the
-	// last one is this container's, and an ID that does not end the path
+	// last one is this container's and an ID that does not end the path
 	// names a parent cgroup.
 	dockerContainerPattern = regexp.MustCompile(`^[0-9]+:[^:]*:.*/docker/([a-f0-9]{64})$`)
 	// scopeContainerPattern matches a cgroup file line whose path ends in the
@@ -80,9 +81,12 @@ var containerMarkers = []string{
 	".dockerenv",        // Docker
 }
 
-// processStarted is the wall clock time when this process started, read once
-// so a later clock step cannot shift the start times derived from it.
-var processStarted = time.Now().Round(0)
+// initialized is the wall clock time when this package was initialized,
+// shortly after this process started.
+//
+// It is read once, so a later clock step cannot shift the start times derived
+// from it.
+var initialized = time.Now().Round(0)
 
 // Errors for container ID detection operations.
 var (
@@ -387,8 +391,8 @@ func ownContainer(
 // Docker reports nothing else that tells a restarted old Watchtower container
 // apart from its replacement when both are candidates. Their recorded start
 // times differ unless they started within about two seconds of each other.
-// The derived start does not move with a clock step after this process
-// started, so a step during startup cannot match another candidate.
+// The derived start does not move with a clock step after this package was
+// initialized, so a step during startup cannot match another candidate.
 //
 // Parameters:
 //   - log: Process logger.
@@ -399,7 +403,7 @@ func ownContainer(
 //   - *container.Container: The matching candidate, or nil when the start
 //     time cannot be read or no single candidate matches it.
 func startedWithThisContainer(log *zerolog.Logger, fsys fs.FS, candidates []*container.Container) *container.Container {
-	started, err := containerStartedAt(fsys, processStarted)
+	started, err := containerStartedAt(fsys, initialized)
 	if err != nil {
 		log.Debug().Err(err).Msg("Could not read when this container started")
 
@@ -445,20 +449,22 @@ func soleCandidate(candidates []*container.Container, matches func(*container.Co
 // process's mount namespace. A container that shares the host's or another
 // container's PID namespace sees that namespace's first process as PID 1.
 //
-// The start is derived from the start of this process, moved back by the
-// time between the two processes' starts. Process start times in /proc count
-// ticks since boot, so that difference does not change with the wall clock.
+// The start is derived from the time this package was initialized, moved back
+// by the time between the two processes' starts. Process start times in /proc
+// count ticks since boot, so that difference does not change with the wall
+// clock.
 //
 // Parameters:
 //   - fsys: Filesystem rooted at "/" holding /proc.
-//   - started: The wall clock time when this process started.
+//   - initialized: The wall clock time when this package was initialized.
 //
 // Returns:
 //   - time.Time: The start time, accurate to about 10 ms plus the delay
-//     between this process starting and reading started.
+//     between this process starting and this package's initialization.
 //   - error: Non-nil when PID 1 runs outside this container or cannot be
-//     checked, or when a process stat file cannot be read or parsed.
-func containerStartedAt(fsys fs.FS, started time.Time) (time.Time, error) {
+//     checked. It is also non-nil when a process stat file cannot be read or
+//     parsed.
+func containerStartedAt(fsys fs.FS, initialized time.Time) (time.Time, error) {
 	ownNamespace, err := fs.ReadLink(fsys, "proc/self/ns/mnt")
 	if err != nil {
 		return time.Time{}, fmt.Errorf("read this process's mount namespace: %w", err)
@@ -485,7 +491,7 @@ func containerStartedAt(fsys fs.FS, started time.Time) (time.Time, error) {
 		return time.Time{}, err
 	}
 
-	return started.Add(-time.Duration(ownTicks-initTicks) * (time.Second / userHZ)), nil
+	return initialized.Add(-time.Duration(ownTicks-initTicks) * (time.Second / userHZ)), nil
 }
 
 // processStartTicks returns when a process started, in clock ticks since
@@ -730,9 +736,9 @@ func parseContainerIDFromCgroupString(log *zerolog.Logger, cgroupString string) 
 //
 // Returns:
 //   - container.ContainerID: The detected container ID if a match is found.
-//   - error: Non-nil if the HOSTNAME env var is missing, the Docker client's
-//     ListContainers call fails, no matching container is found, or several
-//     match and none can be told apart.
+//   - error: Non-nil if the HOSTNAME env var is missing or the Docker
+//     client's ListContainers call fails. It is also non-nil when no matching
+//     container is found or several match and none can be told apart.
 func GetContainerIDFromHostname(
 	log *zerolog.Logger,
 	ctx context.Context,
