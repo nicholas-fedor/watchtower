@@ -228,10 +228,10 @@ func GetCurrentContainerID(
 //     Watchtower image without the Watchtower label.
 //
 // When the cgroup file names a container, as on cgroup v1 or with the host's
-// cgroup namespace, that ID is returned instead of a joiner. Containers
-// waiting to restart are not counted. Ephemeral orchestrators are not counted
-// either, since they join Watchtower's network namespace and carry the
-// Watchtower image's label. A single joiner is returned even when a
+// cgroup namespace, that ID is returned instead of a joiner. Paused
+// containers and those waiting to restart are not counted. Ephemeral
+// orchestrators are not counted either, since they join Watchtower's network
+// namespace and carry the Watchtower image's label. A single joiner is returned even when a
 // self-update renamed it as old, since only that container can be this one.
 // Several joiners are told apart by their start time, then by their names.
 //
@@ -293,8 +293,10 @@ func joiningWatchtower(
 	var joiners []*container.Container
 
 	for _, c := range watchtowers {
-		// Docker reports a container waiting to restart as running too.
-		if c.IsRunning() && !c.IsRestarting() && !c.IsEphemeralOrchestrator() && c.JoinsNetworkOf(mounted) {
+		// Docker reports a paused container and one waiting to restart as
+		// running too.
+		if c.IsRunning() && !c.IsPaused() && !c.IsRestarting() && !c.IsEphemeralOrchestrator() &&
+			c.JoinsNetworkOf(mounted) {
 			joiners = append(joiners, c)
 		}
 	}

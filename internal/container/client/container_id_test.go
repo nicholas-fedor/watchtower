@@ -834,6 +834,13 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 		}))
 	stopped := watchtowerContainer(otherID, "/watchtower-stopped", "vpn",
 		containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateExited}))
+	// paused is paused, which Docker reports as running too.
+	paused := watchtowerContainer(otherID, "/watchtower-paused", "vpn",
+		containerfixture.WithContainerState(dockerContainer.State{
+			Running: true,
+			Paused:  true,
+			Status:  dockerContainer.StatePaused,
+		}))
 	// restarting waits to restart, which Docker reports as running too.
 	restarting := watchtowerContainer(otherID, "/watchtower-restarting", "vpn",
 		containerfixture.WithContainerState(dockerContainer.State{
@@ -929,6 +936,12 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 			// joins Watchtower's network namespace during a self-update.
 			name:         "an ephemeral orchestrator joins as well",
 			listed:       []*container.Container{self, orchestrator},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			name:         "a paused Watchtower container joins as well",
+			listed:       []*container.Container{self, paused},
 			wantID:       selfID,
 			wantDetected: true,
 		},
