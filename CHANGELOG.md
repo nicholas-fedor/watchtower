@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/docker/cli to v29.10.1+incompatible by @renovate[bot] in [#4039](https://github.com/nicholas-fedor/watchtower/pull/4039)
 - Update module github.com/gofiber/schema to v1.10.2 by @renovate[bot] in [#4037](https://github.com/nicholas-fedor/watchtower/pull/4037)
 - Update module github.com/gofiber/schema to v1.10.1 by @renovate[bot] in [#4033](https://github.com/nicholas-fedor/watchtower/pull/4033)
 - Update sigstore/cosign-installer action to v4.1.4 by @renovate[bot] in [#4034](https://github.com/nicholas-fedor/watchtower/pull/4034)
