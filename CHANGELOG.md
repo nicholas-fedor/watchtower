@@ -54,6 +54,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github/codeql-action action to v4.39.5 by @renovate[bot] in [#4030](https://github.com/nicholas-fedor/watchtower/pull/4030)
+- Update module github.com/nicholas-fedor/shoutrrr to v0.25.1 by @renovate[bot] in [#4031](https://github.com/nicholas-fedor/watchtower/pull/4031)
 - Update module github.com/moby/sys/user to v0.5.1 by @renovate[bot] in [#4026](https://github.com/nicholas-fedor/watchtower/pull/4026)
 - Update anchore/sbom-action action to v0.24.4 by @renovate[bot] in [#4019](https://github.com/nicholas-fedor/watchtower/pull/4019)
 - Update golang.org/x/exp digest to d6646c5 by @renovate[bot] in [#4018](https://github.com/nicholas-fedor/watchtower/pull/4018)
