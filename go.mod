@@ -42,7 +42,6 @@ require (
 )
 
 require (
-	connectrpc.com/connect v1.21.1 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20261013165250-51075c6ea6bc // indirect
 	github.com/DefangLabs/secret-detector v1.1.0 // indirect
@@ -69,8 +68,9 @@ require (
 	github.com/cyphar/filepath-securejoin v0.7.0 // indirect
 	github.com/docker/docker-credential-helpers v0.9.13 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
-	github.com/docker/secrets-engine/client v0.2.2 // indirect
-	github.com/docker/secrets-engine/x v0.8.5 // indirect
+	github.com/docker/secrets-engine/client v1.0.0 // indirect
+	github.com/docker/secrets-engine/secrets v1.0.0 // indirect
+	github.com/docker/secrets-engine/x v0.10.0 // indirect
 	github.com/eclipse/paho.golang v0.24.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
