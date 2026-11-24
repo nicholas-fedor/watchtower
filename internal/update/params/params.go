@@ -16,6 +16,7 @@ import (
 // Params holds the settings that one update run applies to the containers it checks.
 type Params struct {
 	Filter              filters.Filter          // Container filter.
+	Due                 filters.Filter          // Containers checked for updates; nil checks every filtered container. The others restart only for a dependency.
 	ComposeProjects     map[string]string       // Compose project name to directory inside Watchtower.
 	CurrentContainerID  container.ContainerID   // ID of the current container being updated.
 	Scope               string                  // Scope this instance runs in, empty for no scope.

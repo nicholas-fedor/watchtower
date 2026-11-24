@@ -8,4 +8,6 @@ type Schedule struct {
 	IntervalSeconds int
 	// UpdateOnStart runs an update check immediately on startup.
 	UpdateOnStart bool
+	// WatchEvents follows Docker's container events to check new containers as they start.
+	WatchEvents bool
 }
