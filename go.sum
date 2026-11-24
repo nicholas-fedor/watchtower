@@ -232,8 +232,8 @@ github.com/gofiber/contrib/v3/zerolog v1.1.12 h1:IRgEJA19hsggIPqjvUQJ5YgMOZ0Bd6U
 github.com/gofiber/contrib/v3/zerolog v1.1.12/go.mod h1:WrYmCnyhjrS64CzBymYt25U9vA8OV7cq/PjXNB6GAM8=
 github.com/gofiber/fiber/v3 v3.7.0 h1:aF+GfB7nP9Dd0wVsv6wmr8675v66OGfjSyoDhPmvKEo=
 github.com/gofiber/fiber/v3 v3.7.0/go.mod h1:7dlbpUZ789TJg4q/VfdS1UWDtB6Fl/Smk6ZYZusMpAQ=
-github.com/gofiber/schema v1.10.0 h1:d/2/NpHOVD0f29aNvM3KSPmaEDLJZvxW5edtN4Ymd8U=
-github.com/gofiber/schema v1.10.0/go.mod h1:scfpXbReJ8y9xKlNnrwlewJ8nIGVZZmzoHZ4i5yGxG0=
+github.com/gofiber/schema v1.10.1 h1:czqOFMD5IHTrnhKdfb4lOPXGXkX6Lrg6io860sl9zog=
+github.com/gofiber/schema v1.10.1/go.mod h1:scfpXbReJ8y9xKlNnrwlewJ8nIGVZZmzoHZ4i5yGxG0=
 github.com/gofiber/utils/v2 v2.6.5 h1:rU+8ao6LKi3fKOA3sEjfLv1T+2C2IwomeVmEKaqkr4A=
 github.com/gofiber/utils/v2 v2.6.5/go.mod h1:OqPxdhDW7fPz0dupDanqf4e5O15IyFKy724y/EY9RI4=
 github.com/gofrs/flock v0.13.2 h1:9o62TArG4T0f8L46kSf8sLtNUGvJEfiCK9md7/ilko0=
