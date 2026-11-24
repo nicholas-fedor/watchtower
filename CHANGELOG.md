@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop guessing among containers that share watchtower's hostname by @nicholas-fedor in [#4035](https://github.com/nicholas-fedor/watchtower/pull/4035)
 - Restart a network container after its rename back times out by @nicholas-fedor in [#4028](https://github.com/nicholas-fedor/watchtower/pull/4028)
 - Identify watchtower in a shared network namespace by @nicholas-fedor in [#4023](https://github.com/nicholas-fedor/watchtower/pull/4023)
 - Stop reporting a session canceled by shutdown as failed by @nicholas-fedor in [#4020](https://github.com/nicholas-fedor/watchtower/pull/4020)
