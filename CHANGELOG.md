@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop reporting a session canceled by shutdown as failed by @nicholas-fedor in [#4020](https://github.com/nicholas-fedor/watchtower/pull/4020)
 - Keep the network container when ephemeral self-update replaces watchtower by @nicholas-fedor in [#4011](https://github.com/nicholas-fedor/watchtower/pull/4011)
 - Start containers again when their removal fails by @nicholas-fedor in [#4007](https://github.com/nicholas-fedor/watchtower/pull/4007)
 - Leave out the shm size for host and none IPC modes by @nicholas-fedor in [#4003](https://github.com/nicholas-fedor/watchtower/pull/4003)
