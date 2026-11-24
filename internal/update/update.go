@@ -289,7 +289,7 @@ func update(
 		skipped,
 	)
 	if err != nil {
-		return nil, cleanupImageInfos, err
+		return progress.Report(log), cleanupImageInfos, err
 	}
 
 	// Perform updates and restarts, either with rolling restarts or in batches.
@@ -479,9 +479,9 @@ func checkDependencies(
 // Returns:
 //   - bool: True when a check of Watchtower's own image failed. A cooldown
 //     deferral does not count.
-//   - error: Non-nil when ctx ends before every check is recorded. It wraps
-//     the context's error as "update canceled". The containers without a
-//     result are reported as skipped with the context's error.
+//   - error: Non-nil when ctx ends during the phase. It wraps the context's
+//     error as "update canceled". The containers without a result are
+//     reported as skipped with the context's error.
 func checkStaleness(
 	log *zerolog.Logger,
 	ctx context.Context,
@@ -602,10 +602,13 @@ func checkStaleness(
 		log.Debug().
 			Err(err).
 			Msg("Parallel staleness checks completed with error")
+	}
 
-		// A worker returns an error only when the session is canceled. A
-		// canceled check records nothing, so its container and those whose
-		// check never ran are reported as skipped.
+	// A worker returns an error only when the session is canceled. A canceled
+	// check records nothing, so its container and those whose check never ran
+	// are reported as skipped. A session canceled while its last checks failed
+	// on their own also ends here, with those failures recorded.
+	if err != nil || ctx.Err() != nil {
 		return canceled()
 	}
 
@@ -640,8 +643,8 @@ func checkStaleness(
 //
 // Returns:
 //   - stalenessCheck: The check's outcome.
-//   - error: Non-nil only when ctx ends. A failed check is returned in the
-//     outcome instead.
+//   - error: Non-nil only when the check fails because ctx ended. Any other
+//     failed check is returned in the outcome.
 func checkContainerStaleness(
 	log, clog *zerolog.Logger,
 	ctx context.Context,
@@ -681,10 +684,10 @@ func checkContainerStaleness(
 		)
 	}
 
-	// Only the session's own cancellation ends the scan. A check that
-	// fails with a timeout of its own, such as a registry request
-	// reaching its client timeout, is that container's check error.
-	if result.checkErr != nil && ctx.Err() != nil {
+	// Only the end of the session's own context ends the scan. A check that
+	// fails on its own is that container's check error, even during a stop.
+	// That covers a registry request reaching its client timeout.
+	if endedBy(ctx, result.checkErr) {
 		return stalenessCheck{}, fmt.Errorf("staleness check canceled: %w", ctx.Err())
 	}
 

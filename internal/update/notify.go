@@ -379,8 +379,7 @@ func endPanickedSession(
 
 // stoppedBy reports whether err comes from a stop that canceled ctx.
 //
-// A stop cancels ctx without a deadline. A Docker call then fails with the
-// context's error or with its cause, so either one counts.
+// A stop cancels ctx before its deadline. A passed deadline is not a stop.
 //
 // Parameters:
 //   - ctx: The session's context.
@@ -389,11 +388,27 @@ func endPanickedSession(
 // Returns:
 //   - bool: True when ctx is canceled and err comes from that cancellation.
 func stoppedBy(ctx context.Context, err error) bool {
-	if err == nil || !errors.Is(ctx.Err(), context.Canceled) {
+	return errors.Is(ctx.Err(), context.Canceled) && endedBy(ctx, err)
+}
+
+// endedBy reports whether err comes from the end of ctx, by a stop or by its
+// deadline.
+//
+// A Docker call on an ended ctx fails with the context's error or with its
+// cause, so either one counts.
+//
+// Parameters:
+//   - ctx: The session's context.
+//   - err: The error to classify. It may be nil.
+//
+// Returns:
+//   - bool: True when ctx has ended and err comes from that end.
+func endedBy(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() == nil {
 		return false
 	}
 
-	return errors.Is(err, context.Canceled) || errors.Is(err, context.Cause(ctx))
+	return errors.Is(err, ctx.Err()) || errors.Is(err, context.Cause(ctx))
 }
 
 // publishScanCompleted ends a scan for event subscribers with scan_completed.

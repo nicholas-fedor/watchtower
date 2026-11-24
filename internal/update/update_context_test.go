@@ -3,6 +3,7 @@ package update
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
+	"github.com/nicholas-fedor/watchtower/internal/container/oci"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
@@ -736,6 +738,125 @@ func TestUpdate_CanceledStalenessPhaseEndsWithOneError(t *testing.T) {
 			assert.Equal(t, map[string]string{"app": "update skipped: context canceled"}, reportErrors(report.Skipped()))
 		})
 	}
+}
+
+// TestUpdate_StalenessCheckErrorsWhenTheSessionEnds verifies which check
+// errors end the staleness phase once the session's context is done. A check
+// that fails because the session ended ends the phase with one error. Its
+// container is reported as skipped with the context's error. A check that
+// fails on its own during a stop keeps its own error in the report, since a
+// failure the stop did not cause is still a failure. The phase still ends.
+func TestUpdate_StalenessCheckErrorsWhenTheSessionEnds(t *testing.T) {
+	t.Parallel()
+
+	errDaemon := errors.New("daemon unreachable")
+
+	tests := []struct {
+		name string
+		// newContext returns the session's context and a function that ends
+		// it during the check.
+		newContext func(t *testing.T) (context.Context, func())
+		// checkErr returns the error the check fails with, given the
+		// session's context after it ended.
+		checkErr func(ctx context.Context) error
+		// wantErr is the error text the phase ends with.
+		wantErr string
+		// wantSkip is the error the report gives the checked container.
+		wantSkip string
+	}{
+		{
+			name: "a check that fails on its own during a stop",
+			newContext: func(t *testing.T) (context.Context, func()) {
+				t.Helper()
+
+				ctx, cancel := context.WithCancel(t.Context())
+				t.Cleanup(cancel)
+
+				return ctx, cancel
+			},
+			checkErr: func(context.Context) error { return errDaemon },
+			wantErr:  "update canceled: context canceled",
+			wantSkip: "daemon unreachable",
+		},
+		{
+			name: "a check that fails with the session's deadline",
+			newContext: func(t *testing.T) (context.Context, func()) {
+				t.Helper()
+
+				ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+				t.Cleanup(cancel)
+
+				return ctx, func() { time.Sleep(2 * time.Minute) }
+			},
+			checkErr: func(ctx context.Context) error { return ctx.Err() },
+			wantErr:  "update canceled: context deadline exceeded",
+			wantSkip: "update skipped: context deadline exceeded",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			synctest.Test(t, func(t *testing.T) {
+				ctx, endSession := tt.newContext(t)
+
+				app := skipTestContainer("app-id", "app", nil)
+				client := newMockClient(t)
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+				client.EXPECT().IsContainerStale(mock.Anything, app, mock.Anything).RunAndReturn(
+					func(ctx context.Context, _ *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
+						endSession()
+
+						return false, "", "", tt.checkErr(ctx)
+					},
+				).Once()
+
+				report, _, err := update(newTestLogger(t), ctx, client, updateParams.Params{}, ratelimit.New())
+
+				require.EqualError(t, err, tt.wantErr)
+				require.NotNil(t, report)
+				assert.Equal(t, map[string]string{"app": tt.wantSkip}, reportErrors(report.Skipped()))
+			})
+		})
+	}
+}
+
+// TestUpdate_StopDuringRestartPlanKeepsTheChecks verifies that a session
+// stopped while it plans its restarts still returns the report of its
+// staleness checks. The stop lands in the listing of stopped network
+// dependents, whose Docker call fails with the stop's cause. The stale
+// container stays in the report, so the partial report does not read as an
+// empty scan.
+func TestUpdate_StopDuringRestartPlanKeepsTheChecks(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancelCause(t.Context())
+	defer cancel(nil)
+
+	errStop := errors.New("terminated signal received")
+
+	app := skipTestContainer("app-id", "app", nil)
+
+	client := mockUpdate.NewMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+	client.EXPECT().IsContainerStale(mock.Anything, app, mock.Anything).
+		Return(true, container.ImageID("sha256:new"), "", nil).Once()
+	client.EXPECT().GetImageAnnotations(mock.Anything, mock.Anything).Return(oci.Annotations{}).Once()
+	client.EXPECT().ListNetworkDependents(mock.Anything).RunAndReturn(
+		func(ctx context.Context) ([]*container.Container, error) {
+			cancel(errStop)
+
+			return nil, fmt.Errorf("list network dependents: %w", context.Cause(ctx))
+		},
+	).Once()
+
+	report, _, err := update(newTestLogger(t), ctx, client, updateParams.Params{}, ratelimit.New())
+
+	require.ErrorIs(t, err, errStop)
+	require.NotNil(t, report, "a session stopped while planning its restarts returned no report")
+	require.Len(t, report.Stale(), 1)
+	assert.Equal(t, "app", report.Stale()[0].Name())
 }
 
 // TestEarlyCancellationStopContainers tests that context cancellation is properly handled
