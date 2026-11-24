@@ -36,8 +36,7 @@ type OrchestratorCreator interface {
 
 // HandoffClient replaces the old Watchtower container with its successor.
 type HandoffClient interface {
-	Renamer
-	ReplacementRemover
+	RollbackClient
 
 	// StopContainer stops the container. The stop waits up to timeout.
 	StopContainer(ctx context.Context, target *container.Container, timeout time.Duration) error
@@ -467,7 +466,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	)
 	if err != nil {
 		// Recover any existing predecessor, including one already renamed to
-		// watchtower-old-* from an earlier attempt (renamed may be false).
+		// watchtower-old-* from an earlier attempt.
 		if !oldGone {
 			restoreAndStartOldContainer(ctx, client, clog, oldContainer, env.originalName)
 		}
@@ -479,7 +478,7 @@ func orchestrateSelfUpdate(log *zerolog.Logger, ctx context.Context,
 	if err != nil {
 		// A stop timeout set on the container takes precedence over the 30
 		// seconds passed to the stop, so the removal's bound follows the longer.
-		RemoveFailedReplacement(clog, ctx, client, oldContainer, newContainerID,
+		removeFailedReplacement(clog, ctx, client, oldContainer, newContainerID,
 			updateParams.Params{Timeout: orchestratorStopTimeout})
 
 		if !oldGone {

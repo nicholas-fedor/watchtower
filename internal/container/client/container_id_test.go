@@ -849,7 +849,7 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 			Status:     dockerContainer.StateRestarting,
 		}))
 	// oldName is the name a self-update gives the container with otherID.
-	oldName := "/" + watchtowerContainer(otherID, "", "").OldName()
+	oldName := "/" + watchtowerContainer(otherID, "", "").OldWatchtowerName()
 	// old is a running Watchtower container that a self-update renamed.
 	old := watchtowerContainer(otherID, oldName, "vpn")
 

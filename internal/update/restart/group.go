@@ -205,7 +205,7 @@ func stopNetworkGroup(
 	// until its replacement exists, so a failure can still restore it.
 	// A container gone by now is skipped with the rest of its group left
 	// alone.
-	err = client.RenameContainer(ctx, head, head.ReplacedName())
+	rename, err := selfupdate.RenameForReplacement(ctx, client, head, head.ReplacedName())
 	if err != nil {
 		failed[head.ID()] = abandonStop(log, client, head, err, "Failed to rename container aside for its replacement")
 		keepMembers(group, failed, stopped)
@@ -220,7 +220,7 @@ func stopNetworkGroup(
 	if err != nil {
 		clog.Debug().Err(err).Msg("Failed to create container")
 
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, "", nil, config, err)
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, "", nil, config, err)
 		keepMembers(group, failed, stopped)
 
 		return
@@ -242,7 +242,7 @@ func stopNetworkGroup(
 		}
 
 		heldBy(group, member, err, failed, stopped)
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, reaching, config, failed[head.ID()])
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, reaching, config, failed[head.ID()])
 
 		// The member starts again only once the namespace it joins is restored.
 		startAgain(ctx, member, client, config, failed, err)
@@ -265,7 +265,7 @@ func stopNetworkGroup(
 
 			return
 		case exists:
-			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, newID, reaching, config, err)
+			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, reaching, config, err)
 
 			return
 		default:
@@ -284,7 +284,7 @@ func stopNetworkGroup(
 // started when it was running, under its temporary name when the rename
 // fails. The joiners that name it then name it by ID, so those recreated
 // against it still find it. These steps keep ctx's values but not its
-// cancellation. The rename and the start get the stop timeout plus 30
+// cancellation. The rename and the start each get the stop timeout plus 30
 // seconds. A failed removal shows as a failed rename.
 //
 // Parameters:
@@ -292,6 +292,7 @@ func stopNetworkGroup(
 //   - ctx: The update's context.
 //   - client: Container client for Docker operations.
 //   - source: The container that stepped aside.
+//   - rename: The rename of source to its temporary name.
 //   - newID: The replacement, empty when it was not created.
 //   - joiners: The containers that may be recreated against source.
 //   - config: Update options. The removal waits up to the stop timeout.
@@ -305,19 +306,15 @@ func restoreReplaced(
 	ctx context.Context,
 	client Client,
 	source *container.Container,
+	rename *selfupdate.TemporaryRename,
 	newID container.ContainerID,
 	joiners []*container.Container,
 	config updateParams.Params,
 	cause error,
 ) error {
-	selfupdate.RemoveFailedReplacement(log, ctx, client, source, newID, config)
-
-	restoreCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
-	defer cancel()
-
 	var restoreErrs []error
 
-	err := client.RenameContainer(restoreCtx, source, source.Name())
+	err := rename.Rollback(log, ctx, client, newID, config)
 	if err != nil {
 		restoreErrs = append(restoreErrs, err)
 
@@ -331,7 +328,10 @@ func restoreReplaced(
 	// Starting a container that still runs does nothing. A container left
 	// under its temporary name is started too, so it keeps running.
 	if source.IsRunning() {
-		err = client.StartContainerByID(restoreCtx, source.ID())
+		startCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), config.DetachedTimeout())
+		defer cancel()
+
+		err = client.StartContainerByID(startCtx, source.ID())
 		if err != nil {
 			restoreErrs = append(restoreErrs, err)
 		}

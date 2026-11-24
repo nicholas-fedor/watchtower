@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 	"testing"
+	"testing/synctest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -361,6 +362,50 @@ func TestStopContainersInReversedOrder_networkGroupNameNotRestored(t *testing.T)
 	assert.Equal(t, map[container.ContainerID]container.ContainerID{"chain-id": "", "torrent-id": ""}, stopped)
 	assert.Equal(t, "vpn-id", torrent.NetworkContainer())
 	assert.Equal(t, "torrent", chain.NetworkContainer())
+}
+
+// TestStopContainersInReversedOrder_networkGroupStartAfterSlowRenameBack
+// verifies that a container whose removal failed is started again even when
+// its rename back runs out its time.
+//
+// The container may already be stopped, and the containers that join it lose
+// their network until it runs again. The rename back and the start each get
+// the stop timeout plus 30 seconds, so a rename back that uses all of its time
+// leaves the start a live context.
+func TestStopContainersInReversedOrder_networkGroupStartAfterSlowRenameBack(t *testing.T) {
+	t.Parallel()
+
+	synctest.Test(t, func(t *testing.T) {
+		group := newNetworkGroup()
+		vpn, torrent, chain := group[0], group[1], group[2]
+		replacement := modelfixture.Container(containerfixture.WithID("new-vpn"))
+
+		client := mockRestart.NewMockClient(t)
+		client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+		client.EXPECT().DiscardCopyFiles(vpn.ID()).Return().Once()
+		mock.InOrder(
+			client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
+			client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+			client.EXPECT().StopAndRemoveContainer(mock.Anything, chain, mock.Anything).Return(nil).Once(),
+			client.EXPECT().StopAndRemoveContainer(mock.Anything, torrent, mock.Anything).Return(nil).Once(),
+			client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(errors.New("remove failed")).Once(),
+			client.EXPECT().GetContainer(mock.Anything, vpn.ID()).Return(vpn, nil).Once(),
+			client.EXPECT().GetContainer(mock.Anything, container.ContainerID("new-vpn")).Return(replacement, nil).Once(),
+			client.EXPECT().StopAndRemoveContainer(mock.Anything, replacement, mock.Anything).Return(nil).Once(),
+			client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").
+				RunAndReturn(func(ctx context.Context, _ *container.Container, _ string) error {
+					<-ctx.Done()
+
+					return ctx.Err()
+				}).Once(),
+			client.EXPECT().StartContainerByID(liveContext, vpn.ID()).Return(nil).Once(),
+		)
+
+		failed, _ := stopContainersInReversedOrder(newTestLogger(t), t.Context(), group, client, updateParams.Params{})
+
+		require.ErrorIs(t, failed[vpn.ID()], errNotRestored)
+		require.ErrorIs(t, failed[vpn.ID()], context.DeadlineExceeded)
+	})
 }
 
 // TestStopContainersInReversedOrder_networkGroupAfterDependency verifies that

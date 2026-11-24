@@ -560,7 +560,7 @@ func TestDetachedContext(t *testing.T) {
 			// The removed replacement held the original name, so the source can
 			// take it back only after the removal.
 			assert.Equal(t,
-				[]string{testContainer.OldName(), "watchtower"},
+				[]string{testContainer.OldWatchtowerName(), "watchtower"},
 				client.TestData.RenameTargets,
 			)
 
@@ -2275,7 +2275,7 @@ func TestClientErrorsNamedOnce(t *testing.T) {
 		source := newWatchtowerContainer()
 		client := mockRestart.NewMockClient(t)
 		client.EXPECT().
-			RenameContainer(mock.Anything, source, source.OldName()).
+			RenameContainer(mock.Anything, source, source.OldWatchtowerName()).
 			Return(clientErr)
 
 		_, renamed, err := restartStaleContainer(newTestLogger(t), t.Context(), source, "", client, updateParams.Params{})

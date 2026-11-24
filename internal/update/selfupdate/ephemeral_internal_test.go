@@ -118,7 +118,7 @@ func expectHandoffStart(client *mockSelfupdate.MockHandoffClient, old *container
 
 	return handoffCalls{
 		stop: client.EXPECT().StopContainer(mock.Anything, old, orchestratorStopTimeout).Return(nil).Once(),
-		rename: client.EXPECT().RenameContainer(mock.Anything, old, old.OldName()).
+		rename: client.EXPECT().RenameContainer(mock.Anything, old, old.OldWatchtowerName()).
 			Return(nil).Once(),
 		start: client.EXPECT().StartContainer(mock.Anything, old).Return(newID, startErr).Once(),
 	}
