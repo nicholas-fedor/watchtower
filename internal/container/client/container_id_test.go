@@ -834,6 +834,13 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 		}))
 	stopped := watchtowerContainer(otherID, "/watchtower-stopped", "vpn",
 		containerfixture.WithContainerState(dockerContainer.State{Status: dockerContainer.StateExited}))
+	// restarting waits to restart, which Docker reports as running too.
+	restarting := watchtowerContainer(otherID, "/watchtower-restarting", "vpn",
+		containerfixture.WithContainerState(dockerContainer.State{
+			Running:    true,
+			Restarting: true,
+			Status:     dockerContainer.StateRestarting,
+		}))
 	// oldName is the name a self-update gives the container with otherID.
 	oldName := "/" + watchtowerContainer(otherID, "", "").OldName()
 	// old is a running Watchtower container that a self-update renamed.
@@ -847,7 +854,9 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 		listErr error
 		// startTime makes /proc report when this container started.
 		startTime bool
-		wantID    container.ContainerID
+		// cgroupID is the container ID the cgroup file names, empty for none.
+		cgroupID string
+		wantID   container.ContainerID
 		// wantDetected reports whether detection returns the container it
 		// read for wantID.
 		wantDetected bool
@@ -924,6 +933,18 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 			wantDetected: true,
 		},
 		{
+			name:         "a Watchtower container waiting to restart joins as well",
+			listed:       []*container.Container{self, restarting},
+			wantID:       selfID,
+			wantDetected: true,
+		},
+		{
+			// The cgroup file is exact, so the containers are not listed.
+			name:     "the cgroup file names this container",
+			cgroupID: selfID,
+			wantID:   selfID,
+		},
+		{
 			name:         "a stopped Watchtower container joins as well",
 			listed:       []*container.Container{self, stopped},
 			wantID:       selfID,
@@ -975,11 +996,20 @@ func TestGetCurrentContainerID_sharedNetworkNamespace(t *testing.T) {
 				writeStartTime(t, fsys)
 			}
 
+			if tt.cgroupID != "" {
+				writeProcFile(t, fsys, cgroupFile(), "12:memory:/docker/"+tt.cgroupID+"\n")
+			}
+
 			client := mockContainerClient.NewMockContainerReader(t)
-			if tt.inspectErr != nil {
+
+			switch {
+			case tt.inspectErr != nil:
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, container.ContainerID(vpnID)).
 					Return(nil, tt.inspectErr).Once()
-			} else {
+			case tt.cgroupID != "":
+				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, container.ContainerID(vpnID)).
+					Return(vpn, nil).Once()
+			default:
 				client.EXPECT().GetCurrentWatchtowerContainer(mock.Anything, container.ContainerID(vpnID)).
 					Return(vpn, nil).Once()
 				client.EXPECT().ListLabeledContainers(mock.Anything, labels.Watchtower).

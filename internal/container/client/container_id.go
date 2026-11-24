@@ -224,7 +224,9 @@ func GetCurrentContainerID(
 //   - No running Watchtower container joins its network namespace, as for a
 //     Watchtower image without the Watchtower label.
 //
-// Ephemeral orchestrators are not counted, since they join Watchtower's
+// When the cgroup file names a container, as on cgroup v1 or with the host's
+// cgroup namespace, that ID is returned instead of a joiner. Containers
+// waiting to restart are not counted. Ephemeral orchestrators are not counted, since they join Watchtower's
 // network namespace and carry the Watchtower image's label. A single joiner is
 // returned even when a self-update renamed it as old, since only that
 // container can be this one. Several joiners are told apart by their start
@@ -233,8 +235,8 @@ func GetCurrentContainerID(
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for the inspect and the listing.
-//   - fsys: Filesystem rooted at "/" holding /proc, read for the start time
-//     of this container's first process.
+//   - fsys: Filesystem rooted at "/" holding /proc, read for the cgroup file
+//     and the start time of this container's first process.
 //   - client: Docker client that reads the containers.
 //   - mountID: The container ID mountinfo names.
 //
@@ -265,6 +267,13 @@ func joiningWatchtower(
 		return mountID, mounted, nil
 	}
 
+	// The cgroup file belongs to this container in any network mode, so an
+	// ID it names is exact.
+	cgroupID, err := GetContainerIDFromCgroupFile(log, fsys)
+	if err == nil {
+		return cgroupID, nil, nil
+	}
+
 	watchtowers, err := client.ListLabeledContainers(ctx, labels.Watchtower)
 	if err != nil {
 		log.Debug().
@@ -277,7 +286,8 @@ func joiningWatchtower(
 	var joiners []*container.Container
 
 	for _, c := range watchtowers {
-		if c.IsRunning() && !c.IsEphemeralOrchestrator() && c.JoinsNetworkOf(mounted) {
+		// Docker reports a container waiting to restart as running too.
+		if c.IsRunning() && !c.IsRestarting() && !c.IsEphemeralOrchestrator() && c.JoinsNetworkOf(mounted) {
 			joiners = append(joiners, c)
 		}
 	}
