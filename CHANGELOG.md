@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update docker secrets-engine modules by @nicholas-fedor in [#4042](https://github.com/nicholas-fedor/watchtower/pull/4042)
 - Update module github.com/docker/cli to v29.10.1+incompatible by @renovate[bot] in [#4039](https://github.com/nicholas-fedor/watchtower/pull/4039)
 - Update module github.com/gofiber/schema to v1.10.2 by @renovate[bot] in [#4037](https://github.com/nicholas-fedor/watchtower/pull/4037)
 - Update module github.com/gofiber/schema to v1.10.1 by @renovate[bot] in [#4033](https://github.com/nicholas-fedor/watchtower/pull/4033)
