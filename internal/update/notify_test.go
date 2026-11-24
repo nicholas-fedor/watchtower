@@ -17,6 +17,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -24,6 +25,7 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/observability/metrics"
 	"github.com/nicholas-fedor/watchtower/internal/observability/notify/format"
 	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
+	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/logcapture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
@@ -174,6 +176,186 @@ func TestRunUpdatesWithNotifications_PassedDeadlineStillRuns(t *testing.T) {
 
 	require.NotNil(t, metric, "a session past its deadline returned no scan metric")
 	assert.True(t, metric.ScanFailed, "a session past its deadline did not report a failed scan")
+}
+
+// TestRunUpdatesWithNotifications_StopDuringSessionIsNoFailure verifies that a
+// session the process is told to stop partway through ends without a failure,
+// as one that starts after the stop does. It logs nothing at warn or error,
+// so no failure reaches notifications. An info line with notify=no records
+// the cancellation and subscribers get scan_completed instead of scan_failed.
+// Stopped during a check, the session sends its partial report and returns
+// its counts without a failed scan. Stopped during the image disk usage query
+// or the container listing, whose Docker calls fail with the stop's cause as
+// Docker calls do, it has no report and returns no metric.
+func TestRunUpdatesWithNotifications_StopDuringSessionIsNoFailure(t *testing.T) {
+	t.Parallel()
+
+	errStop := errors.New("terminated signal received")
+
+	tests := []struct {
+		name string
+		// expect sets the client calls, given a function that stops the session.
+		expect func(client *mockUpdate.MockClient, stop func())
+		// diskSpaceMax is the image disk usage maximum in bytes. A nonzero
+		// value makes the session query image disk usage first.
+		diskSpaceMax int64
+		// wantMetric is the metric the session returns. A nil metric means the
+		// session had no report to send.
+		wantMetric *metrics.Metric
+	}{
+		{
+			name: "during the image disk usage query",
+			expect: func(client *mockUpdate.MockClient, stop func()) {
+				client.EXPECT().GetImageDiskUsage(mock.Anything).RunAndReturn(
+					func(ctx context.Context) (containerClient.ImageDiskUsage, error) {
+						stop()
+
+						return containerClient.ImageDiskUsage{}, fmt.Errorf("query image disk usage: %w", context.Cause(ctx))
+					},
+				).Once()
+			},
+			diskSpaceMax: 10_000,
+			wantMetric:   nil,
+		},
+		{
+			name: "during the container listing",
+			expect: func(client *mockUpdate.MockClient, stop func()) {
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(
+					func(ctx context.Context, _ ...filters.Filter) ([]*container.Container, error) {
+						stop()
+
+						return nil, fmt.Errorf("list containers: %w", context.Cause(ctx))
+					},
+				).Once()
+			},
+			wantMetric: nil,
+		},
+		{
+			name: "during a check",
+			expect: func(client *mockUpdate.MockClient, stop func()) {
+				app := skipTestContainer("app-id", "app", nil)
+
+				client.EXPECT().ListContainers(mock.Anything, mock.Anything).Return([]*container.Container{app}, nil).Once()
+				client.EXPECT().IsContainerStale(mock.Anything, app, mock.Anything).RunAndReturn(
+					func(ctx context.Context, _ *container.Container, _ updateConfig.Policy) (bool, container.ImageID, string, error) {
+						stop()
+
+						return false, "", "", ctx.Err()
+					},
+				).Once()
+			},
+			wantMetric: &metrics.Metric{Skipped: 1},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, cancel := context.WithCancelCause(t.Context())
+			defer cancel(nil)
+
+			client := newMockClient(t)
+			tt.expect(client, func() { cancel(errStop) })
+
+			notifier := mockUpdate.NewMockNotifier(t)
+			batch := expectSessionBatch(t, notifier)
+			notifier.EXPECT().ShouldSendNotification(mock.Anything).Return(true).Maybe()
+
+			broadcaster := events.NewBroadcaster()
+			published, _ := broadcaster.SubscribeWithDone()
+
+			log, logs := logcapture.NewJSON(zerolog.DebugLevel)
+
+			params := defaultTestUpdateParams(filters.NoFilter)
+			params.DiskSpaceMax = tt.diskSpaceMax
+
+			metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
+				Logger:           log,
+				Client:           client,
+				Notifier:         notifier,
+				EventBroadcaster: broadcaster,
+				Update:           params,
+			})
+
+			assert.Equal(t, tt.wantMetric, metric)
+
+			if tt.wantMetric == nil {
+				assert.Empty(t, batch.sent, "a session without a report sent one")
+			} else {
+				assert.Len(t, batch.sent, 1, "the session did not send its partial report")
+			}
+
+			// Events are published synchronously into the subscriber's buffer.
+			var eventTypes []string
+
+			for len(published) > 0 {
+				eventTypes = append(eventTypes, (<-published).Type)
+			}
+
+			assert.Equal(t, []string{"scan_started", "scan_completed"}, eventTypes)
+
+			var notifyValues []any
+
+			for _, entry := range logcapture.Entries[logcapture.Entry](t, logs.String()) {
+				assert.NotContains(t, []any{"warn", "error"}, entry["level"], "a stopped session logged a failure: %v", entry)
+
+				if entry["message"] == "Update canceled: shutting down" {
+					assert.Equal(t, "info", entry["level"])
+
+					notifyValues = append(notifyValues, entry["notify"])
+				}
+			}
+
+			assert.Equal(t, []any{"no"}, notifyValues)
+		})
+	}
+}
+
+// TestRunUpdatesWithNotifications_FailureDuringStopStillFails verifies that an
+// error that does not come from the stop still fails the session, even when
+// the process is stopping. The container listing fails with its own error
+// after the stop, so the session logs "Update execution failed" at error,
+// returns a failed scan and ends with scan_failed.
+func TestRunUpdatesWithNotifications_FailureDuringStopStillFails(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	client := newMockClient(t)
+	client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(
+		func(context.Context, ...filters.Filter) ([]*container.Container, error) {
+			cancel()
+
+			return nil, errors.New("daemon unreachable")
+		},
+	).Once()
+
+	broadcaster := events.NewBroadcaster()
+	published, _ := broadcaster.SubscribeWithDone()
+
+	log, logs := logcapture.NewJSON(zerolog.DebugLevel)
+
+	metric := RunUpdatesWithNotifications(ctx, RunUpdatesWithNotificationsParams{
+		Logger:           log,
+		Client:           client,
+		EventBroadcaster: broadcaster,
+		Update:           defaultTestUpdateParams(filters.NoFilter),
+	})
+
+	assert.Equal(t, &metrics.Metric{ScanFailed: true}, metric)
+
+	// Events are published synchronously into the subscriber's buffer.
+	var eventTypes []string
+
+	for len(published) > 0 {
+		eventTypes = append(eventTypes, (<-published).Type)
+	}
+
+	assert.Equal(t, []string{"scan_started", "scan_failed"}, eventTypes)
+	assert.Equal(t, []string{"error"}, logcapture.Levels(t, logs.String(), "Update execution failed"))
+	assert.Empty(t, logcapture.Levels(t, logs.String(), "Update canceled: shutting down"))
 }
 
 // TestRunUpdatesWithNotifications_PanicEndsSession verifies that a panic during

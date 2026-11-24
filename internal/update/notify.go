@@ -93,28 +93,26 @@ func (e reportedError) Unwrap() error {
 	return e.err
 }
 
-// RunUpdatesWithNotifications performs container updates and sends notifications about the results.
+// RunUpdatesWithNotifications runs an update session and reports its results.
 //
-// It executes the update action with configured parameters, batches notifications, and returns a metric
-// summarizing the session for monitoring purposes, ensuring users are informed of update outcomes.
+// The session updates the containers that params selects. It sends
+// notifications about the results and publishes scan events for subscribers.
 //
-// A panic during the session ends it as an update error does. The panic is
-// logged and sent with the session's notification batch. Subscribers get
-// scan_failed, and the returned metric marks a failed scan.
+// A failed session sends an error notification and publishes scan_failed. Its
+// metric marks a failed scan. A panic or a passed deadline counts as a failure.
 //
-// A session that starts after the process was told to stop makes no update.
-// When ctx is already canceled, it does nothing and returns nil, so it is not
-// reported as a failed scan. A ctx past its deadline still runs and fails, since a timeout is a
-// failure the caller should see.
+// Canceling ctx stops the session without a failure. Canceled before it
+// starts, the session does nothing. Canceled partway through, it reports the
+// work it finished and publishes scan_completed. An error that the
+// cancellation did not cause is still a failure.
 //
 // Parameters:
-//   - ctx: Context for cancellation and timeouts.
-//   - params: The RunUpdatesWithNotificationsParams struct containing all configuration parameters.
-//     params.Logger is required and must be non-nil (nil panics on first log call).
+//   - ctx: Stops the session when canceled. Its deadline bounds the session.
+//   - params: The session's dependencies and update policy. params.Logger must be non-nil.
 //
 // Returns:
-//   - *metrics.Metric: A pointer to a metric object summarizing the update session (scanned, updated, failed counts).
-//     Nil when ctx was already canceled.
+//   - *metrics.Metric: The session's counts. Nil when ctx is canceled before
+//     the session has a report.
 //
 //nolint:nonamedreturns // The deferred recover sets the result.
 func RunUpdatesWithNotifications(
@@ -125,6 +123,9 @@ func RunUpdatesWithNotifications(
 
 	log.Debug().Msg("Starting RunUpdatesWithNotifications")
 
+	// A session that starts after the process was told to stop makes no
+	// update. A session past its deadline still runs and fails, since a
+	// timeout is a failure the caller should see.
 	if errors.Is(ctx.Err(), context.Canceled) {
 		log.Debug().Err(ctx.Err()).Msg("Update skipped: shutting down")
 
@@ -177,13 +178,7 @@ func RunUpdatesWithNotifications(
 			Msg("Watchtower is running in an old instance's container, stopping this instance")
 
 		// End the scan for event subscribers, with nothing scanned.
-		if params.EventBroadcaster != nil {
-			params.EventBroadcaster.Publish(events.Event{
-				Type:      "scan_completed",
-				Timestamp: time.Now().UTC(),
-				Data:      events.ScanCompletedData{},
-			})
-		}
+		publishScanCompleted(params.EventBroadcaster, events.ScanCompletedData{})
 
 		if params.OnOldSelfDetected != nil {
 			params.OnOldSelfDetected()
@@ -222,6 +217,20 @@ func RunUpdatesWithNotifications(
 				Images: entries,
 			},
 		})
+	}
+
+	// A stop partway through ends the session as a completed one. Its report
+	// still lists the work done before the stop, such as replaced containers.
+	if stoppedBy(ctx, err) {
+		log.Info().Err(err).Str("notify", "no").Msg("Update canceled: shutting down")
+
+		if result == nil {
+			publishScanCompleted(params.EventBroadcaster, events.ScanCompletedData{})
+
+			return nil
+		}
+
+		err = nil
 	}
 
 	// Process update result, return metric on failure
@@ -265,18 +274,12 @@ func RunUpdatesWithNotifications(
 
 	metric = generateAndLogMetric(log, result)
 
-	if params.EventBroadcaster != nil {
-		params.EventBroadcaster.Publish(events.Event{
-			Type:      "scan_completed",
-			Timestamp: time.Now().UTC(),
-			Data: events.ScanCompletedData{
-				Scanned: metric.Scanned,
-				Updated: metric.Updated,
-				Failed:  metric.Failed,
-				Skipped: metric.Skipped,
-			},
-		})
-	}
+	publishScanCompleted(params.EventBroadcaster, events.ScanCompletedData{
+		Scanned: metric.Scanned,
+		Updated: metric.Updated,
+		Failed:  metric.Failed,
+		Skipped: metric.Skipped,
+	})
 
 	return metric
 }
@@ -372,6 +375,42 @@ func endPanickedSession(
 	}
 
 	return &metrics.Metric{ScanFailed: true}
+}
+
+// stoppedBy reports whether err comes from a stop that canceled ctx.
+//
+// A stop cancels ctx without a deadline. A Docker call then fails with the
+// context's error or with its cause, so either one counts.
+//
+// Parameters:
+//   - ctx: The session's context.
+//   - err: The error to classify. It may be nil.
+//
+// Returns:
+//   - bool: True when ctx is canceled and err comes from that cancellation.
+func stoppedBy(ctx context.Context, err error) bool {
+	if err == nil || !errors.Is(ctx.Err(), context.Canceled) {
+		return false
+	}
+
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.Cause(ctx))
+}
+
+// publishScanCompleted ends a scan for event subscribers with scan_completed.
+//
+// Parameters:
+//   - broadcaster: Event broadcaster that receives scan_completed. It may be nil.
+//   - data: The scan's counts.
+func publishScanCompleted(broadcaster *events.Broadcaster, data events.ScanCompletedData) {
+	if broadcaster == nil {
+		return
+	}
+
+	broadcaster.Publish(events.Event{
+		Type:      "scan_completed",
+		Timestamp: time.Now().UTC(),
+		Data:      data,
+	})
 }
 
 // executeUpdate performs the container update operation and handles errors.

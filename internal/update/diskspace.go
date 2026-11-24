@@ -30,7 +30,8 @@ var (
 // warning threshold, and returns errImageDiskSpaceExceeded when usage reaches
 // the maximum. A daemon query failure is fail-closed. Both failures are logged
 // at error here, so the session's own failure line for the returned error is
-// kept out of notifications.
+// kept out of notifications. A query that a stop cancels is returned without
+// that log, since the session treats a stop as no failure.
 //
 // Parameters:
 //   - log: Session logger.
@@ -52,6 +53,12 @@ func checkImageDiskSpace(
 
 	usage, err := client.GetImageDiskUsage(ctx)
 	if err != nil {
+		// A stop that cancels the query is no failure, so the session logs it
+		// without notifying.
+		if stoppedBy(ctx, err) {
+			return fmt.Errorf("%w: %w", errImageDiskUsageFailed, err)
+		}
+
 		log.Error().Err(err).Msg(logging.ImageDiskUsageQueryFailed)
 
 		return reportedError{err: fmt.Errorf("%w: %w", errImageDiskUsageFailed, err)}

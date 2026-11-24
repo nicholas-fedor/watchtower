@@ -207,7 +207,9 @@ func update(
 		config.CurrentContainerID,
 		&cleanupImageInfos,
 	)
-	if cleanupErr != nil {
+	// A stop that cancels the cleanup is no failure. The staleness check then
+	// ends the session.
+	if cleanupErr != nil && !stoppedBy(ctx, cleanupErr) {
 		log.Warn().
 			Err(cleanupErr).
 			Msg("Failed to clean up old Watchtower containers, continuing update cycle")
