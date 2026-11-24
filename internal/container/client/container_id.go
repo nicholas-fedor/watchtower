@@ -96,14 +96,20 @@ var (
 	errContainerIDNotFound = errors.New("HOSTNAME environment variable is not set")
 	// errNoContainerWithHostname indicates no container was found with the matching hostname.
 	errNoContainerWithHostname = errors.New("no container found with matching hostname")
-	// errSeveralWatchtowersJoinNetwork indicates that more than one Watchtower
-	// container joins the network namespace of the container mountinfo names,
-	// so mountinfo cannot tell which one is this one.
-	errSeveralWatchtowersJoinNetwork = errors.New("several Watchtower containers join the network container named by mountinfo")
+	// errAmbiguousOwnContainer indicates that several containers could be
+	// Watchtower's own container and none can be told apart.
+	errAmbiguousOwnContainer = errors.New("several containers could be Watchtower's own container")
+	// errNoOwnContainer indicates that no candidate is a running container
+	// that could be Watchtower's own.
+	errNoOwnContainer = errors.New("no running container could be Watchtower's own container")
 	// errNoBootTime indicates that /proc/stat holds no boot time.
 	errNoBootTime = errors.New("no boot time in /proc/stat")
 	// errMalformedProcessStat indicates that /proc/1/stat has no start time.
 	errMalformedProcessStat = errors.New("no start time in /proc/1/stat")
+	// errInitOutsideContainer indicates that PID 1 runs outside this
+	// container, as when the container shares the host's or another
+	// container's PID namespace.
+	errInitOutsideContainer = errors.New("PID 1 runs outside this container")
 )
 
 // GetCurrentContainerID retrieves the current container ID using a fallback strategy.
@@ -119,8 +125,8 @@ var (
 // network container. When that container is not a Watchtower container and
 // exactly one running Watchtower container joins its network namespace, that
 // Watchtower container is the one returned. When several do and none can be
-// told apart, mountinfo counts as failed and only the cgroup file is tried,
-// since they all report the network container's hostname.
+// told apart, detection fails, since the cgroup file was already read and they
+// all report the network container's hostname.
 //
 // The container is returned too when mountinfo detection read it from the
 // daemon, without its image info when mountinfo names it directly, so the
@@ -168,6 +174,14 @@ func GetCurrentContainerID(
 	log.Debug().
 		Err(mountinfoErr).
 		Msg("Mountinfo detection failed")
+
+	// The cgroup file was already read for the joiners. They all report the
+	// network container's hostname, so hostname matching cannot tell them
+	// apart either.
+	if errors.Is(mountinfoErr, errAmbiguousOwnContainer) {
+		return "", nil, fmt.Errorf("failed to detect current container ID: %w", mountinfoErr)
+	}
+
 	errs = append(errs, mountinfoErr)
 
 	// Second attempt: Cgroup file parsing - works in most containerized environments
@@ -187,14 +201,10 @@ func GetCurrentContainerID(
 		Msg("Cgroup file parsing failed")
 	errs = append(errs, err)
 
-	if errors.Is(mountinfoErr, errSeveralWatchtowersJoinNetwork) {
-		return "", nil, fmt.Errorf("failed to detect current container ID: %w", mountinfoErr)
-	}
-
 	// Third attempt: Hostname matching - fallback using Docker API
 	log.Debug().Msg("Attempting to get current container ID using hostname matching")
 
-	containerID, err = GetContainerIDFromHostname(log, ctx, client)
+	containerID, err = GetContainerIDFromHostname(log, ctx, fsys, client)
 	if err == nil {
 		log.Debug().
 			Str("container_id", string(containerID)).
@@ -228,12 +238,9 @@ func GetCurrentContainerID(
 //     Watchtower image without the Watchtower label.
 //
 // When the cgroup file names a container, as on cgroup v1 or with the host's
-// cgroup namespace, that ID is returned instead of a joiner. Paused
-// containers and those waiting to restart are not counted. Ephemeral
-// orchestrators are not counted either, since they join Watchtower's network
-// namespace and carry the Watchtower image's label. A single joiner is returned even when a
-// self-update renamed it as old, since only that container can be this one.
-// Several joiners are told apart by their start time, then by their names.
+// cgroup namespace, that ID is returned instead of a joiner. Otherwise the
+// joiners count as candidates for Watchtower's own container, under the rules
+// that hostname matching also follows.
 //
 // Parameters:
 //   - log: Process logger.
@@ -293,34 +300,18 @@ func joiningWatchtower(
 	var joiners []*container.Container
 
 	for _, c := range watchtowers {
-		// Docker reports a paused container and one waiting to restart as
-		// running too.
-		if c.IsRunning() && !c.IsPaused() && !c.IsRestarting() && !c.IsEphemeralOrchestrator() &&
-			c.JoinsNetworkOf(mounted) {
+		if c.JoinsNetworkOf(mounted) {
 			joiners = append(joiners, c)
 		}
 	}
 
-	var joiner *container.Container
-
-	switch len(joiners) {
-	case 0:
+	joiner, err := ownContainer(log, fsys, joiners)
+	if errors.Is(err, errNoOwnContainer) {
 		return mountID, nil, nil
-	case 1:
-		joiner = joiners[0]
-	default:
-		// A rename-based self-update keeps the old container running until
-		// its replacement removes it, so a replacement whose start cannot be
-		// told apart takes the joiner that is not old. A restarted old
-		// container that does the same removes itself in the replacement's
-		// startup cleanup.
-		joiner = cmp.Or(
-			startedWithThisContainer(log, fsys, joiners),
-			soleJoiner(joiners, func(c *container.Container) bool { return !container.IsSuperseded(c) }),
-		)
-		if joiner == nil {
-			return "", nil, errSeveralWatchtowersJoinNetwork
-		}
+	}
+
+	if err != nil {
+		return "", nil, fmt.Errorf("containers joining the network container named by mountinfo: %w", err)
 	}
 
 	log.Debug().
@@ -330,24 +321,79 @@ func joiningWatchtower(
 	return joiner.ID(), joiner, nil
 }
 
-// startedWithThisContainer returns the one joiner that started when this
+// ownContainer returns the candidate that is Watchtower's own container.
+//
+// Only running containers that are neither paused nor waiting to restart
+// count. Ephemeral orchestrators do not count either, since they inherit
+// Watchtower's network mode and carry the Watchtower image's label. A single
+// candidate is returned even when a self-update renamed it as old, since only
+// that container can be this one. Several are told apart by their start time,
+// then by the one whose name is not old.
+//
+// Parameters:
+//   - log: Process logger.
+//   - fsys: Filesystem rooted at "/" holding /proc, read for the start time of
+//     this container's first process.
+//   - candidates: The containers that one detection method matched.
+//
+// Returns:
+//   - *container.Container: Watchtower's own container.
+//   - error: Non-nil when no candidate counts or when several count and none
+//     can be told apart.
+func ownContainer(
+	log *zerolog.Logger,
+	fsys fs.FS,
+	candidates []*container.Container,
+) (*container.Container, error) {
+	var live []*container.Container
+
+	for _, c := range candidates {
+		// Docker reports a paused container and one waiting to restart as
+		// running too.
+		if c.IsRunning() && !c.IsPaused() && !c.IsRestarting() && !c.IsEphemeralOrchestrator() {
+			live = append(live, c)
+		}
+	}
+
+	switch len(live) {
+	case 0:
+		return nil, errNoOwnContainer
+	case 1:
+		return live[0], nil
+	default:
+		// A rename-based self-update keeps the old container running until
+		// its replacement removes it, so a replacement whose start cannot be
+		// told apart takes the candidate that is not old. A restarted old
+		// container that does the same removes itself in the replacement's
+		// startup cleanup.
+		own := cmp.Or(
+			startedWithThisContainer(log, fsys, live),
+			soleCandidate(live, func(c *container.Container) bool { return !container.IsSuperseded(c) }),
+		)
+		if own == nil {
+			return nil, errAmbiguousOwnContainer
+		}
+
+		return own, nil
+	}
+}
+
+// startedWithThisContainer returns the one candidate that started when this
 // container's first process started.
 //
-// A restarted old Watchtower container and its replacement both join the
-// network namespace, and Docker reports nothing else that tells them apart.
-// Their recorded start times differ unless they started within about two
-// seconds of each other.
+// Docker reports nothing else that tells a restarted old Watchtower container
+// apart from its replacement when both are candidates. Their recorded start
+// times differ unless they started within about two seconds of each other.
 //
 // Parameters:
 //   - log: Process logger.
 //   - fsys: Filesystem rooted at "/" holding /proc.
-//   - joiners: The running Watchtower containers that join the network
-//     namespace.
+//   - candidates: The running containers that could be Watchtower's own.
 //
 // Returns:
-//   - *container.Container: The matching joiner, or nil when the start time
-//     cannot be read or no single joiner matches it.
-func startedWithThisContainer(log *zerolog.Logger, fsys fs.FS, joiners []*container.Container) *container.Container {
+//   - *container.Container: The matching candidate, or nil when the start
+//     time cannot be read or no single candidate matches it.
+func startedWithThisContainer(log *zerolog.Logger, fsys fs.FS, candidates []*container.Container) *container.Container {
 	started, err := containerStartedAt(fsys)
 	if err != nil {
 		log.Debug().Err(err).Msg("Could not read when this container started")
@@ -355,26 +401,25 @@ func startedWithThisContainer(log *zerolog.Logger, fsys fs.FS, joiners []*contai
 		return nil
 	}
 
-	return soleJoiner(joiners, func(c *container.Container) bool {
-		joinerStarted, ok := c.StartedAt()
+	return soleCandidate(candidates, func(c *container.Container) bool {
+		candidateStarted, ok := c.StartedAt()
 
-		return ok && joinerStarted.Sub(started).Abs() <= startTimeTolerance
+		return ok && candidateStarted.Sub(started).Abs() <= startTimeTolerance
 	})
 }
 
-// soleJoiner returns the one joiner that matches.
+// soleCandidate returns the one candidate that matches.
 //
 // Parameters:
-//   - joiners: The running Watchtower containers that join the network
-//     namespace.
-//   - matches: Reports whether a joiner matches.
+//   - candidates: The running containers that could be Watchtower's own.
+//   - matches: Reports whether a candidate matches.
 //
 // Returns:
-//   - *container.Container: The joiner, or nil when none or several match.
-func soleJoiner(joiners []*container.Container, matches func(*container.Container) bool) *container.Container {
+//   - *container.Container: The candidate, or nil when none or several match.
+func soleCandidate(candidates []*container.Container, matches func(*container.Container) bool) *container.Container {
 	var match *container.Container
 
-	for _, c := range joiners {
+	for _, c := range candidates {
 		if !matches(c) {
 			continue
 		}
@@ -389,16 +434,36 @@ func soleJoiner(joiners []*container.Container, matches func(*container.Containe
 	return match
 }
 
-// containerStartedAt returns when the first process of this container's PID
-// namespace started.
+// containerStartedAt returns when the first process of this container started.
+//
+// PID 1 counts as this container's first process only when it shares this
+// process's mount namespace. A container that shares the host's or another
+// container's PID namespace sees that namespace's first process as PID 1.
 //
 // Parameters:
 //   - fsys: Filesystem rooted at "/" holding /proc.
 //
 // Returns:
 //   - time.Time: The start time, accurate to about a second.
-//   - error: Non-nil when /proc/stat or /proc/1/stat cannot be read or parsed.
+//   - error: Non-nil when PID 1 runs outside this container or cannot be
+//     checked, or when /proc/stat or /proc/1/stat cannot be read or parsed.
 func containerStartedAt(fsys fs.FS) (time.Time, error) {
+	ownNamespace, err := fs.ReadLink(fsys, "proc/self/ns/mnt")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("read this process's mount namespace: %w", err)
+	}
+
+	// Reading another process's namespace needs permission to inspect it, so
+	// an error leaves PID 1 unconfirmed.
+	initNamespace, err := fs.ReadLink(fsys, "proc/1/ns/mnt")
+	if err != nil {
+		return time.Time{}, fmt.Errorf("read the mount namespace of PID 1: %w", err)
+	}
+
+	if initNamespace != ownNamespace {
+		return time.Time{}, errInitOutsideContainer
+	}
+
 	stat, err := fs.ReadFile(fsys, "proc/stat")
 	if err != nil {
 		return time.Time{}, fmt.Errorf("read /proc/stat: %w", err)
@@ -641,18 +706,29 @@ func parseContainerIDFromCgroupString(log *zerolog.Logger, cgroupString string) 
 // GetContainerIDFromHostname retrieves the container ID by matching the HOSTNAME env var.
 //
 // It uses the Docker API to list containers and find a matching hostname.
-// When multiple containers share the same hostname (e.g., in Docker Compose setups),
-// it prefers the container with the Watchtower label.
+// Containers whose hostname matches count as candidates for Watchtower's own
+// container under the rules the shared network namespace check also follows.
+// Candidates with the Watchtower label come first. Several containers share a
+// hostname when it is set explicitly, as in some Docker Compose setups.
 //
 // Parameters:
+//   - log: Process logger.
 //   - ctx: Context for cancellation and timeout control.
+//   - fsys: Filesystem rooted at "/" holding /proc, read for the start time of
+//     this container's first process.
 //   - client: Docker client interface for container operations.
 //
 // Returns:
 //   - container.ContainerID: The detected container ID if a match is found.
 //   - error: Non-nil if the HOSTNAME env var is missing, the Docker client's
-//     ListContainers call fails, or no matching container is found.
-func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client ContainerReader) (container.ContainerID, error) {
+//     ListContainers call fails, no matching container is found, or several
+//     match and none can be told apart.
+func GetContainerIDFromHostname(
+	log *zerolog.Logger,
+	ctx context.Context,
+	fsys fs.FS,
+	client ContainerReader,
+) (container.ContainerID, error) {
 	hostname := os.Getenv("HOSTNAME")
 	if hostname == "" {
 		return "", errContainerIDNotFound
@@ -663,11 +739,7 @@ func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client
 		return "", err //nolint:wrapcheck // The client's error already names the failed listing.
 	}
 
-	// Collect all containers matching the hostname.
-	var (
-		firstMatchID    container.ContainerID
-		watchtowerMatch container.ContainerID
-	)
+	var matches, watchtowers []*container.Container
 
 	for _, c := range containers {
 		containerInfo := c.ContainerInfo()
@@ -683,48 +755,31 @@ func GetContainerIDFromHostname(log *zerolog.Logger, ctx context.Context, client
 			continue
 		}
 
-		if containerInfo.Config.Hostname == hostname {
-			// Record only the first match ID instead of accumulating full containers.
-			if firstMatchID == "" {
-				firstMatchID = c.ID()
-			}
+		if containerInfo.Config.Hostname != hostname {
+			continue
+		}
 
-			// Prefer non-old WT to avoid selecting a lingering predecessor
-			// as "current" for the running (successor) process.
-			if c.IsWatchtower() {
-				contName := c.Name()
-				if contName == "" {
-					contName = containerInfo.Name
-				}
+		matches = append(matches, c)
 
-				isOld := container.IsOldContainer(contName)
-
-				if watchtowerMatch == "" {
-					watchtowerMatch = c.ID()
-				} else if !isOld {
-					watchtowerMatch = c.ID()
-				}
-			}
+		if c.IsWatchtower() {
+			watchtowers = append(watchtowers, c)
 		}
 	}
 
-	// Return the Watchtower container if found among matches.
-	if watchtowerMatch != "" {
-		log.Debug().
-			Str("container_id", string(watchtowerMatch)).
-			Msg("Found Watchtower container by hostname with Watchtower label")
-
-		return watchtowerMatch, nil
+	own, err := ownContainer(log, fsys, watchtowers)
+	if errors.Is(err, errNoOwnContainer) {
+		// A Watchtower image without the Watchtower label leaves only the
+		// hostname to go by.
+		own, err = ownContainer(log, fsys, matches)
 	}
 
-	// Fall back to the first match if no Watchtower container was found.
-	if firstMatchID != "" {
-		log.Debug().
-			Str("container_id", string(firstMatchID)).
-			Msg("Found container by hostname (first match, no Watchtower label)")
-
-		return firstMatchID, nil
+	if errors.Is(err, errNoOwnContainer) {
+		return "", errNoContainerWithHostname
 	}
 
-	return "", errNoContainerWithHostname
+	if err != nil {
+		return "", fmt.Errorf("containers with hostname %q: %w", hostname, err)
+	}
+
+	return own.ID(), nil
 }
