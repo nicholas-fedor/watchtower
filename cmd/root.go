@@ -652,9 +652,6 @@ func (p *process) runMain(processCtx context.Context, runCfg settings.RunConfig)
 		Strs("container_names", runCfg.Names).
 		Msg("Processing specified containers")
 
-	// Give a self-updated instance a moment before it lists its predecessors.
-	p.awaitDockerClient()
-
 	// Initialize the event broadcaster for SSE subscribers.
 	// Declared before runUpdatesWithNotifications so the closure can capture it.
 	eventsBroadcaster := events.NewBroadcaster()
@@ -1067,15 +1064,4 @@ func (p *process) detectCurrentContainerID(ctx context.Context) error {
 func (p *process) currentContainerUnknown() bool {
 	// A host binary has no container ID, so only a containerized run counts.
 	return p.currentContainerID == "" && containerClient.InContainer(p.fsys)
-}
-
-// awaitDockerClient pauses for one second before Watchtower first lists containers.
-//
-// It guards against a self-update race in which the new instance's first listing of Watchtower
-// containers can come back empty, which leaves the old instance running. Waiting for a daemon
-// that is not serving its API yet happens earlier, when the client is created.
-func (p *process) awaitDockerClient() {
-	p.log.Debug().
-		Msg("Sleeping for a second to ensure the docker api client has been properly initialized.")
-	p.sleep(1 * time.Second)
 }

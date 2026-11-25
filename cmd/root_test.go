@@ -48,23 +48,6 @@ func newTestLogger(t *testing.T) *zerolog.Logger {
 	return new(zerolog.New(w))
 }
 
-// TestAwaitDockerClient verifies that the wait before the first container
-// listing pauses the process once, for one second.
-func TestAwaitDockerClient(t *testing.T) {
-	t.Parallel()
-
-	var slept []time.Duration
-
-	proc := &process{
-		log:   newTestLogger(t),
-		sleep: func(d time.Duration) { slept = append(slept, d) },
-	}
-
-	proc.awaitDockerClient()
-
-	assert.Equal(t, []time.Duration{time.Second}, slept)
-}
-
 func TestLifecycleFlags(t *testing.T) {
 	cmd := &cobra.Command{}
 
