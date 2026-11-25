@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Leave ephemeral orchestrators out of instance cleanup by @nicholas-fedor in [#4044](https://github.com/nicholas-fedor/watchtower/pull/4044)
+
+## [1.24.2] - 2026-11-24
+
+### Fixed
+
 - Stop guessing among containers that share watchtower's hostname by @nicholas-fedor in [#4035](https://github.com/nicholas-fedor/watchtower/pull/4035)
 - Restart a network container after its rename back times out by @nicholas-fedor in [#4028](https://github.com/nicholas-fedor/watchtower/pull/4028)
 - Identify watchtower in a shared network namespace by @nicholas-fedor in [#4023](https://github.com/nicholas-fedor/watchtower/pull/4023)
@@ -4630,7 +4636,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Compare Releases
 
-- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.24.1...HEAD)
+- [unreleased](https://github.com/nicholas-fedor/watchtower/compare/v1.24.2...HEAD)
+- [1.24.2](https://github.com/nicholas-fedor/watchtower/compare/v1.24.1...v1.24.2)
 - [1.24.1](https://github.com/nicholas-fedor/watchtower/compare/v1.24.0...v1.24.1)
 - [1.24.0](https://github.com/nicholas-fedor/watchtower/compare/v1.23.2...v1.24.0)
 - [1.23.2](https://github.com/nicholas-fedor/watchtower/compare/v1.23.1...v1.23.2)
