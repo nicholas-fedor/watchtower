@@ -406,7 +406,7 @@ func stopContainersInReversedOrder(
 			continue
 		}
 
-		stopGroup(log, ctx, group, containers[:start], client, config, failed, stopped)
+		stopGroup(log, ctx, group, containers[:start], later, client, config, failed, stopped)
 	}
 
 	return failed, stopped

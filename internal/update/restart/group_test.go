@@ -414,22 +414,29 @@ func TestStopContainersInReversedOrder_networkGroupNameNotRestored(t *testing.T)
 	assert.Equal(t, "torrent", chain.NetworkContainer())
 }
 
-// TestStopGroup_monitoredJoinerNameNotRestored verifies that a monitored
-// joiner stopped before the replacement joins the restored vpn by its ID when
-// the create fails and vpn could not take its name back. Its recreation would
-// otherwise name a container that no longer exists under that name.
-func TestStopGroup_monitoredJoinerNameNotRestored(t *testing.T) {
+// TestStopContainersInReversedOrder_laterJoinerNameNotRestored verifies that
+// a monitored joiner in a later group joins the restored vpn by its ID when
+// vpn's replacement fails to create and vpn could not take its name back. The
+// joiner stops before vpn's group, and its recreation would otherwise name a
+// container that no longer exists under that name. The rebound observer is
+// left in place, since it is not stopped before the create.
+func TestStopContainersInReversedOrder_laterJoinerNameNotRestored(t *testing.T) {
 	t.Parallel()
 
-	vpn := modelfixture.Container(containerfixture.WithName("/vpn"), containerfixture.WithID("vpn-id"))
+	running := containerfixture.WithContainerState(dockerContainer.State{Running: true})
+
+	vpn := modelfixture.Container(containerfixture.WithName("/vpn"), containerfixture.WithID("vpn-id"), running)
 	vpn.SetStale(true)
 
+	observer := rebound("observer", "vpn", running)
+
 	app := modelfixture.Container(containerfixture.WithName("/app"), containerfixture.WithID("app-id"),
-		containerfixture.WithNetworkMode("container:vpn"))
+		containerfixture.WithNetworkMode("container:vpn"), running)
 	app.SetLinkedToRestarting(true)
 
 	client := mockRestart.NewMockClient(t)
 	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+	client.EXPECT().DiscardCopyFiles(mock.Anything).Return().Maybe()
 	mock.InOrder(
 		client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(nil).Once(),
 		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
@@ -438,15 +445,14 @@ func TestStopGroup_monitoredJoinerNameNotRestored(t *testing.T) {
 		client.EXPECT().StartContainerByID(mock.Anything, vpn.ID()).Return(nil).Once(),
 	)
 
-	failed := make(map[container.ContainerID]error)
-	stopped := make(map[container.ContainerID]container.ContainerID)
-
-	stopGroup(newTestLogger(t), t.Context(), []*container.Container{vpn, app}, nil, client,
-		updateParams.Params{RollingRestart: true}, failed, stopped)
+	failed, stopped := stopContainersInReversedOrder(newTestLogger(t), t.Context(),
+		[]*container.Container{vpn, observer, app}, client, updateParams.Params{})
 
 	require.ErrorIs(t, failed[vpn.ID()], errNotRestored)
+	assert.True(t, isSkip(failed[observer.ID()]))
 	assert.Equal(t, map[container.ContainerID]container.ContainerID{"app-id": ""}, stopped)
 	assert.Equal(t, "vpn-id", app.NetworkContainer())
+	assert.Equal(t, "vpn-id", observer.NetworkContainer())
 }
 
 // TestStopContainersInReversedOrder_networkGroupStartAfterSlowRenameBack

@@ -137,6 +137,7 @@ func rollingSpans(containers []*container.Container) [][]*container.Container {
 //   - ctx: Context for cancellation and timeouts.
 //   - group: The container, followed by the rest of its group.
 //   - earlier: The containers before the group that are not recreated yet.
+//   - later: The containers after the group, stopped already.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying stop timeout and other behaviors.
 //   - failed: Receives the error of each container that failed.
@@ -145,7 +146,7 @@ func rollingSpans(containers []*container.Container) [][]*container.Container {
 func stopGroup(
 	log *zerolog.Logger,
 	ctx context.Context,
-	group, earlier []*container.Container,
+	group, earlier, later []*container.Container,
 	client Client,
 	config updateParams.Params,
 	failed map[container.ContainerID]error,
@@ -154,7 +155,7 @@ func stopGroup(
 	head := group[0]
 
 	if len(group) > 1 && head.ToRestart() && len(head.CreateConfigTargets(earlier)) == 0 {
-		stopNetworkGroup(log, ctx, group, client, config, failed, stopped)
+		stopNetworkGroup(log, ctx, group, later, client, config, failed, stopped)
 
 		return
 	}
@@ -190,14 +191,16 @@ func stopGroup(
 //
 // The replacement is then removed. The container takes its name back and
 // starts again if it was running. Members already removed are recreated
-// against it. A member that could not be stopped starts again if it was
-// running, and the members not reached yet are skipped. A member that joins
-// no other member and cannot be stopped fails on its own.
+// against it, as are the containers after the group that join it. A member
+// that could not be stopped starts again if it was running, and the members
+// not reached yet are skipped. A member that joins no other member and cannot
+// be stopped fails on its own.
 //
 // Parameters:
 //   - log: Session logger.
 //   - ctx: Context for cancellation and timeouts.
 //   - group: The container, followed by the rest of its group.
+//   - later: The containers after the group, stopped already.
 //   - client: Container client for Docker operations.
 //   - config: Update options specifying stop timeout and other behaviors.
 //   - failed: Receives the error of each container that failed.
@@ -206,7 +209,7 @@ func stopGroup(
 func stopNetworkGroup(
 	log *zerolog.Logger,
 	ctx context.Context,
-	group []*container.Container,
+	group, later []*container.Container,
 	client Client,
 	config updateParams.Params,
 	failed map[container.ContainerID]error,
@@ -214,6 +217,10 @@ func stopNetworkGroup(
 ) {
 	head := group[0]
 	reaching, others := splitReaching(group)
+
+	// A failed replacement is undone before any of these is recreated, so
+	// each one that joins the container must still find it.
+	joiners := slices.Concat(group[1:], later)
 
 	clogVal := log.With().
 		Str("container", head.Name()).
@@ -263,7 +270,7 @@ func stopNetworkGroup(
 	if err != nil {
 		clog.Debug().Err(err).Msg("Failed to create container")
 
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, "", group[1:], config, err)
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, "", joiners, config, err)
 		keepMembers(group, failed, stopped)
 
 		return
@@ -285,7 +292,7 @@ func stopNetworkGroup(
 		}
 
 		heldBy(group, member, err, failed, stopped)
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, group[1:], config, failed[head.ID()])
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, joiners, config, failed[head.ID()])
 
 		// The member starts again only once the namespace it joins is restored.
 		startAgain(ctx, member, client, config, failed, err)
@@ -308,7 +315,7 @@ func stopNetworkGroup(
 
 			return
 		case exists:
-			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, group[1:], config, err)
+			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, joiners, config, err)
 
 			return
 		default:
