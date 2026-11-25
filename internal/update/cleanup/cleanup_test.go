@@ -1618,6 +1618,59 @@ func TestRemoveExcessWatchtowerInstances_ListingFailure(t *testing.T) {
 	assert.Empty(t, cleanupImageInfo)
 }
 
+// TestRemoveExcessWatchtowerInstances_LeavesOrchestratorsRunning verifies that
+// startup cleanup leaves an ephemeral orchestrator running. The orchestrator
+// carries the Watchtower image's label and no scope label, and after starting
+// the replacement it still removes the old container and image.
+func TestRemoveExcessWatchtowerInstances_LeavesOrchestratorsRunning(t *testing.T) {
+	t.Parallel()
+
+	const (
+		orchestratorID = "e100000000000000000000000000000000000000000000000000000000000000"
+		successorID    = "e200000000000000000000000000000000000000000000000000000000000000"
+		oldID          = "e300000000000000000000000000000000000000000000000000000000000000"
+	)
+
+	orchestrator := chainTestContainer(orchestratorID, "watchtower-orchestrator-"+oldID, map[string]string{
+		"com.centurylinklabs.watchtower":                        "true",
+		"com.centurylinklabs.watchtower.ephemeral-orchestrator": "true",
+	})
+
+	t.Run("beside the current instance", func(t *testing.T) {
+		t.Parallel()
+
+		current := chainTestContainer(chainCurrentID, "watchtower", map[string]string{"com.centurylinklabs.watchtower": "true"})
+		excess := chainTestContainer(chainOldAID, "watchtower-a", map[string]string{"com.centurylinklabs.watchtower": "true"})
+
+		// The mock fails the test on any other stop.
+		client := mockCleanup.NewMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(listContainers(current, orchestrator, excess))
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, excess, mock.Anything).Return(nil).Once()
+
+		removed, err := RemoveExcessWatchtowerInstances(newTestLogger(t), t.Context(), client, false, "", nil, current)
+		require.NoError(t, err)
+		assert.Equal(t, 1, removed)
+	})
+
+	t.Run("listed before an old predecessor's successor", func(t *testing.T) {
+		t.Parallel()
+
+		// Detection selected the old predecessor, so cleanup keeps the first
+		// instance in its scope as the successor and must not mistake the
+		// orchestrator listed before it for that instance.
+		old := chainTestContainer(oldID, "watchtower-old-e30000000000", map[string]string{"com.centurylinklabs.watchtower": "true"})
+		successor := chainTestContainer(successorID, "watchtower", map[string]string{"com.centurylinklabs.watchtower": "true"})
+
+		client := mockCleanup.NewMockClient(t)
+		client.EXPECT().ListContainers(mock.Anything, mock.Anything).RunAndReturn(listContainers(orchestrator, successor, old))
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, old, mock.Anything).Return(nil).Once()
+
+		removed, err := RemoveExcessWatchtowerInstances(newTestLogger(t), t.Context(), client, false, "", nil, old)
+		require.NoError(t, err)
+		assert.Equal(t, 1, removed)
+	})
+}
+
 // TestRemoveImages verifies that each collected image is removed, and that a
 // missing image, a conflict, or a canceled context does not count as a
 // failure.

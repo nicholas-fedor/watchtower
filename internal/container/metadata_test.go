@@ -654,6 +654,43 @@ func TestContainer_IsWatchtower(t *testing.T) {
 	}
 }
 
+// TestContainer_IsWatchtowerInstance verifies that a Watchtower container
+// counts as an instance unless it is also an ephemeral orchestrator.
+func TestContainer_IsWatchtowerInstance(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		containerLabels map[string]string
+		want            bool
+	}{
+		{name: "Watchtower container", containerLabels: map[string]string{labels.Watchtower: "true"}, want: true},
+		{
+			name:            "ephemeral orchestrator",
+			containerLabels: map[string]string{labels.Watchtower: "true", labels.EphemeralOrchestrator: "true"},
+			want:            false,
+		},
+		{
+			name:            "orchestrator from an image without the Watchtower label",
+			containerLabels: map[string]string{labels.EphemeralOrchestrator: "true"},
+			want:            false,
+		},
+		{name: "ordinary container", containerLabels: map[string]string{}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			c := &Container{containerInfo: &dockerContainer.InspectResponse{
+				Config: &dockerContainer.Config{Labels: tt.containerLabels},
+			}}
+
+			assert.Equal(t, tt.want, c.IsWatchtowerInstance())
+		})
+	}
+}
+
 // TestContainer_IsEphemeralOrchestrator verifies that only the exact value
 // "true" marks an orchestrator, since cleanup removes the containers it marks.
 func TestContainer_IsEphemeralOrchestrator(t *testing.T) {
@@ -1797,6 +1834,15 @@ func TestIsOrphanedReplacement(t *testing.T) {
 			name: "not a Watchtower container",
 			candidate: MockContainer(containerfixture.WithID("new"), containerfixture.WithName("/app"), created,
 				containerfixture.WithLabels(map[string]string{})),
+			scope: "",
+			want:  false,
+		},
+		{
+			// An orchestrator left created by a failed start would hand the
+			// self-update over again if recovery started it.
+			name: "created ephemeral orchestrator",
+			candidate: MockContainer(containerfixture.WithID("orchestrator"), containerfixture.WithName("/watchtower-orchestrator-current"), created,
+				containerfixture.WithLabels(map[string]string{labels.Watchtower: "true", labels.EphemeralOrchestrator: "true"})),
 			scope: "",
 			want:  false,
 		},

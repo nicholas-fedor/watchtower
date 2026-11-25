@@ -73,6 +73,8 @@ var (
 // Chain identification uses the current container's labels to determine old containers to remove.
 // Scoped instances only remove other instances in the same scope, allowing coexistence with different scopes.
 // Removal operations respect scope boundaries to prevent cross-scope interference.
+// An ephemeral orchestrator is left running, since it may still be handing a
+// self-update over to the current container.
 //
 // Parameters:
 //   - log: Process logger. Required and must be non-nil. A nil logger panics on the first log call.
@@ -322,7 +324,7 @@ func getExcessContainers(log *zerolog.Logger, watchtowerScope string,
 	return excessContainers
 }
 
-// getFilteredContainers returns the Watchtower containers in the given scope other
+// getFilteredContainers returns the Watchtower instances in the given scope other
 // than the current one.
 //
 // When the current container is an old predecessor, the successor it hands off
@@ -351,9 +353,9 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 	var filteredContainers []*container.Container
 
 	// Check the Watchtower label first so the scope filter's debug lines cover
-	// only Watchtower containers, not every container on the host.
+	// only Watchtower instances, not every container on the host.
 	for _, c := range allContainers {
-		if c.IsWatchtower() && inScope(c) {
+		if c.IsWatchtowerInstance() && inScope(c) {
 			filteredContainers = append(filteredContainers, c)
 		}
 	}
@@ -391,12 +393,14 @@ func getFilteredContainers(log *zerolog.Logger, scope string,
 	return excessContainers
 }
 
-// getChainedContainers retrieves containers linked in a chain based on the current container's chain label.
+// getChainedContainers retrieves containers linked in a chain based on the
+// current container's chain label.
 //
-// It reads the IDs in the current container's chain label, identifies the linked
-// Watchtower containers excluding the current one, and returns them as a slice. A linked
-// container that is not a Watchtower container is never returned. If the current container
-// has no chain label or an empty chain label, an empty slice is returned.
+// It reads the IDs in the current container's chain label, identifies the
+// linked Watchtower containers excluding the current one, and returns them as
+// a slice. A linked container that is not a Watchtower instance is never
+// returned. If the current container has no chain label or an empty chain
+// label, an empty slice is returned.
 //
 // Parameters:
 //   - log: Process logger.
@@ -436,12 +440,12 @@ func getChainedContainers(log *zerolog.Logger,
 			continue
 		}
 
-		// Only a Watchtower container can be a replaced instance.
-		if !c.IsWatchtower() {
+		// Only a Watchtower instance can be one that the current container replaced.
+		if !c.IsWatchtowerInstance() {
 			log.Debug().
 				Str("container_id", string(c.ID())).
 				Str("container_name", c.Name()).
-				Msg("Skipping chained container that is not a Watchtower container")
+				Msg("Skipping chained container that is not a Watchtower instance")
 
 			continue
 		}
@@ -453,8 +457,10 @@ func getChainedContainers(log *zerolog.Logger,
 }
 
 // successorOf finds the newer Watchtower instances that may have replaced an
-// old predecessor. Only non-old Watchtower containers in the predecessor's
-// scope count, where an unset or empty scope is the scope "none".
+// old predecessor.
+//
+// Only non-old Watchtower instances in the predecessor's scope count, where an
+// unset or empty scope is the scope "none".
 //
 // Parameters:
 //   - old: The old predecessor container.
@@ -469,7 +475,7 @@ func successorOf(old *container.Container, candidates []*container.Container) (*
 	var firstInScope *container.Container
 
 	for _, c := range candidates {
-		if !c.IsWatchtower() || container.IsOldContainer(c.Name()) || c.NormalizedScope() != oldScope {
+		if !c.IsWatchtowerInstance() || container.IsOldContainer(c.Name()) || c.NormalizedScope() != oldScope {
 			continue
 		}
 
