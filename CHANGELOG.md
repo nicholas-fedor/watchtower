@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Rebind containers that Compose recreates in the same session by @nicholas-fedor in [#4052](https://github.com/nicholas-fedor/watchtower/pull/4052)
 - Stop monitored joiners before their network container in rolling restarts by @nicholas-fedor in [#4048](https://github.com/nicholas-fedor/watchtower/pull/4048)
 - Leave ephemeral orchestrators out of instance cleanup by @nicholas-fedor in [#4044](https://github.com/nicholas-fedor/watchtower/pull/4044)
 
