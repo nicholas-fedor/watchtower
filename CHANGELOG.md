@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Leave ephemeral orchestrators out of instance cleanup by @nicholas-fedor in [#4044](https://github.com/nicholas-fedor/watchtower/pull/4044)
 
+### Changed
+
+- Stop pausing a second before the first container listing by @nicholas-fedor in [#4046](https://github.com/nicholas-fedor/watchtower/pull/4046)
+
 ## [1.24.2] - 2026-11-24
 
 ### Fixed
