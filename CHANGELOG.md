@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stop monitored joiners before their network container in rolling restarts by @nicholas-fedor in [#4048](https://github.com/nicholas-fedor/watchtower/pull/4048)
 - Leave ephemeral orchestrators out of instance cleanup by @nicholas-fedor in [#4044](https://github.com/nicholas-fedor/watchtower/pull/4044)
 
 ### Changed
