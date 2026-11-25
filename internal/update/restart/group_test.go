@@ -18,6 +18,7 @@ import (
 	dockerContainer "github.com/moby/moby/api/types/container"
 
 	"github.com/nicholas-fedor/watchtower/internal/container"
+	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/containerfixture"
 	"github.com/nicholas-fedor/watchtower/internal/testutil/modelfixture"
 	"github.com/nicholas-fedor/watchtower/internal/update/cleanup"
@@ -75,6 +76,54 @@ func TestNetworkGroups(t *testing.T) {
 	groups = networkGroups([]*container.Container{app, vpn, torrent, db, applied, proxy, chain})
 
 	assert.Equal(t, [][]*container.Container{{app}, {vpn, torrent, db, applied, proxy, chain}}, groups)
+}
+
+// TestRollingSpans verifies the spans a rolling restart replaces together. A
+// later group with a container that joins one in the span extends the span
+// through itself, taking in the groups between them, while each group stays
+// whole. A Watchtower container never extends a span, since it restarts last.
+func TestRollingSpans(t *testing.T) {
+	t.Parallel()
+
+	vpn := modelfixture.Container(containerfixture.WithName("/vpn"), containerfixture.WithID("vpn-id"))
+	db := modelfixture.Container(containerfixture.WithName("/db"), containerfixture.WithID("db-id"))
+	observer := rebound("observer", "db")
+	app := modelfixture.Container(containerfixture.WithName("/app"), containerfixture.WithID("app-id"),
+		containerfixture.WithNetworkMode("container:vpn"))
+	other := modelfixture.Container(containerfixture.WithName("/other"), containerfixture.WithID("other-id"))
+	watchtower := modelfixture.Container(containerfixture.WithName("/watchtower"), containerfixture.WithID("watchtower-id"),
+		containerfixture.WithNetworkMode("container:vpn"),
+		containerfixture.WithLabels(map[string]string{labels.Watchtower: "true"}))
+
+	tests := []struct {
+		name       string
+		containers []*container.Container
+		want       [][]*container.Container
+	}{
+		{
+			name:       "a joiner directly behind the container it joins",
+			containers: []*container.Container{vpn, app, other},
+			want:       [][]*container.Container{{vpn, app}, {other}},
+		},
+		{
+			name:       "a joiner placed after another group",
+			containers: []*container.Container{vpn, db, observer, app, other},
+			want:       [][]*container.Container{{vpn, db, observer, app}, {other}},
+		},
+		{
+			name:       "a Watchtower container that joins",
+			containers: []*container.Container{vpn, other, watchtower},
+			want:       [][]*container.Container{{vpn}, {other}, {watchtower}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, rollingSpans(tt.containers))
+		})
+	}
 }
 
 // TestStopContainersInReversedOrder_networkGroup verifies that a container
@@ -363,6 +412,47 @@ func TestStopContainersInReversedOrder_networkGroupNameNotRestored(t *testing.T)
 	assert.Equal(t, map[container.ContainerID]container.ContainerID{"chain-id": "", "torrent-id": ""}, stopped)
 	assert.Equal(t, "vpn-id", torrent.NetworkContainer())
 	assert.Equal(t, "torrent", chain.NetworkContainer())
+}
+
+// TestStopContainersInReversedOrder_laterJoinerNameNotRestored verifies that
+// a monitored joiner in a later group joins the restored vpn by its ID when
+// vpn's replacement fails to create and vpn could not take its name back. The
+// joiner stops before vpn's group, and its recreation would otherwise name a
+// container that no longer exists under that name. The rebound observer is
+// left in place, since it is not stopped before the create.
+func TestStopContainersInReversedOrder_laterJoinerNameNotRestored(t *testing.T) {
+	t.Parallel()
+
+	running := containerfixture.WithContainerState(dockerContainer.State{Running: true})
+
+	vpn := modelfixture.Container(containerfixture.WithName("/vpn"), containerfixture.WithID("vpn-id"), running)
+	vpn.SetStale(true)
+
+	observer := rebound("observer", "vpn", running)
+
+	app := modelfixture.Container(containerfixture.WithName("/app"), containerfixture.WithID("app-id"),
+		containerfixture.WithNetworkMode("container:vpn"), running)
+	app.SetLinkedToRestarting(true)
+
+	client := mockRestart.NewMockClient(t)
+	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+	client.EXPECT().DiscardCopyFiles(mock.Anything).Return().Maybe()
+	mock.InOrder(
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(nil).Once(),
+		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn-replaced-vpn-id").Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID(""), errors.New("create failed")).Once(),
+		client.EXPECT().RenameContainer(mock.Anything, vpn, "vpn").Return(errors.New("rename failed")).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, vpn.ID()).Return(nil).Once(),
+	)
+
+	failed, stopped := stopContainersInReversedOrder(newTestLogger(t), t.Context(),
+		[]*container.Container{vpn, observer, app}, client, updateParams.Params{})
+
+	require.ErrorIs(t, failed[vpn.ID()], errNotRestored)
+	assert.True(t, isSkip(failed[observer.ID()]))
+	assert.Equal(t, map[container.ContainerID]container.ContainerID{"app-id": ""}, stopped)
+	assert.Equal(t, "vpn-id", app.NetworkContainer())
+	assert.Equal(t, "vpn-id", observer.NetworkContainer())
 }
 
 // TestStopContainersInReversedOrder_networkGroupStartAfterSlowRenameBack
@@ -904,6 +994,101 @@ func TestRun_networkGroup(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+// TestRun_rollingMonitoredJoiner verifies that a rolling restart stops a
+// monitored container that joins a recreated container's network before that
+// container is removed. Both are then recreated in order with a wait for each
+// to become healthy.
+func TestRun_rollingMonitoredJoiner(t *testing.T) {
+	t.Parallel()
+
+	vpn := modelfixture.Container(
+		containerfixture.WithName("/vpn"),
+		containerfixture.WithID("vpn-id"),
+		containerfixture.WithContainerState(dockerContainer.State{Running: true}),
+	)
+	vpn.SetStale(true)
+
+	app := modelfixture.Container(
+		containerfixture.WithName("/app"),
+		containerfixture.WithID("app-id"),
+		containerfixture.WithNetworkMode("container:vpn"),
+		containerfixture.WithContainerState(dockerContainer.State{Running: true}),
+	)
+	app.SetLinkedToRestarting(true)
+
+	client := mockRestart.NewMockClient(t)
+	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+	client.EXPECT().WaitForContainerHealthy(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	mock.InOrder(
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(nil).Once(),
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("new-vpn")).Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, app).Return(container.ContainerID("new-app"), nil).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("new-app")).Return(nil).Once(),
+	)
+
+	err := Run(newTestLogger(t), t.Context(), []*container.Container{vpn, app}, client,
+		updateParams.Params{RollingRestart: true}, &[]cleanup.RemovedImageInfo{}, &state.Progress{})
+	require.NoError(t, err)
+}
+
+// TestPerformRollingRestart_spanKeepsGroupReplacement verifies that a group
+// placed between a monitored joiner and the container it joins keeps its own
+// replacement in a rolling restart. The joiner stops first. db's replacement
+// fails to create, so db takes its name back and runs again while observer,
+// which joins db, is left in place. vpn is then replaced, and app is
+// recreated against it.
+func TestPerformRollingRestart_spanKeepsGroupReplacement(t *testing.T) {
+	t.Parallel()
+
+	running := containerfixture.WithContainerState(dockerContainer.State{Running: true})
+
+	vpn := modelfixture.Container(containerfixture.WithName("/vpn"), containerfixture.WithID("vpn-id"), running)
+	vpn.SetStale(true)
+
+	db := modelfixture.Container(containerfixture.WithName("/db"), containerfixture.WithID("db-id"), running)
+	db.SetStale(true)
+
+	observer := rebound("observer", "db", running)
+
+	app := modelfixture.Container(containerfixture.WithName("/app"), containerfixture.WithID("app-id"),
+		containerfixture.WithNetworkMode("container:vpn"), running)
+	app.SetLinkedToRestarting(true)
+
+	createErr := errors.New("create failed")
+
+	// The strict mock fails on a stop of observer or db.
+	client := mockRestart.NewMockClient(t)
+	client.EXPECT().SnapshotCopyFiles(mock.Anything, mock.Anything).Return(nil)
+	client.EXPECT().DiscardCopyFiles(mock.Anything).Return().Maybe()
+	client.EXPECT().WaitForContainerHealthy(mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
+	mock.InOrder(
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, app, mock.Anything).Return(nil).Once(),
+		client.EXPECT().RenameContainer(mock.Anything, db, "db-replaced-db-id").Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, db).Return(container.ContainerID(""), createErr).Once(),
+		client.EXPECT().RenameContainer(mock.Anything, db, "db").Return(nil).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, db.ID()).Return(nil).Once(),
+		client.EXPECT().StopAndRemoveContainer(mock.Anything, vpn, mock.Anything).Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, vpn).Return(container.ContainerID("new-vpn"), nil).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("new-vpn")).Return(nil).Once(),
+		client.EXPECT().CreateContainer(mock.Anything, app).Return(container.ContainerID("new-app"), nil).Once(),
+		client.EXPECT().StartContainerByID(mock.Anything, container.ContainerID("new-app")).Return(nil).Once(),
+	)
+
+	failed, err := performRollingRestart(newTestLogger(t), t.Context(),
+		[]*container.Container{vpn, db, observer, app}, client,
+		updateParams.Params{RollingRestart: true}, &[]cleanup.RemovedImageInfo{}, nil)
+	require.NoError(t, err)
+
+	require.ErrorIs(t, failed[db.ID()], createErr)
+	assert.True(t, isSkip(failed[observer.ID()]))
+	assert.NotContains(t, failed, vpn.ID())
+	assert.NotContains(t, failed, app.ID())
 }
 
 // TestStopOne_failedRemoval verifies that a running container whose stop or

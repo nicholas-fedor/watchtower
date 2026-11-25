@@ -309,19 +309,19 @@ func (g *DependencyGraph) Sort(log *zerolog.Logger, containers []*container.Cont
 	return nil
 }
 
-// PlaceRebound returns plan with the rebound containers placed in it.
+// PlaceRebound returns plan with the rebound containers placed in it and each
+// container of plan that joins another's namespace moved behind it.
 //
 // Each container is placed after the containers of plan and rebound that its
 // host config names and that it depends on in the graph. Docker resolves the
 // host config's containers when it creates a container, so they must exist
-// again by then. A container is placed as
-// soon as those are, so a rebound container directly follows the container
-// whose namespace it joins unless it waits for another, while plan keeps its
-// order otherwise. When only containers in a dependency cycle remain, the
-// first container on a cycle is placed, so a container that waits for a cycle
-// still follows the members it depends on. Watchtower's own containers stay
-// last, as [DependencyGraph.Sort] places them, since their self-update hands
-// over to a new process.
+// again by then. A container that joins another's namespace is placed as soon
+// as those are, so it directly follows the container it joins unless it waits
+// for another. The rest of plan keeps its order. When only containers in a
+// dependency cycle remain, the first container on a cycle is placed, so a
+// container that waits for a cycle still follows the members it depends on.
+// Watchtower's own containers stay last, as [DependencyGraph.Sort] places
+// them, since their self-update hands over to a new process.
 //
 // Parameters:
 //   - plan: Containers to restart, in the order [DependencyGraph.Sort] gives.
@@ -336,22 +336,46 @@ func (g *DependencyGraph) PlaceRebound(
 	plan, rebound []*container.Container,
 	joiners map[container.ContainerID][]*container.Container,
 ) []*container.Container {
-	if len(rebound) == 0 {
-		return plan
-	}
-
 	// Watchtower's own containers stay last, so nothing is placed after
 	// them.
 	ordered, watchtowers := splitWatchtowers(plan)
 
 	members := slices.Concat(ordered, rebound)
+
+	// A container of plan that joins another's namespace comes before the
+	// rebound containers that join it too.
+	joining := make(map[container.ContainerID][]*container.Container, len(joiners))
+
+	for _, c := range ordered {
+		provider := slices.IndexFunc(members, c.JoinsNetworkOf)
+		if provider >= 0 {
+			id := members[provider].ID()
+			joining[id] = append(joining[id], c)
+		}
+	}
+
+	if len(rebound) == 0 && len(joining) == 0 {
+		return plan
+	}
+
+	for id, reboundJoiners := range joiners {
+		joining[id] = append(joining[id], reboundJoiners...)
+	}
+
 	pending, dependents := g.reboundEdges(members, rebound)
 
-	// A rebound container waits from the start. A container of plan waits
-	// once its turn came before its dependencies were placed.
+	// A joiner waits from the start, so it is placed as soon as it can be.
+	// Any other container of plan waits once its turn came before its
+	// dependencies were placed.
 	waiting := make(map[container.ContainerID]bool, len(members))
 	for _, c := range rebound {
 		waiting[c.ID()] = true
+	}
+
+	for _, cs := range joining {
+		for _, c := range cs {
+			waiting[c.ID()] = true
+		}
 	}
 
 	result := make([]*container.Container, 0, len(members))
@@ -368,7 +392,7 @@ func (g *DependencyGraph) PlaceRebound(
 		}
 
 		// The containers that join c come first, then the others c freed.
-		for _, next := range slices.Concat(joiners[c.ID()], dependents[c.ID()]) {
+		for _, next := range slices.Concat(joining[c.ID()], dependents[c.ID()]) {
 			if !placed[next.ID()] && waiting[next.ID()] && pending[next.ID()] == 0 {
 				place(next)
 			}

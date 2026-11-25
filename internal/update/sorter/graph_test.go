@@ -490,8 +490,9 @@ func TestDependencyGraph_Sort(t *testing.T) {
 }
 
 // TestDependencyGraph_PlaceRebound verifies where rebound containers are
-// placed in the restart order. A rebound container directly follows the
-// container whose network it joins, while the plan keeps its order. A
+// placed in the restart order. A rebound container or a container of the plan
+// directly follows the container whose network it joins, while the rest of
+// the plan keeps its order. A
 // dependency on Watchtower never moves a container after it, since its
 // self-update hands over to a new process. When only a dependency cycle is
 // left, a member of the cycle is released first, so a container that waits
@@ -561,6 +562,37 @@ func TestDependencyGraph_PlaceRebound(t *testing.T) {
 			plan:    []string{"vpn"},
 			joining: []string{"d", "a", "b"},
 			want:    []string{"vpn", "a", "d", "b"},
+		},
+		{
+			// A rolling restart recreates the two together.
+			name: "moves a container of the plan behind the container it joins",
+			deployment: []deployed{
+				{name: "vpn"},
+				{name: "db"},
+				{name: "app", networkMode: "container:vpn"},
+			},
+			plan: []string{"vpn", "db", "app"},
+			want: []string{"vpn", "app", "db"},
+		},
+		{
+			name: "keeps a container of the plan after another container it waits for",
+			deployment: []deployed{
+				{name: "vpn"},
+				{name: "db"},
+				{name: "app", networkMode: "container:vpn", dependsOn: "db"},
+			},
+			plan: []string{"vpn", "db", "app"},
+			want: []string{"vpn", "db", "app"},
+		},
+		{
+			name: "keeps a Watchtower container of the plan last",
+			deployment: []deployed{
+				{name: "vpn"},
+				{name: "db"},
+				{name: "watchtower", networkMode: "container:vpn", watchtower: true},
+			},
+			plan: []string{"vpn", "db", "watchtower"},
+			want: []string{"vpn", "db", "watchtower"},
 		},
 	}
 
