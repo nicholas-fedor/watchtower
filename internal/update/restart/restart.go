@@ -465,7 +465,7 @@ func recordRestartOutcomes(
 		// A failed rebound container that the session does not hold, such
 		// as an unmonitored one, is added so that the report, the metrics
 		// and every notification count it.
-		if _, held := (*progress)[containerID]; !held {
+		if progress.Holder(containerID) == nil {
 			progress.AddFailed(log, c, err, config)
 		}
 	}

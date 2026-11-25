@@ -277,9 +277,22 @@ func (s *Session) runComposeApply(
 
 	cancelApply()
 
+	// A container that Compose recreates here and that joins one Watchtower
+	// recreates later in the session must be rebound, so the containers it
+	// reports are recorded even when the apply failed partway.
+	if !params.NoRestart {
+		s.mu.Lock()
+		for _, item := range applied {
+			if item.ID != "" {
+				s.created = append(s.created, item.ID)
+			}
+		}
+		s.mu.Unlock()
+	}
+
 	if err != nil {
 		applyErr := composeApplyError(params, err)
-		markComposeResultFailures(applied, progress, failed, applyErr)
+		markComposeResultFailures(log, applied, progress, failed, applyErr)
 
 		if !params.NoRestart {
 			s.rejectComposeApply(batch)
@@ -476,9 +489,15 @@ func (s *Session) recordComposeApply(
 	progress.MarkForUpdate(log, containerID)
 }
 
-// markComposeResultFailures records apply failures for result containers represented in session progress.
+// markComposeResultFailures records apply failures for result containers
+// represented in session progress.
+//
+// A result container that replaced its tracked container becomes that
+// container's new container ID, so a later rebind of it updates the tracked
+// status instead of adding another one.
 //
 // Parameters:
+//   - log: Process logger.
 //   - items: Compose results returned before the failure.
 //   - progress: Session progress, or nil.
 //   - failed: Map to record errors.
@@ -487,6 +506,7 @@ func (s *Session) recordComposeApply(
 // Returns:
 //   - none.
 func markComposeResultFailures(
+	log *zerolog.Logger,
 	items []composeApply.Container,
 	progress *state.Progress,
 	failed map[container.ContainerID]error,
@@ -513,6 +533,10 @@ func markComposeResultFailures(
 			for id, status := range *progress {
 				if status != nil && strings.TrimPrefix(status.Name(), "/") == name {
 					failed[id] = err
+
+					if item.ID != "" && item.ID != id {
+						progress.SetNewContainerID(log, id, item.ID)
+					}
 				}
 			}
 		}

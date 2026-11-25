@@ -12,6 +12,9 @@ import (
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 
+	cerrdefs "github.com/containerd/errdefs"
+
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	containerClient "github.com/nicholas-fedor/watchtower/internal/container/client"
 	"github.com/nicholas-fedor/watchtower/internal/container/filters"
@@ -165,7 +168,7 @@ func update(
 		watcher = gitClient[0]
 	}
 
-	gitSession := rebuild.NewSession(watcher, config.Docker)
+	gitSession := rebuild.NewSession(watcher, composeApply.NewClient(config.Docker))
 
 	// Initialize logging for the update process start.
 	log.Debug().Msg("Starting container update check")
@@ -919,13 +922,15 @@ func skipFailedUpdateCheck(
 // kept out of the sorts and the implicit restarts. They are placed after the
 // other monitored containers. A container that joins the network namespace of
 // a container on the list is rebound and placed after it, whether or not it
-// is monitored or running.
+// is monitored or running. That includes a container that Compose created in
+// the rebuilds.
 //
 // Parameters:
 //   - log: Process logger.
 //   - ctx: Context for cancellation and timeouts.
-//   - client: Container client for the Git image builds and the listing of
-//     stopped network dependents.
+//   - client: Container client for the Git image builds, the listing of
+//     stopped network dependents, and the inspection of the containers Compose
+//     created.
 //   - config: Update parameters.
 //   - gitSession: The session's Git monitor.
 //   - progress: Session progress that receives the rebuild results.
@@ -1059,7 +1064,23 @@ func planRestarts(
 
 	// Compose already recreated the containers it applied. Do not recreate
 	// them again from their inspect data.
-	return gitSession.ExcludeApplied(allContainersToRestart), nil
+	allContainersToRestart = gitSession.ExcludeApplied(allContainersToRestart)
+
+	// Compose names a joined container by its ID when it creates a container,
+	// so a container it created above that joins a container Watchtower
+	// recreates keeps the ID that the replacement makes stale. The listing
+	// came before the rebuilds, so these containers are inspected now and
+	// rebound. A container that joins an applied container is left alone
+	// because Compose created it against that container's replacement, which
+	// is not on the list.
+	if ids := gitSession.ComposeContainerIDs(); len(ids) > 0 && len(allContainersToRestart) > 0 {
+		composeCreated := inspectUnlisted(log, ctx, client, ids, allContainers)
+		if len(composeCreated) > 0 {
+			allContainersToRestart = implicitrestart.Rebind(log, graph, allContainersToRestart, composeCreated, nil)
+		}
+	}
+
+	return allContainersToRestart, nil
 }
 
 // sortFailed logs a failure to order the containers by dependency and returns
@@ -1078,6 +1099,65 @@ func sortFailed(log *zerolog.Logger, msg string, err error) error {
 		Msg(msg)
 
 	return fmt.Errorf("%w: %w", errSortDependenciesFailed, err)
+}
+
+// inspectUnlisted inspects each container of ids that listed does not hold.
+//
+// A container removed since Compose created it is left out, since it has no
+// network left to rebind. A container whose inspection fails otherwise is
+// left out with a warning, since it may keep the network of a container that
+// is recreated. The inspections stop when ctx ends.
+//
+// Parameters:
+//   - log: Process logger.
+//   - ctx: Context for the inspections.
+//   - client: Container client.
+//   - ids: IDs of the containers to inspect.
+//   - listed: Containers already listed, which are not inspected again.
+//
+// Returns:
+//   - []*container.Container: The inspected containers, in the order of ids.
+func inspectUnlisted(
+	log *zerolog.Logger,
+	ctx context.Context,
+	client Client,
+	ids []container.ContainerID,
+	listed []*container.Container,
+) []*container.Container {
+	held := make(map[container.ContainerID]bool, len(listed)+len(ids))
+	for _, c := range listed {
+		held[c.ID()] = true
+	}
+
+	var inspected []*container.Container
+
+	for _, containerID := range ids {
+		if held[containerID] {
+			continue
+		}
+
+		held[containerID] = true
+
+		c, err := client.GetContainer(ctx, containerID)
+
+		switch {
+		case err == nil:
+			inspected = append(inspected, c)
+		case cerrdefs.IsNotFound(err):
+			// The container was removed since Compose created it, so there is
+			// no network to rebind.
+		case endedBy(ctx, err):
+			// The restarts report the session's end for every container.
+			return inspected
+		default:
+			log.Warn().
+				Err(err).
+				Str("container_id", containerID.ShortID()).
+				Msg(logging.ComposeContainerUninspected)
+		}
+	}
+
+	return inspected
 }
 
 // unmonitoredContainers returns the containers of allContainers that are not

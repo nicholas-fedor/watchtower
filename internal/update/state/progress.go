@@ -105,17 +105,62 @@ func (m Progress) AddScanned(log *zerolog.Logger,
 		Msg("Added container as scanned")
 }
 
+// Holder returns the status that holds a container by its own ID or as the
+// new container that replaced a held one earlier in the session.
+//
+// A container that Compose created in place of a scanned one is held by the
+// scanned container's status.
+//
+// Parameters:
+//   - containerID: ID of the container.
+//
+// Returns:
+//   - *ContainerStatus: The holding status, or nil when no status holds the
+//     container.
+func (m Progress) Holder(containerID container.ContainerID) *ContainerStatus {
+	if status, ok := m[containerID]; ok {
+		return status
+	}
+
+	if containerID == "" {
+		return nil
+	}
+
+	for _, status := range m {
+		if status != nil && status.newContainerID == containerID {
+			return status
+		}
+	}
+
+	return nil
+}
+
 // UpdateFailed marks containers as failed with errors.
+//
+// A container that replaced a held one earlier in the session marks that one
+// as failed, unless that one already failed. It keeps its failure then, so a
+// failed rebind of a container from a failed Compose apply cannot hide why the
+// apply failed.
 //
 // Parameters:
 //   - failures: Map of container IDs to errors.
 func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[container.ContainerID]error) {
 	for containerID, err := range failures {
-		update, exists := m[containerID]
-		if !exists {
+		update := m.Holder(containerID)
+		if update == nil {
 			log.Debug().
 				Str("container_id", containerID.ShortID()).
 				Msg("Container not found in progress map, cannot mark as failed")
+
+			continue
+		}
+
+		if update.containerID != containerID && update.state == FailedState {
+			log.Debug().
+				Err(err).
+				Str("container_id", containerID.ShortID()).
+				Str("name", update.Name()).
+				Msg("Replaced container already failed, keeping its failure")
 
 			continue
 		}
@@ -130,20 +175,33 @@ func (m Progress) UpdateFailed(log *zerolog.Logger, failures map[container.Conta
 	}
 }
 
-// UpdateSkipped marks containers as skipped, with the reason for each. A
-// container already marked as failed keeps its failure and error, so a later
-// phase skipping it cannot hide why it failed.
+// UpdateSkipped marks containers as skipped, with the reason for each.
+//
+// A container already marked as failed keeps its failure and error, so a later
+// phase skipping it cannot hide why it failed. A container that replaced a
+// held one earlier in the session leaves that one's state as it is, since a
+// skipped rebind keeps the replacement running as Compose created it.
 //
 // Parameters:
 //   - log: Process logger.
 //   - skips: Map of container IDs to skip reasons.
 func (m Progress) UpdateSkipped(log *zerolog.Logger, skips map[container.ContainerID]error) {
 	for containerID, reason := range skips {
-		update, exists := m[containerID]
-		if !exists {
+		update := m.Holder(containerID)
+		if update == nil {
 			log.Debug().
 				Str("container_id", containerID.ShortID()).
 				Msg("Container not found in progress map, cannot mark as skipped")
+
+			continue
+		}
+
+		if update.containerID != containerID {
+			log.Debug().
+				Err(reason).
+				Str("container_id", containerID.ShortID()).
+				Str("name", update.Name()).
+				Msg("Replacement container skipped, keeping the replaced container's state")
 
 			continue
 		}
@@ -278,25 +336,27 @@ func (m Progress) SetReportMeta(log *zerolog.Logger, containerID container.Conta
 // container keeps its updated state. A container the scan skipped, failed or
 // found a newer image for keeps that state, since its recreation changes
 // neither its image nor why the scan reported it. A monitor-only container
-// with a newer image is still listed as stale, for example. A container the
-// progress does not hold is skipped.
+// with a newer image is still listed as stale, for example. A container that
+// replaced a held one earlier in the session, such as one that Compose
+// created, becomes that one's new container ID and leaves its state as it is.
+// A container the progress does not hold is skipped.
 //
 // Parameters:
 //   - log: Process logger.
 //   - c: The container that was recreated.
 //   - newID: ID of the new container.
 func (m Progress) RecordRestart(log *zerolog.Logger, c *container.Container, newID container.ContainerID) {
-	if _, exists := m[c.ID()]; !exists {
+	status := m.Holder(c.ID())
+	if status == nil {
 		return
 	}
 
-	m.SetNewContainerID(log, c.ID(), newID)
+	m.SetNewContainerID(log, status.containerID, newID)
 
-	if c.IsStale() {
+	if status.containerID != c.ID() || c.IsStale() {
 		return
 	}
 
-	status := m[c.ID()]
 	reported := status.state == SkippedState || status.state == FailedState
 	newerImage := status.newImage != "" && status.newImage != status.oldImage
 

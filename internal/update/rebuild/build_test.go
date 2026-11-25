@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -34,7 +35,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("returns errGitNotAssociated when the container has no repo", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 		docker := mockRebuild.NewMockImageBuilder(t)
 
@@ -45,7 +46,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("returns an error when the commit is empty", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		docker := mockRebuild.NewMockImageBuilder(t)
 
@@ -57,7 +58,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("returns an error when the build context is cancelled", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
@@ -73,7 +74,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("logs exactly one changelog entry resolved from the git tag", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 		docker := mockRebuild.NewMockImageBuilder(t)
 		expectGitBuild(docker)
@@ -106,7 +107,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("keeps a nested dockerfile and context on the rebuilt container", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 			labels.GitDockerfile: "build/docker/Dockerfile",
 			labels.GitContext:    ".",
@@ -137,7 +138,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("persists git-watch only when the source label enabled it", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 			labels.GitWatch: "yes",
 		})
@@ -162,7 +163,7 @@ func TestSession_build(t *testing.T) {
 	t.Run("does not pass a digest-pinned image as a build tag", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		image := "ghcr.io/org/app@sha256:" + strings.Repeat("a", 64)
 		commit := "0123456789abcdef0123456789abcdef01234567"
 		c := gitAssociatedContainer("digest", "/digest", image, nil)
@@ -196,7 +197,7 @@ func TestSession_build(t *testing.T) {
 		t.Parallel()
 
 		synctest.Test(t, func(t *testing.T) {
-			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}), dockerConfig.Docker{})
+			sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}), composeApply.NewClient(dockerConfig.Docker{}))
 			commit := "0123456789abcdef0123456789abcdef01234567"
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 
@@ -227,7 +228,7 @@ func TestSession_build(t *testing.T) {
 		t.Parallel()
 
 		synctest.Test(t, func(t *testing.T) {
-			sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+			sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 			c := gitAssociatedContainer("timeout", "/timeout", "myapp:latest", nil)
 			commit := "0123456789abcdef0123456789abcdef01234567"
 
@@ -291,7 +292,7 @@ func TestSession_build(t *testing.T) {
 				t.Parallel()
 
 				client := git.New(newTestLogger(t), git.Options{Token: "tok", Timeout: time.Second})
-				sess := NewSession(client, dockerConfig.Docker{})
+				sess := NewSession(client, composeApply.NewClient(dockerConfig.Docker{}))
 				c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 					labels.GitRepo: tt.repo,
 				})

@@ -76,7 +76,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 
 		var checkouts int
@@ -162,7 +162,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}).
 			Twice()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 
 		var checkouts int
@@ -228,7 +228,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}).
 			Twice()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -288,7 +288,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}).
 			Twice()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -356,7 +356,7 @@ func TestSession_applyCompose(t *testing.T) {
 				}).
 				Once()
 
-			sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+			sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
@@ -394,7 +394,7 @@ func TestSession_applyCompose(t *testing.T) {
 		applier := mockRebuild.NewMockApplier(t)
 		parent, cancel := context.WithCancel(t.Context())
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(_ context.Context, _, _ string, opts project.CheckoutOptions) error {
 			if opts.Prior != nil {
@@ -440,7 +440,7 @@ func TestSession_applyCompose(t *testing.T) {
 			Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -476,7 +476,7 @@ func TestSession_applyCompose(t *testing.T) {
 		t.Parallel()
 
 		dir := writeComposeProjectDir(t)
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
 			labels.ComposeDir: dir,
@@ -497,7 +497,7 @@ func TestSession_applyCompose(t *testing.T) {
 
 		dir := writeComposeProjectDir(t)
 		applier := mockRebuild.NewMockApplier(t)
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return project.ErrDirty
@@ -528,7 +528,7 @@ func TestSession_applyCompose(t *testing.T) {
 			Return([]composeApply.Container{{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 			Once()
 
-		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}), dockerConfig.Docker{})
+		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 10 * time.Millisecond}), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(ctx context.Context, _, _ string, _ project.CheckoutOptions) error {
 			<-ctx.Done()
@@ -567,7 +567,7 @@ func TestSession_applyCompose(t *testing.T) {
 		var logs bytes.Buffer
 
 		log := zerolog.New(&logs)
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -605,6 +605,11 @@ func TestSession_applyCompose(t *testing.T) {
 		require.Len(t, report.Failed(), 2)
 		assert.Contains(t, logs.String(), "may have partially recreated services")
 		assert.NotContains(t, logs.String(), "Leaving running container untouched")
+
+		// A rebind of a container Compose created before the failure
+		// updates the failed status of the container it replaced.
+		assert.Same(t, (*progress)[c.ID()], progress.Holder("new-api"))
+		assert.Same(t, (*progress)[fresh.ID()], progress.Holder("new-fresh"))
 	})
 
 	t.Run("fails a service omitted from the compose apply result", func(t *testing.T) {
@@ -617,7 +622,7 @@ func TestSession_applyCompose(t *testing.T) {
 			Return([]composeApply.Container{{Service: "api", ID: "new-api", ImageID: "sha256:api"}}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -680,7 +685,7 @@ func TestSession_applyCompose(t *testing.T) {
 			Return([]composeApply.Container{{Service: "api", ImageID: "sha256:built"}}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -729,7 +734,7 @@ func TestSession_applyCompose(t *testing.T) {
 			Return(nil, context.Canceled).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -763,7 +768,7 @@ func TestSession_applyCompose(t *testing.T) {
 
 		dir := writeComposeProjectDir(t)
 		checkedOut := false
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			checkedOut = true
@@ -815,7 +820,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -865,7 +870,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -910,7 +915,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -975,7 +980,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -1022,7 +1027,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -1074,7 +1079,7 @@ func TestSession_applyCompose(t *testing.T) {
 			}, nil).
 			Once()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 		sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 			return nil
@@ -1218,7 +1223,7 @@ func TestSession_recordCompose(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+			sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 			c := tt.source()
 			c.SetStale(true)
 

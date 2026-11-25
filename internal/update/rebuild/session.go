@@ -2,6 +2,7 @@ package rebuild
 
 import (
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/rs/zerolog"
@@ -14,7 +15,6 @@ import (
 	"github.com/nicholas-fedor/watchtower/internal/git"
 	"github.com/nicholas-fedor/watchtower/internal/git/project"
 	"github.com/nicholas-fedor/watchtower/internal/observability/logging"
-	dockerConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/docker"
 	updateConfig "github.com/nicholas-fedor/watchtower/internal/settings/config/update"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
@@ -45,21 +45,24 @@ type Session struct {
 	results  map[container.ContainerID]git.CheckResult
 	built    map[container.ContainerID]container.ImageID
 	applied  map[container.ContainerID]struct{}
-	mu       sync.Mutex
+	// created holds the IDs of the containers Compose reported after the
+	// session's applies that recreate containers.
+	created []container.ContainerID
+	mu      sync.Mutex
 }
 
 // NewSession constructs an empty session for one Update() call.
 //
 // Parameters:
 //   - client: Git monitor client. May be unused when no container is monitored.
-//   - docker: Docker connection settings for the session's Compose applies.
+//   - apply: Applier for the session's Compose applies.
 //
 // Returns:
 //   - *Session: Session with empty result and built maps.
-func NewSession(client *git.Client, docker dockerConfig.Docker) *Session {
+func NewSession(client *git.Client, apply Applier) *Session {
 	return &Session{
 		client:   client,
-		apply:    composeApply.NewClient(docker),
+		apply:    apply,
 		checkout: project.Checkout,
 		results:  make(map[container.ContainerID]git.CheckResult),
 		built:    make(map[container.ContainerID]container.ImageID),
@@ -249,6 +252,24 @@ func (s *Session) NoRestartBuiltIDs(params updateParams.Params) map[container.Co
 	}
 
 	return ids
+}
+
+// ComposeContainerIDs returns the IDs of the containers that Compose reported
+// after the session's applies, including an apply that failed partway.
+//
+// A build-only apply leaves the running containers in place, so it adds none.
+//
+// Returns:
+//   - []container.ContainerID: The reported container IDs, in apply order.
+func (s *Session) ComposeContainerIDs() []container.ContainerID {
+	if s == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return slices.Clone(s.created)
 }
 
 // store records the Git check result of a container.

@@ -21,6 +21,8 @@ var commonTemplates = map[string]string{
 	// "Could not update container" (update failed after its check),
 	// "Could not reconnect container to the network of a recreated container"
 	// (a container sharing a recreated container's network could not join the new one),
+	// "Could not inspect a container Compose created. It may lose its network if it joins a recreated container"
+	// (a container from a Compose apply could not be checked for a shared network),
 	// "Ignoring depends-on entry that names no container" (depends-on label entry matched nothing),
 	// "Skipping container update (self-dependency)" (container depends on itself),
 	// "Skipping container update (circular dependency)" (container is in a dependency cycle),
@@ -134,6 +136,8 @@ var commonTemplates = map[string]string{
     Update failed for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} ({{with (index $e.Data "image")}}{{.}}{{else}}unknown{{end}}){{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Could not reconnect container to the network of a recreated container" -}}
     Could not reconnect {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}} to the network of {{with (index $e.Data "network_container")}}{{.}}{{else}}a recreated container{{end}}{{with (index $e.Data "error")}}: {{.}}{{end}}
+{{- else if eq $msg "Could not inspect a container Compose created. It may lose its network if it joins a recreated container" -}}
+    Could not inspect {{with (index $e.Data "container_id")}}container {{.}}{{else}}a container{{end}} that Compose created. It may lose its network if it joins a recreated container{{with (index $e.Data "error")}}: {{.}}{{end}}
 {{- else if eq $msg "Ignoring depends-on entry that names no container" -}}
     Ignored depends-on {{with (index $e.Data "depends_on")}}{{.}}{{else}}entry{{end}} for {{with (index $e.Data "container")}}{{.}}{{else}}container{{end}}: no container has that name
 {{- else if eq $msg "Skipping container update (self-dependency)" -}}

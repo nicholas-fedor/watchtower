@@ -61,5 +61,6 @@ Could not reconnect torrent to the network of vpn: failed to create container: C
 Starting Watchtower ephemeral self-update
 Could not remove ephemeral orchestrator 0dd0dd000000 after it failed to start: Error response from daemon: removal of container 0dd0dd000000 is already in progress
 Could not update app: no image info available
+Could not inspect container abcdef123456 that Compose created. It may lose its network if it joins a recreated container: failed to inspect container: daemon unavailable
 Unrecognized message with fields | alpha=one beta=2 
 Unrecognized message without fields

@@ -18,12 +18,15 @@ import (
 	dockerImage "github.com/moby/moby/api/types/image"
 	dockerNetwork "github.com/moby/moby/api/types/network"
 
+	composeLabels "github.com/nicholas-fedor/watchtower/internal/compose/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
+	"github.com/nicholas-fedor/watchtower/internal/registry/ratelimit"
 	"github.com/nicholas-fedor/watchtower/internal/update/implicitrestart"
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
+	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
@@ -610,8 +613,62 @@ func gitWatchedTestContainer(t *testing.T, extra map[string]string) (*container.
 	return app, git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Second}), commit
 }
 
+// staleComposeServices returns one Git-watched container per service of the
+// Compose project webstack, whose remote tip is newer than their stamp, after
+// the session's staleness phase has checked and recorded them. The project
+// directory is the repository itself, and the session applies the project
+// through applier.
+//
+// Parameters:
+//   - t: Test that owns the repository.
+//   - config: Update parameters for the check.
+//   - progress: Session progress that receives the check results.
+//   - applier: Applier the session runs the Compose apply through.
+//   - services: Names of the services, which also name their containers.
+//
+// Returns:
+//   - []*container.Container: The stale containers, in the order of services.
+//   - *rebuild.Session: The session holding their check results.
+func staleComposeServices(
+	t *testing.T,
+	config updateParams.Params,
+	progress *state.Progress,
+	applier rebuild.Applier,
+	services ...string,
+) ([]*container.Container, *rebuild.Session) {
+	t.Helper()
+
+	repoDir, branch, _ := initGitRepoWithCommit(t)
+
+	members := make([]*container.Container, 0, len(services))
+	for _, service := range services {
+		members = append(members, skipTestContainer(service+"-id", service, map[string]string{
+			labels.GitRepo:                    repoDir,
+			labels.GitRef:                     branch,
+			labels.GitLastCommit:              "0123456789abcdef0123456789abcdef01234567",
+			labels.ComposeDir:                 repoDir,
+			composeLabels.ComposeProjectLabel: "webstack",
+			composeLabels.ComposeServiceLabel: service,
+		}))
+	}
+
+	session := rebuild.NewSession(git.New(newTestLogger(t), git.Options{Timeout: 5 * time.Second}), applier)
+
+	_, err := checkStaleness(newTestLogger(t), t.Context(), newMockClient(t), config, ratelimit.New(),
+		session, progress, members)
+	require.NoError(t, err)
+
+	for _, c := range members {
+		require.True(t, c.IsStale(), c.Name())
+	}
+
+	return members, session
+}
+
 // initGitRepoWithCommit creates a Git repository with one commit in a
 // temporary directory, so a Git check can list its refs without a network.
+// The commit holds a Compose file, so the repository also serves as a Compose
+// project directory that a rebuild checks out without a fetch.
 //
 // Parameters:
 //   - t: Test that owns the directory.
@@ -632,9 +689,12 @@ func initGitRepoWithCommit(t *testing.T) (dir, branch, commit string) {
 	worktree, err := repo.Worktree()
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "README"), []byte("hello\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services: {}\n"), 0o600))
 
-	_, err = worktree.Add("README")
-	require.NoError(t, err)
+	for _, file := range []string{"README", "compose.yaml"} {
+		_, err = worktree.Add(file)
+		require.NoError(t, err)
+	}
 
 	hash, err := worktree.Commit("init", &goGit.CommitOptions{
 		Author: &object.Signature{Name: "test", Email: "test@example.com", When: time.Now()},

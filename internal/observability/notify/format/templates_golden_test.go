@@ -98,6 +98,7 @@ var legacyTemplateMessages = []string{
 	logging.EphemeralSelfUpdateStarting,
 	logging.OrchestratorCleanupFailed,
 	logging.ConfigNotRecreatable,
+	logging.ComposeContainerUninspected,
 }
 
 // Disk sizes used by the image-usage budget fixtures, in bytes.
@@ -224,6 +225,11 @@ func goldenEntryData(message string) map[string]any {
 			"image":             "org/torrent:latest",
 			"network_container": "vpn",
 			"error":             "failed to create container: Conflict. The container name \"/torrent\" is already in use",
+		}
+	case logging.ComposeContainerUninspected:
+		return map[string]any{
+			"container_id": "abcdef123456",
+			"error":        "failed to inspect container: daemon unavailable",
 		}
 	case logging.UnresolvedDependsOn:
 		return map[string]any{"container": "app", "depends_on": "missing-db"}

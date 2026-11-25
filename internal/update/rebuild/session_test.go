@@ -2,6 +2,7 @@ package rebuild
 
 import (
 	"context"
+	"errors"
 	"maps"
 	"path/filepath"
 	"strings"
@@ -126,7 +127,7 @@ func TestNewSession(t *testing.T) {
 		t.Parallel()
 
 		client := gitTestClient(t)
-		sess := NewSession(client, dockerConfig.Docker{})
+		sess := NewSession(client, composeApply.NewClient(dockerConfig.Docker{}))
 
 		require.NotNil(t, sess)
 		assert.Equal(t, client, sess.client)
@@ -154,7 +155,7 @@ func TestSession_storeAndResult(t *testing.T) {
 	t.Run("stores and retrieves a check result", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		want := git.CheckResult{Stale: true, Commit: "abc123", Tag: "v1.2.3", Kind: "tag", Ref: "v1.2.3"}
 
 		sess.store("c1", want)
@@ -166,7 +167,7 @@ func TestSession_storeAndResult(t *testing.T) {
 	t.Run("returns false for an unknown container", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		_, ok := sess.result("missing")
 		assert.False(t, ok)
 	})
@@ -198,7 +199,7 @@ func TestSession_Watching(t *testing.T) {
 	t.Run("is true for an associated container when monitoring is enabled", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", nil)
 
 		assert.True(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
@@ -207,7 +208,7 @@ func TestSession_Watching(t *testing.T) {
 	t.Run("is false when git-watch is false", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("id", "/app", "myapp:latest", map[string]string{
 			labels.GitWatch: "false",
 		})
@@ -218,7 +219,7 @@ func TestSession_Watching(t *testing.T) {
 	t.Run("is false for an unassociated container", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := mockUpdate.CreateMockContainer("id", "/app", "myapp:latest", time.Now())
 
 		assert.False(t, sess.Watching(newTestLogger(t), c, updateParams.Params{Git: gitConfig.Defaults{Enable: true}}))
@@ -227,7 +228,7 @@ func TestSession_Watching(t *testing.T) {
 	t.Run("is false for Watchtower itself", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := mockUpdate.CreateMockContainerWithConfig(
 			"wt",
 			"/watchtower",
@@ -290,7 +291,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 	t.Run("skips containers that are not stale or have no stored stale result", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 		fresh := gitAssociatedContainer("fresh", "/fresh", "myapp:latest", nil)
 		staleNoResult := gitAssociatedContainer("none", "/none", "myapp:latest", nil)
@@ -312,7 +313,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 	t.Run("skips monitor-only and no-pull containers", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 		monitor := gitAssociatedContainer("mon", "/mon", "myapp:latest", map[string]string{
 			"com.centurylinklabs.watchtower.monitor-only": "true",
@@ -337,7 +338,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 	t.Run("records a failed build and unmarks the container stale", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 		c := gitAssociatedContainer("fail", "/fail", "myapp:latest", nil)
 		c.SetStale(true)
@@ -354,7 +355,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 	t.Run("builds a stale associated container", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 		c := gitAssociatedContainer("ok", "/ok", "myapp:latest", nil)
 		c.SetStale(true)
@@ -381,7 +382,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "missing")
 		applier := mockRebuild.NewMockApplier(t)
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 
 		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
@@ -406,7 +407,7 @@ func TestSession_PrepareRebuilds(t *testing.T) {
 
 		missing := filepath.Join(t.TempDir(), "missing")
 		applier := mockRebuild.NewMockApplier(t)
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = applier
 
 		c := gitAssociatedContainer("api", "/api", "webstack-api:latest", map[string]string{
@@ -454,14 +455,14 @@ func TestSession_ExcludeApplied(t *testing.T) {
 		var sess *Session
 		assert.Equal(t, list, sess.ExcludeApplied(list))
 
-		sess = NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess = NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		assert.Equal(t, list, sess.ExcludeApplied(list))
 	})
 
 	t.Run("drops compose-applied containers", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		applied := gitAssociatedContainer("applied", "/applied", "myapp:latest", nil)
 		kept := gitAssociatedContainer("kept", "/kept", "other:latest", nil)
 		sess.applied[applied.ID()] = struct{}{}
@@ -483,7 +484,7 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 		var sess *Session
 		assert.Nil(t, sess.NoRestartBuiltIDs(updateParams.Params{NoRestart: true}))
 
-		sess = NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess = NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.built["built"] = "sha256:git"
 		assert.Nil(t, sess.NoRestartBuiltIDs(updateParams.Params{}))
 	})
@@ -491,7 +492,7 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 	t.Run("returns a copy of the built container IDs during a no-restart update", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		sess.built["built"] = "sha256:git"
 
 		got := sess.NoRestartBuiltIDs(updateParams.Params{NoRestart: true})
@@ -500,6 +501,88 @@ func TestSession_NoRestartBuiltIDs(t *testing.T) {
 		got["other"] = struct{}{}
 
 		assert.Len(t, sess.built, 1, "the snapshot must not share the session's map")
+	})
+}
+
+// TestSession_ComposeContainerIDs checks which containers a session reports
+// as created by its Compose applies. The update session inspects them to
+// rebind those that join a container it recreates later. An apply that failed
+// partway counts too, while a build-only apply recreates nothing and adds none.
+func TestSession_ComposeContainerIDs(t *testing.T) {
+	t.Parallel()
+
+	reported := []composeApply.Container{
+		{Service: "api", Name: "/api", ID: "new-api", ImageID: "sha256:api"},
+		{Service: "worker", Name: "/worker", ID: "new-worker", ImageID: "sha256:worker"},
+		{Service: "worker", Name: "/worker-2"},
+	}
+
+	tests := []struct {
+		name      string
+		applyErr  error
+		noRestart bool
+		want      []container.ContainerID
+	}{
+		{
+			name: "an apply that recreates containers",
+			want: []container.ContainerID{"new-api", "new-worker"},
+		},
+		{
+			name:     "an apply that failed partway",
+			applyErr: errors.New("compose up: worker failed to start"),
+			want:     []container.ContainerID{"new-api", "new-worker"},
+		},
+		{
+			name:      "a build-only apply",
+			noRestart: true,
+			want:      nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			dir := writeComposeProjectDir(t)
+			applier := mockRebuild.NewMockApplier(t)
+			applier.EXPECT().Apply(mock.Anything, mock.Anything).Return(reported, tt.applyErr).Once()
+
+			sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
+			sess.apply = applier
+			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error { return nil }
+
+			members := make([]*container.Container, 0, 2)
+
+			for _, service := range []string{"api", "worker"} {
+				c := gitAssociatedContainer(service, "/"+service, "webstack-"+service+":latest", map[string]string{
+					labels.ComposeDir:                 dir,
+					composeLabels.ComposeProjectLabel: "webstack",
+					composeLabels.ComposeServiceLabel: service,
+				})
+				c.SetStale(true)
+				sess.store(c.ID(), git.CheckResult{Stale: true, Commit: "0123456789abcdef0123456789abcdef01234567"})
+				members = append(members, c)
+			}
+
+			sess.PrepareRebuilds(
+				newTestLogger(t),
+				t.Context(),
+				mockRebuild.NewMockImageBuilder(t),
+				members,
+				updateParams.Params{NoRestart: tt.noRestart, Git: gitConfig.Defaults{Enable: true}},
+				nil,
+				map[container.ContainerID]error{},
+			)
+
+			assert.Equal(t, tt.want, sess.ComposeContainerIDs())
+		})
+	}
+
+	t.Run("a nil session reports none", func(t *testing.T) {
+		t.Parallel()
+
+		var sess *Session
+		assert.Nil(t, sess.ComposeContainerIDs())
 	})
 }
 
@@ -526,7 +609,7 @@ func TestSession_reuseUnrestartedBuild(t *testing.T) {
 	) (*Session, *container.Container, *state.Report, map[container.ContainerID]error) {
 		t.Helper()
 
-		sess := NewSession(client, dockerConfig.Docker{})
+		sess := NewSession(client, composeApply.NewClient(dockerConfig.Docker{}))
 		sess.apply = mockRebuild.NewMockApplier(t)
 
 		c := gitAssociatedContainer("app", "/app", "myapp:latest", nil)
@@ -584,7 +667,7 @@ func TestSession_reuseUnrestartedBuild(t *testing.T) {
 
 		// Each session lists the container fresh. The applier allows one build.
 		for range 2 {
-			sess := NewSession(client, dockerConfig.Docker{})
+			sess := NewSession(client, composeApply.NewClient(dockerConfig.Docker{}))
 			sess.apply = applier
 			sess.checkout = func(context.Context, string, string, project.CheckoutOptions) error {
 				return nil
