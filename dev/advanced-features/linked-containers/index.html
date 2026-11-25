@@ -3799,7 +3799,9 @@ This includes containers Watchtower would otherwise leave alone:</p>
 </ul>
 <h4 id="recreation_order">Recreation Order<a class="headerlink" href="#recreation_order" title="Permanent link">&para;</a></h4>
 <p>A recreated container follows the container whose network it joins, along with any container Watchtower recreates that its links or volumes-from name, since Docker resolves those when it creates the container.
-A monitored container also follows the containers it depends on.</p>
+A monitored container also follows the containers it depends on.
+A monitored container that joins the network of a container Watchtower recreates moves directly behind it as well, unless it waits for another container.
+Watchtower's own container stays last, since its self-update hands over to a new process.</p>
 <h4 id="replacing_the_shared_container">Replacing the Shared Container<a class="headerlink" href="#replacing_the_shared_container" title="Permanent link">&para;</a></h4>
 <p>Watchtower replaces the shared container before it removes the containers that join it:</p>
 <ol>
@@ -3810,12 +3812,13 @@ A monitored container also follows the containers it depends on.</p>
 <li>It removes the containers that join the shared container, then the shared container itself. These removals run to their end even when the update is canceled, since Docker finishes a stop it has begun.</li>
 <li>It recreates the removed containers against the replacement.</li>
 </ol>
-<p>Without rolling restarts, the shared container is not replaced early when its own network mode, links or volumes-from name another container Watchtower recreates.
+<p>The shared container is not replaced early when its own network mode, links or volumes-from name another container Watchtower recreates at the same time.
 In that case the joining containers are removed first and the replacement is created only after that other container's.</p>
-<p>With rolling restarts, a monitored container that joins the shared container is stopped only in its own turn, after the shared container is replaced.
-It has no network until then. On Podman the shared container cannot be removed while it runs, so its replacement is undone.</p>
+<p>With rolling restarts, a monitored container that joins the shared container stops before the shared container is removed, together with any containers placed between the two.
+Watchtower recreates them in order before it moves on to the next container, so the joining container never runs on a removed network.</p>
 <h4 id="failures">Failures<a class="headerlink" href="#failures" title="Permanent link">&para;</a></h4>
 <p>If the replacement cannot be created before the joining containers are removed, the shared container takes its name back and those containers are left untouched.
+The containers already stopped in step 1 are recreated against it.
 When the replacement is created only after they were removed, a failed create leaves the shared container and the joining containers removed. Watchtower reports each of them.</p>
 <p>A container stopped in step 1 that joins the network of another container in the group and cannot be stopped, such as one whose pre-update command skips it, keeps the shared container in place.
 Watchtower then renames nothing. It reports the shared container as failed and skips the containers of its group it did not reach.</p>
@@ -4100,7 +4103,7 @@ A recreated container or a restart of Watchtower reports the problem again.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 21, 2026 16:14:07 UTC"><span class="timeago" datetime="2026-11-21T16:14:07+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 21, 2026 16:14:07 UTC">2026-11-21</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 25, 2026 06:52:06 UTC"><span class="timeago" datetime="2026-11-25T06:52:06+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 25, 2026 06:52:06 UTC">2026-11-25</span>
   </span>
 
     
