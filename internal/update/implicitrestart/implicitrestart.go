@@ -113,16 +113,16 @@ func Reconcile(
 }
 
 // Rebind marks the containers that join the network namespace of a container
-// in plan as rebinding and returns plan with them placed in it.
+// in plan as rebinding and returns plan with them placed in it. A container of
+// plan that joins another's namespace moves behind that container too.
 //
 // A container is rebound whether it is running or stopped, including one that
 // is monitor-only or not monitored. A container that joins a rebound container
 // is rebound in turn. Watchtower containers, runs of Docker Engine jobs,
 // excluded containers and containers already in plan are never rebound.
 // Neither are the containers that join a Watchtower container, whose
-// self-update replaces it after this process hands over. The rebound
-// containers are placed in plan as [sorter.DependencyGraph.PlaceRebound]
-// describes.
+// self-update replaces it after this process hands over. The containers are
+// placed as [sorter.DependencyGraph.PlaceRebound] describes.
 //
 // Parameters:
 //   - log: Process logger.
@@ -132,7 +132,8 @@ func Reconcile(
 //   - excluded: Container IDs that must not be rebound.
 //
 // Returns:
-//   - []*container.Container: plan with the rebound containers placed in it.
+//   - []*container.Container: plan with the rebound containers placed in it,
+//     in restart order.
 func Rebind(
 	log *zerolog.Logger,
 	graph *sorter.DependencyGraph,

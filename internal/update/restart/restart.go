@@ -71,8 +71,8 @@ const (
 // container is stopped and recreated before the next one. Otherwise every
 // stale container is marked for update, then every container stops in reverse
 // order before any is recreated in order. A container that others join is
-// replaced before they are removed, so a failed replacement leaves them
-// joined to the restored container. Without rolling restarts, this needs a
+// replaced before it is removed, so after a failed replacement they join the
+// restored container again. Without rolling restarts, this needs a
 // host config that names no container earlier in the list. A container the
 // session left untouched on purpose is recorded as skipped. One example is a container whose
 // pre-update hook asked to skip it. Any other failure is recorded as failed.
@@ -148,9 +148,11 @@ func Run(
 //
 // It processes containers sequentially in forward order, stopping and restarting each as needed,
 // collecting cleaned image info for stale containers only to ensure proper cleanup.
-// A container is stopped and recreated with the rest of its group, the rebound
+// A container is stopped and recreated with the rest of its span, the later
 // containers that join its network namespace and the containers placed
-// between them, so a cancellation never leaves one of them removed.
+// between them. A span stops as a restart that is not rolling does, so each
+// joiner stops before the container it joins is removed while each network
+// group keeps its own replacement. No cancellation leaves a member removed.
 // The function checks for context cancellation at the start of each iteration to enable
 // prompt exit when the context is canceled.
 //
@@ -185,13 +187,13 @@ func performRollingRestart(
 		Strs("processing_order", containerNames).
 		Msg("Starting performRollingRestart")
 
-	groups := networkGroups(containers)
+	spans := rollingSpans(containers)
 
 	// Process containers in forward order to respect dependency chains.
-	for g, group := range groups {
+	for i, span := range spans {
 		// Check for context cancellation to enable prompt exit when context is canceled.
 		if ctx.Err() != nil {
-			for _, remaining := range groups[g:] {
+			for _, remaining := range spans[i:] {
 				for _, untouched := range remaining {
 					log.Info().
 						Str("container", untouched.Name()).
@@ -205,24 +207,20 @@ func performRollingRestart(
 			return failed, fmt.Errorf("rolling restart canceled: %w", ctx.Err())
 		}
 
-		if !group[0].ToRestart() {
-			continue
-		}
-
-		for _, c := range group {
+		for _, c := range span {
 			if c.IsStale() && progress != nil {
 				progress.MarkForUpdate(log, c.ID())
 			}
 		}
 
-		// The groups before this one are recreated already, so none can hold
-		// a container this group's create config names.
-		stopped := make(map[container.ContainerID]container.ContainerID, len(group))
-		stopGroup(log, ctx, group, nil, client, config, failed, stopped)
+		// The spans before this one are recreated already, so none can hold
+		// a container this span's create configs name.
+		spanFailed, stopped := stopContainersInReversedOrder(log, ctx, span, client, config)
+		maps.Copy(failed, spanFailed)
 
-		for _, c := range group {
+		for _, c := range span {
 			created, wasStopped := stopped[c.ID()]
-			if !recreates(c, wasStopped) {
+			if !c.ToRestart() || !recreates(c, wasStopped) {
 				continue
 			}
 

@@ -616,6 +616,38 @@ func TestRebind(t *testing.T) {
 		assert.False(t, app.IsRebinding())
 	})
 
+	// A rolling restart recreates a container of the plan with the container
+	// whose namespace it joins, so it moves behind that container.
+	t.Run("places a container of the plan behind the container of the plan it joins", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		db := named("db", "bridge")
+		app := named("app", "container:vpn")
+		plan := []*container.Container{vpn, db, app}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, nil), plan, nil, nil)
+
+		assert.Equal(t, []string{"vpn", "app", "db"}, names(got))
+		assert.False(t, app.IsRebinding())
+	})
+
+	// Watchtower's self-update hands over to a new process, so its container
+	// restarts last even when it joins another container of the plan.
+	t.Run("keeps a Watchtower container of the plan last", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := named("vpn", "bridge")
+		db := named("db", "bridge")
+		watchtower := named("watchtower", "container:vpn",
+			containerfixture.WithLabels(map[string]string{labels.Watchtower: "true"}))
+		plan := []*container.Container{vpn, db, watchtower}
+
+		got := Rebind(newTestLogger(t), testGraph(t, plan, nil), plan, nil, nil)
+
+		assert.Equal(t, []string{"vpn", "db", "watchtower"}, names(got))
+	})
+
 	// The scan keeps a network container's ID when it cannot inspect the
 	// container, an ID that is gone once the container is recreated.
 	t.Run("names the recreated container in the network mode", func(t *testing.T) {

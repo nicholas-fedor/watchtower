@@ -78,6 +78,49 @@ func networkGroups(containers []*container.Container) [][]*container.Container {
 	return groups
 }
 
+// rollingSpans splits containers in restart order into the spans a rolling
+// restart replaces together.
+//
+// Each span starts with a network group and runs through the last later
+// group with a container that joins the network namespace of a container in
+// the span, together with the groups in between. So a monitored container
+// stops before the container it joins is removed, while each group keeps its
+// own replacement. Watchtower's own containers never extend a span, since
+// they restart last.
+//
+// Parameters:
+//   - containers: Containers in restart order.
+//
+// Returns:
+//   - [][]*container.Container: The spans, in restart order.
+func rollingSpans(containers []*container.Container) [][]*container.Container {
+	groups := networkGroups(containers)
+	spans := make([][]*container.Container, 0, len(groups))
+
+	for first, start := 0, 0; first < len(groups); {
+		end := start + len(groups[first])
+		next := first + 1
+
+		// A later group extends the span through itself when one of its
+		// containers joins a container already in the span.
+		for i, groupEnd := next, end; i < len(groups); i++ {
+			groupEnd += len(groups[i])
+
+			joins := slices.ContainsFunc(groups[i], func(c *container.Container) bool {
+				return !c.IsWatchtower() && slices.ContainsFunc(containers[start:end], c.JoinsNetworkOf)
+			})
+			if joins {
+				end, next = groupEnd, i+1
+			}
+		}
+
+		spans = append(spans, containers[start:end])
+		first, start = next, end
+	}
+
+	return spans
+}
+
 // stopGroup stops a container and the containers after it in its group and
 // records the outcomes.
 //
@@ -220,7 +263,7 @@ func stopNetworkGroup(
 	if err != nil {
 		clog.Debug().Err(err).Msg("Failed to create container")
 
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, "", nil, config, err)
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, "", group[1:], config, err)
 		keepMembers(group, failed, stopped)
 
 		return
@@ -242,7 +285,7 @@ func stopNetworkGroup(
 		}
 
 		heldBy(group, member, err, failed, stopped)
-		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, reaching, config, failed[head.ID()])
+		failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, group[1:], config, failed[head.ID()])
 
 		// The member starts again only once the namespace it joins is restored.
 		startAgain(ctx, member, client, config, failed, err)
@@ -265,7 +308,7 @@ func stopNetworkGroup(
 
 			return
 		case exists:
-			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, reaching, config, err)
+			failed[head.ID()] = restoreReplaced(clog, ctx, client, head, &rename, newID, group[1:], config, err)
 
 			return
 		default:

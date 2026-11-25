@@ -182,6 +182,8 @@ When Compose recreates a joining container during a Git-monitored apply in the s
 
 A recreated container follows the container whose network it joins, along with any container Watchtower recreates that its links or volumes-from name, since Docker resolves those when it creates the container.
 A monitored container also follows the containers it depends on.
+A monitored container that joins the network of a container Watchtower recreates moves directly behind it as well, unless it waits for another container.
+Watchtower's own container stays last, since its self-update hands over to a new process.
 
 #### Replacing the Shared Container
 
@@ -194,15 +196,16 @@ Watchtower replaces the shared container before it removes the containers that j
 5. It removes the containers that join the shared container, then the shared container itself. These removals run to their end even when the update is canceled, since Docker finishes a stop it has begun.
 6. It recreates the removed containers against the replacement.
 
-Without rolling restarts, the shared container is not replaced early when its own network mode, links or volumes-from name another container Watchtower recreates.
+The shared container is not replaced early when its own network mode, links or volumes-from name another container Watchtower recreates at the same time.
 In that case the joining containers are removed first and the replacement is created only after that other container's.
 
-With rolling restarts, a monitored container that joins the shared container is stopped only in its own turn, after the shared container is replaced.
-It has no network until then. On Podman the shared container cannot be removed while it runs, so its replacement is undone.
+With rolling restarts, a monitored container that joins the shared container stops before the shared container is removed, together with any containers placed between the two.
+Watchtower recreates them in order before it moves on to the next container, so the joining container never runs on a removed network.
 
 #### Failures
 
 If the replacement cannot be created before the joining containers are removed, the shared container takes its name back and those containers are left untouched.
+The containers already stopped in step 1 are recreated against it.
 When the replacement is created only after they were removed, a failed create leaves the shared container and the joining containers removed. Watchtower reports each of them.
 
 A container stopped in step 1 that joins the network of another container in the group and cannot be stopped, such as one whose pre-update command skips it, keeps the shared container in place.
