@@ -100,9 +100,9 @@ func (c *Client) DiscardCopyFiles(containerID container.ContainerID) {
 // the --self-update-orchestrator flag. It is configured with AutoRemove for
 // automatic cleanup and mounts the Docker socket for container management.
 //
-// The ephemeral container does not set the watchtower label
-// (com.centurylinklabs.watchtower = "true") to avoid being detected as an
-// excess Watchtower instance by the scope and filter systems.
+// The ephemeral container carries the ephemeral orchestrator label, which
+// keeps startup cleanup from removing it as an excess Watchtower instance
+// even when the image gives it the Watchtower label.
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeout control.

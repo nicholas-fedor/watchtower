@@ -546,6 +546,19 @@ func (c *Container) IsWatchtower() bool {
 	return containsWatchtowerLabel(info.Config.Labels)
 }
 
+// IsWatchtowerInstance reports whether the container runs a Watchtower
+// instance.
+//
+// An ephemeral orchestrator runs from the Watchtower image and so carries its
+// label, but it only hands a self-update over to the replacement and exits.
+//
+// Returns:
+//   - bool: True for a Watchtower container that is not an ephemeral
+//     orchestrator.
+func (c *Container) IsWatchtowerInstance() bool {
+	return c.IsWatchtower() && !c.IsEphemeralOrchestrator()
+}
+
 // IsJobRun reports whether the container is a run of a Docker Engine job.
 //
 // The engine creates each run and removes it after a success. It keeps a
@@ -930,7 +943,7 @@ func IsSuperseded(container *Container) bool {
 // IsOrphanedReplacement reports whether a container counts as a replacement
 // that an interrupted self-update left in the created state.
 //
-// Any Watchtower container in the created state counts when it is in the given
+// Any Watchtower instance in the created state counts when it is in the given
 // scope or its chain label names the current container, unless it is the
 // current container or a renamed predecessor. One scope runs one Watchtower
 // instance, so such a container is never a separate instance to keep. A
@@ -946,7 +959,7 @@ func IsSuperseded(container *Container) bool {
 // Returns:
 //   - bool: True when the candidate is an orphaned replacement.
 func IsOrphanedReplacement(candidate *Container, currentID ContainerID, scope string) bool {
-	return candidate.IsWatchtower() &&
+	return candidate.IsWatchtowerInstance() &&
 		candidate.ID() != currentID &&
 		!IsOldContainer(candidate.Name()) &&
 		candidate.IsCreated() &&

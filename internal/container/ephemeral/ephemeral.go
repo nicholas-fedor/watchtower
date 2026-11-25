@@ -330,7 +330,8 @@ func removeLeftoverOrchestrator(
 //   - Forwards Docker connection environment variables (DOCKER_HOST, DOCKER_TLS_VERIFY,
 //     DOCKER_CERT_PATH, DOCKER_API_VERSION) to maintain connection parity with the source
 //   - Sets the orchestrator label for identification
-//   - Omits the watchtower label and scope label to avoid excess instance detection
+//   - Sets no scope label. The Watchtower label still comes from the image, so
+//     the orchestrator label is what tells it apart from Watchtower instances
 //
 // Parameters:
 //   - sourceContainer: Current Watchtower container.
@@ -370,7 +371,8 @@ func buildOrchestratorConfig(
 		Cmd:   []string{"--self-update-orchestrator"},
 		Env:   env,
 		Labels: map[string]string{
-			// Orchestrator label only — watchtower label omitted to avoid excess instance detection.
+			// The image adds the Watchtower label, and this one tells the
+			// orchestrator apart from Watchtower instances.
 			labels.EphemeralOrchestrator: "true",
 		},
 	}
