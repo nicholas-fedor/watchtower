@@ -3779,6 +3779,7 @@ This includes containers Watchtower would otherwise leave alone:</p>
 <li>A monitor-only container.</li>
 <li>A container excluded from monitoring, such as one without the enable label or in another instance's scope.</li>
 <li>A container skipped because of a circular dependency or a dependency on itself.</li>
+<li>A container that Compose created during a Git-monitored apply earlier in the same session, which Docker records as joining the container before Watchtower recreated it.</li>
 </ul>
 <p>Any other monitored container that joins the network is restarted as a dependent of the container it joins instead (see <a href="#restarting_dependent_containers">Restarting Dependent Containers</a>), so its lifecycle hooks run and the remove-volumes configuration option applies to it.</p>
 <p>Watchtower never recreates these containers this way:</p>
@@ -3787,7 +3788,6 @@ This includes containers Watchtower would otherwise leave alone:</p>
 <li>A run of a Docker Engine job (see <a href="../compose-jobs/">Compose Jobs</a>).</li>
 <li>A container built from Git in the same session while the no-restart configuration option is set, which keeps running as it is with the removed container's network.</li>
 </ul>
-<p>When Compose recreates a joining container during a Git-monitored apply in the same session as Watchtower recreates the container it joins, the new container still refers to the removed one.</p>
 <h4 id="how_a_recreated_container_is_handled">How a Recreated Container Is Handled<a class="headerlink" href="#how_a_recreated_container_is_handled" title="Permanent link">&para;</a></h4>
 <ul>
 <li>It keeps its image. A monitor-only container is still checked for updates and reported as usual.</li>
@@ -4103,7 +4103,7 @@ A recreated container or a restart of Watchtower reports the problem again.</p>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 25, 2026 06:52:06 UTC"><span class="timeago" datetime="2026-11-25T06:52:06+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 25, 2026 06:52:06 UTC">2026-11-25</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-timeago" title="November 25, 2026 23:48:23 UTC"><span class="timeago" datetime="2026-11-25T23:48:23+00:00" locale="en"></span></span><span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-iso_date" title="November 25, 2026 23:48:23 UTC">2026-11-25</span>
   </span>
 
     
