@@ -61,5 +61,6 @@ Could not reconnect container to the network of a recreated container: failed to
 Starting Watchtower ephemeral self-update
 Failed to clean up ephemeral orchestrator after start failure: Error response from daemon: removal of container 0dd0dd000000 is already in progress
 Could not update container. Its configuration cannot be recreated: no image info available
+Could not inspect a container Compose created. It may lose its network if it joins a recreated container: failed to inspect container: daemon unavailable
 Unrecognized message with fields
 Unrecognized message without fields

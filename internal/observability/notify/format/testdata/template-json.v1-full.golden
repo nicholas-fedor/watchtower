@@ -597,6 +597,15 @@
     },
     {
       "data": {
+        "container_id": "abcdef123456",
+        "error": "failed to inspect container: daemon unavailable"
+      },
+      "level": "debug",
+      "message": "Could not inspect a container Compose created. It may lose its network if it joins a recreated container",
+      "time": "2026-10-07T12:01:03Z"
+    },
+    {
+      "data": {
         "alpha": "one",
         "beta": 2
       },

@@ -1,7 +1,9 @@
 package update
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -9,6 +11,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	cerrdefs "github.com/containerd/errdefs"
+
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/git"
@@ -22,6 +27,7 @@ import (
 	mockUpdate "github.com/nicholas-fedor/watchtower/internal/update/mocks"
 	updateParams "github.com/nicholas-fedor/watchtower/internal/update/params"
 	"github.com/nicholas-fedor/watchtower/internal/update/rebuild"
+	mockRebuild "github.com/nicholas-fedor/watchtower/internal/update/rebuild/mocks"
 	"github.com/nicholas-fedor/watchtower/internal/update/sorter"
 	"github.com/nicholas-fedor/watchtower/internal/update/state"
 )
@@ -83,7 +89,7 @@ func staleGitTestContainer(
 	t.Helper()
 
 	app, gitClient, commit := gitWatchedTestContainer(t, nil)
-	session := rebuild.NewSession(gitClient, dockerConfig.Docker{})
+	session := rebuild.NewSession(gitClient, composeApply.NewClient(dockerConfig.Docker{}))
 
 	_, err := checkStaleness(newTestLogger(t), t.Context(), newMockClient(t), config, ratelimit.New(),
 		session, progress, []*container.Container{app})
@@ -287,7 +293,7 @@ func TestPlanRestarts(t *testing.T) {
 		}
 
 		monitored := []*container.Container{cyclic, app, db}
-		restarts := planTestRestarts(t, rebuild.NewSession(nil, dockerConfig.Docker{}), updateParams.Params{}, &state.Progress{},
+		restarts := planTestRestarts(t, rebuild.NewSession(nil, composeApply.NewClient(dockerConfig.Docker{})), updateParams.Params{}, &state.Progress{},
 			monitored, map[container.ContainerID]struct{}{cyclic.ID(): {}})
 
 		assert.Equal(t, []*container.Container{db, app}, restarts)
@@ -344,7 +350,7 @@ func TestPlanRestarts(t *testing.T) {
 		require.NoError(t, err)
 
 		restarts, err := planRestarts(log, t.Context(), newMockClient(t), updateParams.Params{},
-			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored, nil)
+			rebuild.NewSession(nil, composeApply.NewClient(dockerConfig.Docker{})), &state.Progress{}, graph, monitored, monitored, nil)
 
 		require.ErrorIs(t, err, errSortDependenciesFailed)
 		assert.Nil(t, restarts)
@@ -392,7 +398,7 @@ func TestPlanRestarts_rebinds(t *testing.T) {
 			Return([]*container.Container{stopped}, nil).Once()
 
 		restarts, err := planRestarts(log, t.Context(), client, updateParams.Params{},
-			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, all, monitored, nil)
+			rebuild.NewSession(nil, composeApply.NewClient(dockerConfig.Docker{})), &state.Progress{}, graph, all, monitored, nil)
 		require.NoError(t, err)
 
 		assert.Equal(t, []*container.Container{vpn, excluded, monitorOnly, stopped}, restarts)
@@ -424,7 +430,7 @@ func TestPlanRestarts_rebinds(t *testing.T) {
 		// it runs, so it is still rebound rather than left on a removed
 		// namespace.
 		restarts, err := planRestarts(log, t.Context(), client, updateParams.Params{},
-			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored,
+			rebuild.NewSession(nil, composeApply.NewClient(dockerConfig.Docker{})), &state.Progress{}, graph, monitored, monitored,
 			map[container.ContainerID]struct{}{cyclic.ID(): {}})
 		require.NoError(t, err)
 
@@ -444,7 +450,7 @@ func TestPlanRestarts_rebinds(t *testing.T) {
 
 		// The strict mock fails on a call to ListNetworkDependents.
 		restarts, err := planRestarts(log, t.Context(), mockUpdate.NewMockClient(t), updateParams.Params{},
-			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored, nil)
+			rebuild.NewSession(nil, composeApply.NewClient(dockerConfig.Docker{})), &state.Progress{}, graph, monitored, monitored, nil)
 		require.NoError(t, err)
 		assert.Empty(t, restarts)
 	})
@@ -466,7 +472,195 @@ func TestPlanRestarts_rebinds(t *testing.T) {
 		client.EXPECT().ListNetworkDependents(mock.Anything).Return(nil, listErr).Once()
 
 		_, err = planRestarts(log, t.Context(), client, updateParams.Params{},
-			rebuild.NewSession(nil, dockerConfig.Docker{}), &state.Progress{}, graph, monitored, monitored, nil)
+			rebuild.NewSession(nil, composeApply.NewClient(dockerConfig.Docker{})), &state.Progress{}, graph, monitored, monitored, nil)
 		require.ErrorIs(t, err, listErr)
+	})
+}
+
+// TestPlanRestarts_rebindsComposeCreated verifies that a container a Compose
+// apply created during planning is rebound after a container Watchtower
+// recreates when it joins that container's network namespace, including one
+// that joins another rebound container Compose created. A container that joins
+// a container Compose applied already joins its replacement and is left
+// alone. The containers Compose applied are left out of the restarts.
+func TestPlanRestarts_rebindsComposeCreated(t *testing.T) {
+	t.Parallel()
+
+	// created returns a container that Compose created for service, in the
+	// network namespace that networkMode names.
+	created := func(service, networkMode string) *container.Container {
+		return modelfixture.Container(
+			containerfixture.WithName("/"+service),
+			containerfixture.WithID("new-"+service+"-id"),
+			containerfixture.WithNetworkMode(networkMode),
+		)
+	}
+
+	// plan applies the services through an applier that reports newContainers,
+	// which the client returns on inspection, and plans the session's restarts
+	// with recreated, a stale container Watchtower recreates itself.
+	plan := func(
+		t *testing.T,
+		recreated *container.Container,
+		services []string,
+		newContainers ...*container.Container,
+	) []*container.Container {
+		t.Helper()
+
+		applied := make([]composeApply.Container, 0, len(newContainers))
+
+		client := newMockClient(t)
+
+		for i, c := range newContainers {
+			applied = append(applied, composeApply.Container{Service: services[i], Name: c.Name(), ID: c.ID()})
+			client.EXPECT().GetContainer(mock.Anything, c.ID()).Return(c, nil).Once()
+		}
+
+		applier := mockRebuild.NewMockApplier(t)
+		applier.EXPECT().Apply(mock.Anything, mock.Anything).Return(applied, nil).Once()
+
+		config := updateParams.Params{Git: gitConfig.Defaults{Enable: true}}
+		progress := &state.Progress{}
+		members, session := staleComposeServices(t, config, progress, applier, services...)
+
+		recreated.SetStale(true)
+
+		monitored := append([]*container.Container{recreated}, members...)
+
+		log := newTestLogger(t)
+		graph, err := sorter.NewDependencyGraph(log, monitored, nil, false)
+		require.NoError(t, err)
+
+		restarts, err := planRestarts(log, t.Context(), client, config, session, progress,
+			graph, monitored, monitored, nil)
+		require.NoError(t, err)
+
+		return restarts
+	}
+
+	t.Run("rebinds a joiner of a container Watchtower recreates", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := skipTestContainer("vpn-id", "vpn", nil)
+		app := created("app", "container:vpn")
+
+		restarts := plan(t, vpn, []string{"app"}, app)
+
+		assert.Equal(t, []*container.Container{vpn, app}, restarts)
+		assert.True(t, app.IsRebinding())
+	})
+
+	t.Run("rebinds a joiner of a rebound container Compose created", func(t *testing.T) {
+		t.Parallel()
+
+		vpn := skipTestContainer("vpn-id", "vpn", nil)
+		app := created("app", "container:vpn")
+		worker := created("worker", "container:app")
+
+		restarts := plan(t, vpn, []string{"app", "worker"}, app, worker)
+
+		assert.Equal(t, []*container.Container{vpn, app, worker}, restarts)
+		assert.True(t, worker.IsRebinding())
+	})
+
+	t.Run("leaves a joiner of an applied container alone", func(t *testing.T) {
+		t.Parallel()
+
+		db := skipTestContainer("db-id", "db", nil)
+		vpn := created("vpn", "")
+		app := created("app", "container:vpn")
+
+		restarts := plan(t, db, []string{"vpn", "app"}, vpn, app)
+
+		assert.Equal(t, []*container.Container{db}, restarts)
+		assert.False(t, app.IsRebinding())
+	})
+}
+
+// TestInspectUnlisted verifies that only the containers the listing does not
+// hold are inspected, each once and in the given order. A removed container is
+// left out quietly. A failed inspection warns and moves on, and an ended
+// session stops the inspections without a warning.
+func TestInspectUnlisted(t *testing.T) {
+	t.Parallel()
+
+	listed := skipTestContainer("listed-id", "listed", nil)
+
+	t.Run("inspects each unlisted container once", func(t *testing.T) {
+		t.Parallel()
+
+		first := skipTestContainer("first-id", "first", nil)
+		second := skipTestContainer("second-id", "second", nil)
+
+		client := mockUpdate.NewMockClient(t)
+		client.EXPECT().GetContainer(mock.Anything, first.ID()).Return(first, nil).Once()
+		client.EXPECT().GetContainer(mock.Anything, second.ID()).Return(second, nil).Once()
+
+		got := inspectUnlisted(newTestLogger(t), t.Context(), client,
+			[]container.ContainerID{first.ID(), listed.ID(), second.ID(), first.ID()},
+			[]*container.Container{listed})
+		assert.Equal(t, []*container.Container{first, second}, got)
+	})
+
+	// A failed inspection warns and moves on. A removed container is left
+	// out quietly.
+	for _, tt := range []struct {
+		name     string
+		err      error
+		wantWarn []string
+	}{
+		{
+			name:     "a failed inspection warns and moves on",
+			err:      errors.New("failed to inspect container: daemon unavailable"),
+			wantWarn: []string{logging.ComposeContainerUninspected},
+		},
+		{
+			name:     "leaves out a container that no longer exists",
+			err:      fmt.Errorf("failed to inspect container: %w", cerrdefs.ErrNotFound),
+			wantWarn: nil,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			kept := skipTestContainer("kept-id", "kept", nil)
+
+			client := mockUpdate.NewMockClient(t)
+			client.EXPECT().GetContainer(mock.Anything, container.ContainerID("lost-id")).Return(nil, tt.err).Once()
+			client.EXPECT().GetContainer(mock.Anything, kept.ID()).Return(kept, nil).Once()
+
+			log, logs := logcapture.NewJSON(zerolog.DebugLevel)
+
+			got := inspectUnlisted(log, t.Context(), client, []container.ContainerID{"lost-id", kept.ID()}, nil)
+			assert.Equal(t, []*container.Container{kept}, got)
+			assert.Equal(t, tt.wantWarn, logcapture.Messages(t, logs.String(), "warn"))
+		})
+	}
+
+	t.Run("an ended session stops the inspections", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+
+		// The strict mock fails on a second inspection.
+		client := mockUpdate.NewMockClient(t)
+		client.EXPECT().GetContainer(mock.Anything, container.ContainerID("first-id")).
+			Return(nil, fmt.Errorf("failed to inspect container: %w", context.Canceled)).Once()
+
+		log, logs := logcapture.NewJSON(zerolog.DebugLevel)
+
+		got := inspectUnlisted(log, ctx, client, []container.ContainerID{"first-id", "second-id"}, nil)
+		assert.Empty(t, got)
+		assert.Empty(t, logcapture.Messages(t, logs.String(), "warn"))
+	})
+
+	t.Run("inspects nothing without IDs", func(t *testing.T) {
+		t.Parallel()
+
+		// The strict mock fails on any call.
+		got := inspectUnlisted(newTestLogger(t), t.Context(), mockUpdate.NewMockClient(t), nil,
+			[]*container.Container{listed})
+		assert.Empty(t, got)
 	})
 }

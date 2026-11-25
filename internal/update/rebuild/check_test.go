@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	composeApply "github.com/nicholas-fedor/watchtower/internal/compose/apply"
 	"github.com/nicholas-fedor/watchtower/internal/container"
 	"github.com/nicholas-fedor/watchtower/internal/container/labels"
 	"github.com/nicholas-fedor/watchtower/internal/container/provenance"
@@ -26,7 +27,7 @@ func TestSession_Check(t *testing.T) {
 	t.Run("treats an unassociated container as fresh and stores the empty result", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := mockUpdate.CreateMockContainer("plain", "/plain", "nginx:latest", time.Now())
 
 		stale, newest, err := sess.Check(t.Context(), c, updateParams.Params{})
@@ -42,7 +43,7 @@ func TestSession_Check(t *testing.T) {
 	t.Run("returns a wrapped error when the remote cannot be listed", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}), dockerConfig.Docker{})
+		sess := NewSession(git.New(newTestLogger(t), git.Options{Timeout: 50 * time.Millisecond}), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("bad", "/bad", "myapp:latest", map[string]string{
 			labels.GitRepo: "https://127.0.0.1:1/org/app.git",
 		})
@@ -64,7 +65,7 @@ func TestSession_Check(t *testing.T) {
 	t.Run("names an invalid git-host once", func(t *testing.T) {
 		t.Parallel()
 
-		sess := NewSession(gitTestClient(t), dockerConfig.Docker{})
+		sess := NewSession(gitTestClient(t), composeApply.NewClient(dockerConfig.Docker{}))
 		c := gitAssociatedContainer("bad-host", "/bad-host", "myapp:latest", map[string]string{
 			labels.GitRepo: "https://git.example.com/org/app.git",
 			labels.GitHost: "ftp://git.example.com",

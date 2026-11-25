@@ -2511,3 +2511,34 @@ func TestRecordRestartOutcomes_rebinding(t *testing.T) {
 	assert.Equal(t, "vpn", reported[0]["network_container"])
 	assert.Equal(t, "failed to create container: name in use", reported[0]["error"])
 }
+
+// TestRecordRestartOutcomes_rebindingReplacement verifies that a failed
+// rebind of a container that Compose created earlier in the session, in place
+// of a container the session scanned, fails that container's status. The
+// report then lists the container once, with the rebind's error.
+func TestRecordRestartOutcomes_rebindingReplacement(t *testing.T) {
+	t.Parallel()
+
+	log := newTestLogger(t)
+	scanned := modelfixture.Container(
+		containerfixture.WithName("/torrent"),
+		containerfixture.WithID("scanned-id"),
+	)
+	replacement := newRebindingContainer(true)
+
+	progress := state.Progress{}
+	progress.AddScanned(log, scanned, "sha256:new", updateParams.Params{})
+	progress.MarkForUpdate(log, scanned.ID())
+	progress.SetNewContainerID(log, scanned.ID(), replacement.ID())
+
+	recordRestartOutcomes(log, &progress, []*container.Container{replacement}, map[container.ContainerID]error{
+		replacement.ID(): errors.New("failed to create container: name in use"),
+	}, updateParams.Params{})
+
+	require.Len(t, progress, 1)
+
+	report := progress.Report(log)
+	require.Len(t, report.Failed(), 1)
+	assert.Equal(t, scanned.ID(), report.Failed()[0].ID())
+	assert.Equal(t, "failed to create container: name in use", report.Failed()[0].Error())
+}

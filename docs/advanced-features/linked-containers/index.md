@@ -158,6 +158,7 @@ This includes containers Watchtower would otherwise leave alone:
 - A monitor-only container.
 - A container excluded from monitoring, such as one without the enable label or in another instance's scope.
 - A container skipped because of a circular dependency or a dependency on itself.
+- A container that Compose created during a Git-monitored apply earlier in the same session, which Docker records as joining the container before Watchtower recreated it.
 
 Any other monitored container that joins the network is restarted as a dependent of the container it joins instead (see [Restarting Dependent Containers](#restarting_dependent_containers)), so its lifecycle hooks run and the remove-volumes configuration option applies to it.
 
@@ -166,8 +167,6 @@ Watchtower never recreates these containers this way:
 - Its own containers and the containers that join a Watchtower container's network. Its self-update replaces its container only after the running instance hands over, which is too late to recreate them against the new container.
 - A run of a Docker Engine job (see [Compose Jobs](../compose-jobs/index.md)).
 - A container built from Git in the same session while the no-restart configuration option is set, which keeps running as it is with the removed container's network.
-
-When Compose recreates a joining container during a Git-monitored apply in the same session as Watchtower recreates the container it joins, the new container still refers to the removed one.
 
 #### How a Recreated Container Is Handled
 

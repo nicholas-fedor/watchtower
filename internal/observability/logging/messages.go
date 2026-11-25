@@ -73,6 +73,11 @@ const (
 	// namespace of a recreated container cannot be recreated to join the new
 	// one.
 	ContainerRebindFailed = "Could not reconnect container to the network of a recreated container"
+	// ComposeContainerUninspected is logged when a container that a Compose
+	// apply created cannot be inspected to check whether it joins the network
+	// namespace of a container that is recreated.
+	ComposeContainerUninspected = "Could not inspect a container Compose created. " +
+		"It may lose its network if it joins a recreated container"
 	// SelfUpdateSkippedRunOnce is logged when a run-once session leaves
 	// Watchtower's own container alone.
 	SelfUpdateSkippedRunOnce = "Skipping Watchtower self-update in run-once mode"

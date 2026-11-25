@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 	dockerContainer "github.com/moby/moby/api/types/container"
@@ -428,6 +429,39 @@ func TestProgress_AddScanned(t *testing.T) {
 	}
 }
 
+// TestProgress_Holder verifies that a container is held by its own status or
+// by the status of the container it replaced earlier in the session. An empty
+// ID never matches a status without a new container.
+func TestProgress_Holder(t *testing.T) {
+	t.Parallel()
+
+	progress := Progress{
+		"cont1": &ContainerStatus{containerID: "cont1", newContainerID: "new1"},
+		"cont2": &ContainerStatus{containerID: "cont2"},
+	}
+
+	tests := []struct {
+		containerID container.ContainerID
+		wantHolder  container.ContainerID
+	}{
+		{containerID: "cont1", wantHolder: "cont1"},
+		{containerID: "cont2", wantHolder: "cont2"},
+		{containerID: "new1", wantHolder: "cont1"},
+		{containerID: "other", wantHolder: ""},
+		{containerID: "", wantHolder: ""},
+	}
+
+	for _, tt := range tests {
+		if tt.wantHolder == "" {
+			assert.Nil(t, progress.Holder(tt.containerID), tt.containerID)
+
+			continue
+		}
+
+		assert.Same(t, progress[tt.wantHolder], progress.Holder(tt.containerID), tt.containerID)
+	}
+}
+
 func TestProgress_UpdateFailed(t *testing.T) {
 	type args struct {
 		failures map[container.ContainerID]error
@@ -495,6 +529,47 @@ func TestProgress_UpdateFailed(t *testing.T) {
 			},
 		},
 		{
+			name: "failure of the container that replaced a held one",
+			m: Progress{
+				"cont1": &ContainerStatus{state: UpdatedState, containerID: "cont1", newContainerID: "new1"},
+			},
+			args: args{
+				failures: map[container.ContainerID]error{
+					"new1": errors.New("rebind failed"),
+				},
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{
+					state:          FailedState,
+					containerID:    "cont1",
+					containerError: errors.New("rebind failed"),
+				},
+			},
+		},
+		{
+			name: "failure of the container that replaced a failed one keeps the first failure",
+			m: Progress{
+				"cont1": &ContainerStatus{
+					state:          FailedState,
+					containerID:    "cont1",
+					newContainerID: "new1",
+					containerError: errors.New("compose apply failed"),
+				},
+			},
+			args: args{
+				failures: map[container.ContainerID]error{
+					"new1": errors.New("rebind failed"),
+				},
+			},
+			want: Progress{
+				"cont1": &ContainerStatus{
+					state:          FailedState,
+					containerID:    "cont1",
+					containerError: errors.New("compose apply failed"),
+				},
+			},
+		},
+		{
 			name: "failure container not in progress map",
 			m: Progress{
 				"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"},
@@ -548,6 +623,69 @@ func TestProgress_UpdateFailed(t *testing.T) {
 					)
 				}
 			}
+		})
+	}
+}
+
+// TestProgress_UpdateSkipped checks that a skip marks only the container's own
+// status. An earlier failure is kept. A skipped replacement or a container the
+// progress does not hold changes nothing.
+func TestProgress_UpdateSkipped(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		m         Progress
+		skips     map[container.ContainerID]error
+		wantState State
+		wantError string
+	}{
+		{
+			name:      "skip of a held container",
+			m:         Progress{"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"}},
+			skips:     map[container.ContainerID]error{"cont1": errors.New("update canceled")},
+			wantState: SkippedState,
+			wantError: "update canceled",
+		},
+		{
+			name: "skip of the container that replaced a held one keeps that one's state",
+			m: Progress{
+				"cont1": &ContainerStatus{state: UpdatedState, containerID: "cont1", newContainerID: "new1"},
+			},
+			skips:     map[container.ContainerID]error{"new1": errors.New("update canceled")},
+			wantState: UpdatedState,
+			wantError: "",
+		},
+		{
+			name: "skip of a failed container keeps the failure",
+			m: Progress{
+				"cont1": &ContainerStatus{
+					state:          FailedState,
+					containerID:    "cont1",
+					containerError: errors.New("stop failed"),
+				},
+			},
+			skips:     map[container.ContainerID]error{"cont1": errors.New("update canceled")},
+			wantState: FailedState,
+			wantError: "stop failed",
+		},
+		{
+			name:      "skip of a container the progress does not hold",
+			m:         Progress{"cont1": &ContainerStatus{state: ScannedState, containerID: "cont1"}},
+			skips:     map[container.ContainerID]error{"other": errors.New("update canceled")},
+			wantState: ScannedState,
+			wantError: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tt.m.UpdateSkipped(newTestLogger(t), tt.skips)
+
+			require.Len(t, tt.m, 1)
+			assert.Equal(t, tt.wantState, tt.m["cont1"].state)
+			assert.Equal(t, tt.wantError, tt.m["cont1"].Error())
 		})
 	}
 }
@@ -1469,6 +1607,29 @@ func TestProgressRecordRestart(t *testing.T) {
 
 		progress.RecordRestart(newTestLogger(t), c, "ignored")
 		assert.Empty(t, progress)
+	})
+
+	// Compose recreated the held container as compose1 earlier in the
+	// session, and compose1 was then recreated again to rebind its network.
+	// The held status names the latest container and stays updated.
+	t.Run("container that replaced a held one", func(t *testing.T) {
+		t.Parallel()
+
+		id := container.ContainerID("cont1")
+		progress := Progress{id: &ContainerStatus{
+			containerID:    id,
+			oldImage:       "img",
+			newImage:       "img",
+			newContainerID: "compose1",
+			state:          UpdatedState,
+		}}
+
+		c := modelfixture.Container(containerfixture.WithID("compose1"))
+
+		progress.RecordRestart(newTestLogger(t), c, "rebound1")
+		require.Len(t, progress, 1)
+		assert.Equal(t, container.ContainerID("rebound1"), progress[id].NewContainerID())
+		assert.Equal(t, UpdatedState, progress[id].state)
 	})
 }
 
