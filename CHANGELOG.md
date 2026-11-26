@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/gofiber/contrib/v3/zerolog to v1.1.13 by @renovate[bot] in [#4056](https://github.com/nicholas-fedor/watchtower/pull/4056)
 - Update module github.com/huandu/xstrings to v1.6.6 by @renovate[bot] in [#4054](https://github.com/nicholas-fedor/watchtower/pull/4054)
 - Update module github.com/huandu/xstrings to v1.6.5 by @renovate[bot] in [#4050](https://github.com/nicholas-fedor/watchtower/pull/4050)
 
