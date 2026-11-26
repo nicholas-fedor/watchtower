@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update module github.com/huandu/xstrings to v1.6.6 by @renovate[bot] in [#4054](https://github.com/nicholas-fedor/watchtower/pull/4054)
 - Update module github.com/huandu/xstrings to v1.6.5 by @renovate[bot] in [#4050](https://github.com/nicholas-fedor/watchtower/pull/4050)
 
 ## [1.24.2] - 2026-11-24
