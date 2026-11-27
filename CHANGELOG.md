@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Chores
 
+- Update github.com/moby/extensions digest to bf2f48d by @renovate[bot] in [#4060](https://github.com/nicholas-fedor/watchtower/pull/4060)
 - Update module github.com/gofiber/contrib/v3/swaggo to v1.0.19 by @renovate[bot] in [#4055](https://github.com/nicholas-fedor/watchtower/pull/4055)
 - Update module github.com/gofiber/contrib/v3/zerolog to v1.1.13 by @renovate[bot] in [#4056](https://github.com/nicholas-fedor/watchtower/pull/4056)
 - Update module github.com/huandu/xstrings to v1.6.6 by @renovate[bot] in [#4054](https://github.com/nicholas-fedor/watchtower/pull/4054)
