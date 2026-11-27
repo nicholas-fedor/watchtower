@@ -123,8 +123,8 @@ github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxK
 github.com/dlclark/regexp2 v1.11.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
 github.com/docker/cli v29.10.1+incompatible h1:0wlyVoe0snmKYUUjJuhoR0HiSqRHQonKVcZzT7LwkVM=
 github.com/docker/cli v29.10.1+incompatible/go.mod h1:JLrzqnKDaYBop7H2jaqPtU4hHvMKP+vjCwu2uszcLI8=
-github.com/docker/compose/v5 v5.8.0 h1:UA+EN1bHwms7LQHftNyQp0cNN+Jj1z0FBx0IyCSAHms=
-github.com/docker/compose/v5 v5.8.0/go.mod h1:r/gf0BwwKvvleAWTXbhAZJHQ+TRcFE/nSMXc15fcLgg=
+github.com/docker/compose/v5 v5.8.1 h1:b6Y695MqWVstDjC3QWbKq2N8Gd3Au8rt5+qMao00xD8=
+github.com/docker/compose/v5 v5.8.1/go.mod h1:zv68k6hLifgdbLY6nD1grn5S9/2VsGEzZAR9VPycgTI=
 github.com/docker/distribution v2.8.3+incompatible h1:AtKxIZ36LoNK51+Z6RpzLpddBirtxJnzDrHLEKxTAYk=
 github.com/docker/distribution v2.8.3+incompatible/go.mod h1:J2gT2udsDAN96Uj4KfcMRqY0/ypR+oyYUYmja8H+y+w=
 github.com/docker/docker-credential-helpers v0.9.13 h1:yLE5jCyKJraJaBACIGqgpLX0UheWfZUwBkIeCu6WPFU=
@@ -139,8 +139,6 @@ github.com/docker/secrets-engine/client v1.0.0 h1:/zMCWoch4OOoMQoCo257H6siYUuUcQ
 github.com/docker/secrets-engine/client v1.0.0/go.mod h1:EGa8hWWhSWBQ4+Yn2BHO4xeXZ4wYCI9eAQ3U1Fy1sIA=
 github.com/docker/secrets-engine/secrets v1.0.0 h1:29fYA7dLYYN6dbyCoDUX7VVu0usZ8bKvpJolCbs8TAw=
 github.com/docker/secrets-engine/secrets v1.0.0/go.mod h1:xGWoZkaQpSd/PP5s8etspPkrs8Qa07jVblo2UEQZi5w=
-github.com/docker/secrets-engine/x v0.10.0 h1:8BjTRq4MkvCXNhmyORZ+Q9fJohH5hv7PLQu9qDzbwbA=
-github.com/docker/secrets-engine/x v0.10.0/go.mod h1:wmXg0qCNHtWU5YBohD2dNryjGdlGwJ/vSfpRo2QWSjQ=
 github.com/eclipse/paho.golang v0.24.0 h1:TcqZlyi9nBu1GhHeD9FPI0y8Lu2mSDRm0Wj/maWVVOw=
 github.com/eclipse/paho.golang v0.24.0/go.mod h1:UgP5muyv9x5gfkVksNCkg2lAWZs1vENy5sZ17IQePHw=
 github.com/elazarl/goproxy v1.7.2 h1:Y2o6urb7Eule09PjlhQRGNsqRfPmYI3KKQLFpCAV3+o=

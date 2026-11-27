@@ -12,7 +12,7 @@ require (
 	github.com/containerd/platforms v1.0.0-rc.5
 	github.com/distribution/reference v0.6.0
 	github.com/docker/cli v29.10.1+incompatible
-	github.com/docker/compose/v5 v5.8.0
+	github.com/docker/compose/v5 v5.8.1
 	github.com/docker/go-connections v0.8.2
 	github.com/go-git/go-git/v5 v5.19.3
 	github.com/gofiber/contrib/v3/swaggo v1.0.19
@@ -70,7 +70,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/docker/secrets-engine/client v1.0.0 // indirect
 	github.com/docker/secrets-engine/secrets v1.0.0 // indirect
-	github.com/docker/secrets-engine/x v0.10.0 // indirect
 	github.com/eclipse/paho.golang v0.24.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/fatih/structs v1.1.0 // indirect
